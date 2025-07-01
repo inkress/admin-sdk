@@ -15,7 +15,10 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "rollup -c",
@@ -35,9 +38,21 @@
     "sdk",
     "payments",
     "ecommerce",
-    "typescript"
+    "typescript",
+    "javascript",
+    "rest-api",
+    "client",
+    "admin",
+    "storefront",
+    "orders",
+    "products",
+    "merchants"
   ],
-  "author": "Inkress",
+  "author": {
+    "name": "Inkress",
+    "email": "dev@inkress.com",
+    "url": "https://inkress.com"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

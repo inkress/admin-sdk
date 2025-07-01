@@ -4,6 +4,7 @@ import {
   PublicMerchantFees,
   ApiResponse,
   PaginationParams,
+  PublicMerchant,
 } from '../types';
 
 export interface PublicProductListParams extends PaginationParams {
@@ -22,14 +23,26 @@ export interface PublicProductListResponse {
   };
 }
 
+export interface PublicMerchantParams {
+  username?: string;
+  'domain.cname'?: string;
+}
+
 export class PublicResource {
   constructor(private client: HttpClient) {}
 
   /**
+   * Get public information about a merchant by username or cname
+   */
+  async getMerchant(params: PublicMerchantParams): Promise<ApiResponse<PublicMerchant>> {
+    return this.client.get<PublicMerchant>(`/public/m`, params);
+  }
+  
+  /**
    * Get merchant fees (public endpoint - no auth required)
    */
-  async getMerchantFees(merchantUsername: string): Promise<ApiResponse<PublicMerchantFees>> {
-    return this.client.get<PublicMerchantFees>(`/public/m/${merchantUsername}/fees`);
+  async getMerchantFees(merchantUsername: string, params: { currency: string, total: number }): Promise<ApiResponse<PublicMerchantFees>> {
+    return this.client.get<PublicMerchantFees>(`/public/m/${merchantUsername}/fees`, params);
   }
 
   /**

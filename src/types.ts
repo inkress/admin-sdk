@@ -150,6 +150,50 @@ export interface UpdateMerchantData {
   about?: string;
 }
 
+export interface PublicMerchant {
+  id: number;
+  name: string;
+  username: string;
+  about?: string;
+  logo?: string;
+  sector?: string;
+  business_type?: string;
+  theme_colour?: string;
+  data?: any;
+}
+
+// Category types
+export interface Category {
+  id: number;
+  name: string;
+  description?: string | null;
+  kind: number;
+  kind_id?: number | null;
+  parent_id?: number | null;
+  parent?: {
+    id: number;
+    name: string;
+  } | null;
+  children?: {
+    id: number;
+    name: string;
+  }[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateCategoryData {
+  name: string;
+  description?: string;
+  kind: number;
+  kind_id?: number;
+  parent_id?: number;
+}
+
+export interface UpdateCategoryData extends Partial<Omit<CreateCategoryData, 'parent_id'>> {
+  // parent_id is immutable after creation
+}
+
 // Product types
 export interface Product {
   id: number;
@@ -169,10 +213,7 @@ export interface Product {
   data?: Record<string, any>;
   meta?: Record<string, any>;
   currency: Currency;
-  category?: {
-    id: number;
-    name: string;
-  };
+  category?: Category;
   merchant: Merchant;
   organisation: Organisation;
   created_at: string;

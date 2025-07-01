@@ -17,7 +17,7 @@ export class HttpClient {
       apiVersion: 'v1',
       clientId: '',
       timeout: 30000,
-      retries: 3,
+      retries: 0,
       headers: {},
       ...config,
     };

@@ -3,6 +3,7 @@ import { InkressConfig } from './types';
 
 // Import resources
 import { MerchantsResource } from './resources/merchants';
+import { CategoriesResource } from './resources/categories';
 import { OrdersResource } from './resources/orders';
 import { ProductsResource } from './resources/products';
 import { BillingPlansResource } from './resources/billing-plans';
@@ -27,6 +28,19 @@ import { PublicResource } from './resources/public';
  * // List merchants
  * const merchants = await inkress.merchants.list();
  * 
+ * // Get public merchant information (no auth required)
+ * const publicMerchant = await inkress.public.getMerchant({ username: 'merchant-username' });
+ * 
+ * // List categories
+ * const categories = await inkress.categories.list();
+ * 
+ * // Create a category
+ * const category = await inkress.categories.create({
+ *   name: 'Electronics',
+ *   description: 'Electronic devices and accessories',
+ *   kind: 1
+ * });
+ * 
  * // Create an order
  * const order = await inkress.orders.create({
  *   currency_code: 'USD',
@@ -45,6 +59,7 @@ export class InkressSDK {
   
   // Resource instances
   public readonly merchants: MerchantsResource;
+  public readonly categories: CategoriesResource;
   public readonly orders: OrdersResource;
   public readonly products: ProductsResource;
   public readonly billingPlans: BillingPlansResource;
@@ -57,6 +72,7 @@ export class InkressSDK {
     
     // Initialize resources
     this.merchants = new MerchantsResource(this.client);
+    this.categories = new CategoriesResource(this.client);
     this.orders = new OrdersResource(this.client);
     this.products = new ProductsResource(this.client);
     this.billingPlans = new BillingPlansResource(this.client);

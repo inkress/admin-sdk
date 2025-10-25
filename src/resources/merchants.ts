@@ -53,4 +53,33 @@ export class MerchantsResource {
   async update(id: number, data: UpdateMerchantData): Promise<ApiResponse<Merchant>> {
     return this.client.put<Merchant>(`/merchants/${id}`, data);
   }
+
+  /**
+   * Get merchant account balances
+   */
+  async balances(): Promise<ApiResponse> {
+    return this.client.post(`/merchants/account/balances`, {});
+  }
+
+  /**
+   * Get merchant subscription plan details
+   */
+  async subscription(): Promise<ApiResponse> {
+    return this.client.post(`/merchants/account/plan`, {});
+  }
+
+  /**
+   * Get list of merchant account invoices
+   */
+  async invoices(): Promise<ApiResponse> {
+    return this.client.post(`/merchants/account/invoices`, {});
+  }
+
+  /**
+   * Get a specific merchant invoice by ID
+   */
+  async invoice(invoiceId: string): Promise<ApiResponse> {
+    return this.client.post(`/merchants/account/invoice/${invoiceId}`, {});
+  }
+  
 }

@@ -10,6 +10,8 @@ import { BillingPlansResource } from './resources/billing-plans';
 import { SubscriptionsResource } from './resources/subscriptions';
 import { UsersResource } from './resources/users';
 import { PublicResource } from './resources/public';
+import { KycResource } from './resources/kyc';
+import { PayoutResource } from './resources/payout';
 
 /**
  * Main Inkress Commerce API SDK class
@@ -66,6 +68,8 @@ export class InkressSDK {
   public readonly subscriptions: SubscriptionsResource;
   public readonly users: UsersResource;
   public readonly public: PublicResource;
+  public readonly kyc: KycResource;
+  public readonly payout: PayoutResource;
 
   constructor(config: InkressConfig) {
     this.client = new HttpClient(config);
@@ -79,6 +83,8 @@ export class InkressSDK {
     this.subscriptions = new SubscriptionsResource(this.client);
     this.users = new UsersResource(this.client);
     this.public = new PublicResource(this.client);
+    this.kyc = new KycResource(this.client);
+    this.payout = new PayoutResource(this.client);
   }
 
   /**

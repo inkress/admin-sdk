@@ -376,6 +376,13 @@ class SubscriptionsResource {
         return this.client.get('/billing_subscriptions', params);
     }
     /**
+     * Gets a billing subscription by ID
+     * Requires Client-Id header to be set in the configuration
+     */
+    async get(id) {
+        return this.client.get(`/billing_subscriptions/${id}`);
+    }
+    /**
      * Create a subscription payment link
      * Requires Client-Id header to be set in the configuration
      */

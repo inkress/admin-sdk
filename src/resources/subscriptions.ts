@@ -29,7 +29,7 @@ export interface SubscriptionListResponse {
 export interface CreateSubscriptionLinkData {
   reference_id: string;
   title: string;
-  plan_id: string;
+  plan_uid: string;
   customer: {
     first_name: string;
     last_name: string;
@@ -83,6 +83,14 @@ export class SubscriptionsResource {
    */
   async list(params?: SubscriptionListParams): Promise<ApiResponse<SubscriptionListResponse>> {
     return this.client.get<SubscriptionListResponse>('/billing_subscriptions', params);
+  }
+
+  /**
+   * Gets a billing subscription by ID
+   * Requires Client-Id header to be set in the configuration
+   */
+  async get(id?: number): Promise<ApiResponse<Subscription>> {
+    return this.client.get<Subscription>(`/billing_subscriptions/${id}`);
   }
 
   /**

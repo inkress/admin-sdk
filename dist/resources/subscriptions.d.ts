@@ -18,7 +18,7 @@ export interface SubscriptionListResponse {
 export interface CreateSubscriptionLinkData {
     reference_id: string;
     title: string;
-    plan_id: string;
+    plan_uid: string;
     customer: {
         first_name: string;
         last_name: string;
@@ -65,6 +65,11 @@ export declare class SubscriptionsResource {
      * Requires Client-Id header to be set in the configuration
      */
     list(params?: SubscriptionListParams): Promise<ApiResponse<SubscriptionListResponse>>;
+    /**
+     * Gets a billing subscription by ID
+     * Requires Client-Id header to be set in the configuration
+     */
+    get(id?: number): Promise<ApiResponse<Subscription>>;
     /**
      * Create a subscription payment link
      * Requires Client-Id header to be set in the configuration

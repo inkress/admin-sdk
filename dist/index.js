@@ -183,6 +183,12 @@ class MerchantsResource {
         return this.client.post(`/merchants/account/balances`, {});
     }
     /**
+     * Get merchant account limits
+     */
+    async limits() {
+        return this.client.post(`/merchants/account/limits`, {});
+    }
+    /**
      * Get merchant subscription plan details
      */
     async subscription() {

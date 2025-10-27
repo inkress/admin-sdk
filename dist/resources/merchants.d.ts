@@ -38,6 +38,10 @@ export declare class MerchantsResource {
      */
     balances(): Promise<ApiResponse>;
     /**
+     * Get merchant account limits
+     */
+    limits(): Promise<ApiResponse>;
+    /**
      * Get merchant subscription plan details
      */
     subscription(): Promise<ApiResponse>;

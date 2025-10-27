@@ -62,6 +62,13 @@ export class MerchantsResource {
   }
 
   /**
+   * Get merchant account limits
+   */
+  async limits(): Promise<ApiResponse> {
+    return this.client.post(`/merchants/account/limits`, {});
+  }
+
+  /**
    * Get merchant subscription plan details
    */
   async subscription(): Promise<ApiResponse> {

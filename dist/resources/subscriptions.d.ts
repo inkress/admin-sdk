@@ -26,11 +26,12 @@ export interface CreateSubscriptionLinkData {
     };
 }
 export interface CreateSubscriptionLinkResponse {
-    id: number;
-    payment_urls: {
-        short_link: string;
-    };
-    subscription: Subscription;
+    status: 'paid';
+    total: number;
+    reference: string;
+    currency: string;
+    subscription_status: string;
+    subscription_uid: string;
 }
 export interface ChargeSubscriptionData {
     reference_id: string;

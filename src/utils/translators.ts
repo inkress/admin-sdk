@@ -43,6 +43,7 @@ export const FeeStructureTranslator = {
   toString(value: FeeStructureValue): FeeStructureKey {
     const key = reverseFeeStructure[value];
     if (!key) {
+      return '';
       throw new Error(`Unknown fee structure value: ${value}`);
     }
     return key;
@@ -83,6 +84,7 @@ export const KindTranslator = {
       return mappings.Kind[key as KindKey];
     }
     
+    return 0;
     throw new Error(`Unknown kind value: ${key} (tried with context: ${fullKey})`);
   },
 
@@ -92,6 +94,7 @@ export const KindTranslator = {
   toString(value: KindValue): KindKey {
     const key = reverseKind[value];
     if (!key) {
+      return '';
       throw new Error(`Unknown kind value: ${value}`);
     }
     return key;
@@ -163,6 +166,7 @@ export const StatusTranslator = {
       return mappings.Status[key as StatusKey];
     }
     
+    return 0;
     throw new Error(`Unknown status value: ${key} (tried with context: ${fullKey})`);
   },
 
@@ -172,6 +176,7 @@ export const StatusTranslator = {
   toString(value: StatusValue): StatusKey {
     const key = reverseStatus[value];
     if (!key) {
+      return '';
       throw new Error(`Unknown status value: ${value}`);
     }
     return key;
@@ -233,6 +238,7 @@ export const AccessTranslator = {
   toString(value: AccessValue): AccessKey {
     const key = reverseAccess[value];
     if (!key) {
+      return '';
       throw new Error(`Unknown access value: ${value}`);
     }
     return key;
@@ -257,6 +263,7 @@ export const createTranslator = <T extends Record<string, number>>(mapping: T) =
     toString: (value: T[keyof T]): keyof T => {
       const key = reverse[value];
       if (!key) {
+        return '';
         throw new Error(`Unknown value: ${value}`);
       }
       return key;

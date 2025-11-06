@@ -343,7 +343,7 @@ const FeeStructureTranslator = {
     toString(value) {
         const key = reverseFeeStructure[value];
         if (!key) {
-            throw new Error(`Unknown fee structure value: ${value}`);
+            return '';
         }
         return key;
     },
@@ -377,7 +377,7 @@ const KindTranslator = {
         if (mappings.Kind[key] !== undefined) {
             return mappings.Kind[key];
         }
-        throw new Error(`Unknown kind value: ${key} (tried with context: ${fullKey})`);
+        return 0;
     },
     /**
      * Convert integer to string for user display
@@ -385,7 +385,7 @@ const KindTranslator = {
     toString(value) {
         const key = reverseKind[value];
         if (!key) {
-            throw new Error(`Unknown kind value: ${value}`);
+            return '';
         }
         return key;
     },
@@ -445,7 +445,7 @@ const StatusTranslator = {
         if (mappings.Status[key] !== undefined) {
             return mappings.Status[key];
         }
-        throw new Error(`Unknown status value: ${key} (tried with context: ${fullKey})`);
+        return 0;
     },
     /**
      * Convert integer to string for user display
@@ -453,7 +453,7 @@ const StatusTranslator = {
     toString(value) {
         const key = reverseStatus[value];
         if (!key) {
-            throw new Error(`Unknown status value: ${value}`);
+            return '';
         }
         return key;
     },

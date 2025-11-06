@@ -153,7 +153,7 @@ export interface BaseFilterParams extends PaginationParams {
   distinct?: string;
   /** Override page behavior */
   override_page?: string | boolean;
-  [key: string]: any;
+  // [key: string]: any;
 }
 
 export interface PaginatedResponse<T> {

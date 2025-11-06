@@ -1,9 +1,28 @@
 import { HttpClient } from '../client';
-import { Product, PublicMerchantFees, ApiResponse, PaginationParams, PublicMerchant } from '../types';
-export interface PublicProductListParams extends PaginationParams {
+import { Product, PublicMerchantFees, ApiResponse, BaseFilterParams, PublicMerchant } from '../types';
+export interface PublicProductFilterParams extends BaseFilterParams {
     search?: string;
     category?: string;
     limit?: number;
+    id?: number;
+    title?: string;
+    teaser?: string;
+    price?: number;
+    permalink?: string;
+    image?: string;
+    public?: boolean;
+    unlimited?: boolean;
+    units_remaining?: number;
+    units_sold?: number;
+    rating_sum?: number;
+    rating_count?: number;
+    tag_ids?: number[];
+    uid?: string;
+    category_id?: number;
+    currency_id?: number;
+    user_id?: number;
+    inserted_at?: string;
+    updated_at?: string;
 }
 export interface PublicProductListResponse {
     entries: Product[];
@@ -35,6 +54,6 @@ export declare class PublicResource {
     /**
      * Get merchant products (public endpoint - no auth required)
      */
-    getMerchantProducts(merchantUsername: string, params?: PublicProductListParams): Promise<ApiResponse<PublicProductListResponse>>;
+    getMerchantProducts(merchantUsername: string, params?: PublicProductFilterParams): Promise<ApiResponse<PublicProductListResponse>>;
 }
 //# sourceMappingURL=public.d.ts.map

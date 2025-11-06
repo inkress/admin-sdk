@@ -1,15 +1,34 @@
 import { HttpClient } from '../client';
 import {
-  Product,
+  PayoutRequest,
+  CreatePayoutRequestData,
+  UpdatePayoutRequestData,
   ApiResponse,
-  PaginationParams,
-  // CreatePayoutRequestData,
-  // PayoutRequest,
+  BaseFilterParams,
 } from '../types';
 
-export interface PayoutRequestListParams extends PaginationParams {
+export interface PayoutRequestFilterParams extends BaseFilterParams {
+  // Common filters (note: 'q' field is available for general search via BaseFilterParams)
   status?: number;
   requester_id?: number;
+  limit?: number;
+  
+  // Database field filters - any field from the ledger_payouts table can be filtered
+  id?: number;
+  total?: number;
+  balance_on_request?: number;
+  reference_id?: string;
+  evidence_file_id?: number;
+  merchant_id?: number;
+  type?: number;
+  sub_type?: number;
+  reviewer_id?: number;
+  reviewed_at?: string;
+  due_at?: string;
+  fee_total?: number;
+  currency_id?: number;
+  inserted_at?: string;
+  updated_at?: string;
 }
 
 export interface PayoutRequestListResponse {
@@ -45,29 +64,6 @@ export interface BankInfoUpdateRequestData {
   swift_code?: string;
 }
 
-export interface CreatePayoutRequestData {
-  total: number;
-  type: 'standard' | 'early';
-}
-
-export interface PayoutRequest {
-  total: number;
-  type: 'standard';
-  status: number;
-  fee_total: number;
-  reference_id: string;
-  reviewed_at: string;
-  due_at: string;
-  reviewer?: any;
-  requester: any;
-  currency?: any;
-  merchant?: any;
-  bank_account?: any;
-  evidence_file?: any;
-  inserted_at: string;
-  updated_at: string;
-}
-
 export class PayoutResource {
   constructor(private client: HttpClient) {}
 
@@ -75,7 +71,7 @@ export class PayoutResource {
    * List payout requests with pagination and filtering
    * Requires Client-Id header to be set in the configuration
    */
-  async list(params?: PayoutRequestListParams): Promise<ApiResponse<PayoutRequestListResponse>> {
+  async list(params?: PayoutRequestFilterParams): Promise<ApiResponse<PayoutRequestListResponse>> {
     return this.client.get<PayoutRequestListResponse>('/ledger_payouts', params);
   }
 

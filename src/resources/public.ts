@@ -3,14 +3,36 @@ import {
   Product,
   PublicMerchantFees,
   ApiResponse,
-  PaginationParams,
+  BaseFilterParams,
   PublicMerchant,
 } from '../types';
 
-export interface PublicProductListParams extends PaginationParams {
-  search?: string;
+export interface PublicProductFilterParams extends BaseFilterParams {
+  // Common filters
+  search?: string; // Legacy search field - consider using 'q' instead
   category?: string;
   limit?: number;
+  
+  // Database field filters - any field from the products table can be filtered
+  id?: number;
+  title?: string;
+  teaser?: string;
+  price?: number;
+  permalink?: string;
+  image?: string;
+  public?: boolean;
+  unlimited?: boolean;
+  units_remaining?: number;
+  units_sold?: number;
+  rating_sum?: number;
+  rating_count?: number;
+  tag_ids?: number[];
+  uid?: string;
+  category_id?: number;
+  currency_id?: number;
+  user_id?: number;
+  inserted_at?: string;
+  updated_at?: string;
 }
 
 export interface PublicProductListResponse {
@@ -50,7 +72,7 @@ export class PublicResource {
    */
   async getMerchantProducts(
     merchantUsername: string, 
-    params?: PublicProductListParams
+    params?: PublicProductFilterParams
   ): Promise<ApiResponse<PublicProductListResponse>> {
     return this.client.get<PublicProductListResponse>(`/public/m/${merchantUsername}/products`, params);
   }

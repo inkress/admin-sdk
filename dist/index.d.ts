@@ -77,4 +77,6 @@ export declare class InkressSDK {
 export * from './types';
 export * from './client';
 export { InkressSDK as default };
+export { processQuery, QueryBuilder, type QueryParams, type RangeQuery, type StringQuery, type DateQuery, type JsonQueryParams, } from './utils/query-transformer';
+export { OrderQueryBuilder } from './resources/orders';
 //# sourceMappingURL=index.d.ts.map

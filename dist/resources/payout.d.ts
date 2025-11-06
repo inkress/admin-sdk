@@ -1,8 +1,24 @@
 import { HttpClient } from '../client';
-import { ApiResponse, PaginationParams } from '../types';
-export interface PayoutRequestListParams extends PaginationParams {
+import { PayoutRequest, CreatePayoutRequestData, ApiResponse, BaseFilterParams } from '../types';
+export interface PayoutRequestFilterParams extends BaseFilterParams {
     status?: number;
     requester_id?: number;
+    limit?: number;
+    id?: number;
+    total?: number;
+    balance_on_request?: number;
+    reference_id?: string;
+    evidence_file_id?: number;
+    merchant_id?: number;
+    type?: number;
+    sub_type?: number;
+    reviewer_id?: number;
+    reviewed_at?: string;
+    due_at?: string;
+    fee_total?: number;
+    currency_id?: number;
+    inserted_at?: string;
+    updated_at?: string;
 }
 export interface PayoutRequestListResponse {
     entries: PayoutRequest[];
@@ -33,27 +49,6 @@ export interface BankInfoUpdateRequestData {
     routing_number?: string;
     swift_code?: string;
 }
-export interface CreatePayoutRequestData {
-    total: number;
-    type: 'standard' | 'early';
-}
-export interface PayoutRequest {
-    total: number;
-    type: 'standard';
-    status: number;
-    fee_total: number;
-    reference_id: string;
-    reviewed_at: string;
-    due_at: string;
-    reviewer?: any;
-    requester: any;
-    currency?: any;
-    merchant?: any;
-    bank_account?: any;
-    evidence_file?: any;
-    inserted_at: string;
-    updated_at: string;
-}
 export declare class PayoutResource {
     private client;
     constructor(client: HttpClient);
@@ -61,7 +56,7 @@ export declare class PayoutResource {
      * List payout requests with pagination and filtering
      * Requires Client-Id header to be set in the configuration
      */
-    list(params?: PayoutRequestListParams): Promise<ApiResponse<PayoutRequestListResponse>>;
+    list(params?: PayoutRequestFilterParams): Promise<ApiResponse<PayoutRequestListResponse>>;
     /**
      * Get a specific payout request by ID
      * Requires Client-Id header to be set in the configuration

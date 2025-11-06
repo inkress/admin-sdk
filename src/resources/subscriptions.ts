@@ -7,13 +7,38 @@ import {
   SubscriptionChargeData,
   ApiResponse,
   PaginationParams,
+  BaseFilterParams,
+  SubscriptionStatus,
 } from '../types';
+import {
+  StatusTranslator,
+  KindTranslator,
+  StatusKey,
+  KindKey,
+} from '../utils/translators';
 
-export interface SubscriptionListParams extends PaginationParams {
-  status?: number; // 1=pending, 2=active, 3=cancelled
+export interface SubscriptionListParams extends BaseFilterParams {
+  // Common filters (note: 'q' field is available for general search via BaseFilterParams)
+  status?: SubscriptionStatus | StatusKey | number; // Accept contextual, full string, and integer for compatibility
   billing_plan_id?: number;
   customer_id?: number;
   limit?: number;
+  
+  // Database field filters - any field from the billing_subscriptions table can be filtered
+  id?: number;
+  record_id?: number;
+  record?: string;
+  start_date?: string;
+  end_date?: string;
+  current_period_start?: string;
+  current_period_end?: string;
+  trial_end?: string;
+  canceled_at?: string;
+  uid?: string;
+  kind?: number;
+  token?: string;
+  inserted_at?: string;
+  updated_at?: string;
 }
 
 export interface SubscriptionListResponse {
@@ -79,11 +104,27 @@ export class SubscriptionsResource {
   constructor(private client: HttpClient) {}
 
   /**
+   * Convert filter parameters (strings to integers where needed)
+   */
+  private translateFilters(params?: SubscriptionListParams): any {
+    if (!params) return params;
+    
+    const translated: any = { ...params };
+    
+    if (params.status && typeof params.status === 'string') {
+      translated.status = StatusTranslator.toIntegerWithContext(params.status as SubscriptionStatus | StatusKey, 'billing_subscription');
+    }
+    
+    return translated;
+  }
+
+  /**
    * List billing subscriptions with pagination and filtering
    * Requires Client-Id header to be set in the configuration
    */
   async list(params?: SubscriptionListParams): Promise<ApiResponse<SubscriptionListResponse>> {
-    return this.client.get<SubscriptionListResponse>('/billing_subscriptions', params);
+    const translatedParams = this.translateFilters(params);
+    return this.client.get<SubscriptionListResponse>('/billing_subscriptions', translatedParams);
   }
 
   /**

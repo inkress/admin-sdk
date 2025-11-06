@@ -147,12 +147,18 @@ await inkress.merchants.update(merchantId, { name: 'New Name' });
 ### Products Resource
 
 ```typescript
-// List products with pagination and filtering
+// List products with contextual filtering
 await inkress.products.list({
   page: 1,
   per_page: 50,
+  status: 'published',  // Contextual: 'published' instead of 'product_published'
   category_id: 1,
-  search: 'laptop'
+  q: 'laptop'  // General search across multiple fields
+});
+
+// Alternative: use legacy search field
+await inkress.products.list({
+  search: 'laptop'  // Legacy search field
 });
 
 // Get product details
@@ -166,8 +172,11 @@ await inkress.products.create({
   category_id: 1
 });
 
-// Update product
-await inkress.products.update(productId, { price: 1199.99 });
+// Update product with contextual status
+await inkress.products.update(productId, { 
+  price: 1199.99,
+  status: 'published'  // Contextual: 'published' instead of 'product_published'
+});
 
 // Delete product
 await inkress.products.delete(productId);
@@ -176,17 +185,19 @@ await inkress.products.delete(productId);
 ### Categories Resource
 
 ```typescript
-// List categories
-await inkress.categories.list({ kind: 1 });
+// List categories with contextual filtering
+await inkress.categories.list({ 
+  kind: 'published'  // Contextual: 'published' instead of 'product_published'
+});
 
 // Get category details
 await inkress.categories.get(categoryId);
 
-// Create category
+// Create category with contextual kind
 await inkress.categories.create({
   name: 'Electronics',
   description: 'Electronic devices',
-  kind: 1
+  kind: 'published'  // Contextual: 'published' instead of 'product_published'
 });
 
 // Update category
@@ -199,7 +210,7 @@ await inkress.categories.delete(categoryId);
 ### Orders Resource
 
 ```typescript
-// Create an order
+// Create an order with contextual strings
 await inkress.orders.create({
   currency_code: 'USD',
   customer: {
@@ -209,41 +220,64 @@ await inkress.orders.create({
   },
   total: 99.99,
   reference_id: 'order-123',
-  kind: 'online'
+  kind: 'online',      // Contextual: 'online' instead of 'order_online'
+  status: 'pending'    // Contextual: 'pending' instead of 'order_pending'
 });
 
 // Get order details
 await inkress.orders.get(orderId);
 
-// Update order status
-await inkress.orders.update(orderId, { status: 2 });
+// Update order status using contextual strings
+await inkress.orders.update(orderId, { 
+  status: 'confirmed'  // Contextual: 'confirmed' instead of 'order_confirmed'
+});
+
+// List orders with contextual filtering
+await inkress.orders.list({
+  status: 'shipped',   // Contextual: 'shipped' instead of 'order_shipped'
+  kind: 'online',      // Contextual: 'online' instead of 'order_online'
+  q: 'electronics'
+});
+
+// Backward compatibility - integers and full strings still work
+await inkress.orders.list({
+  status: 2,                    // Integer still works
+  kind: 'order_subscription',   // Full string still works
+  q: 'monthly'
+});
 
 // Get order status (public endpoint)
 await inkress.orders.getStatus(orderId);
-
-// List orders
-await inkress.orders.list();
 ```
 
 ### Users Resource
 
 ```typescript
-// List users
-await inkress.users.list();
+// List users with contextual filtering
+await inkress.users.list({
+  status: 'approved',     // Contextual: 'approved' instead of 'account_approved'
+  kind: 'organisation',   // Contextual: 'organisation' instead of 'user_organisation'
+  q: 'admin'
+});
 
 // Get user details
 await inkress.users.get(userId);
 
-// Create user
+// Create user with contextual values
 await inkress.users.create({
   email: 'user@example.com',
   first_name: 'John',
   last_name: 'Doe',
-  role: 'customer'
+  password: 'secure-password',
+  status: 'pending',      // Contextual: 'pending' instead of 'account_pending'
+  kind: 'organisation'    // Contextual: 'organisation' instead of 'user_organisation'
 });
 
-// Update user
-await inkress.users.update(userId, { first_name: 'Jane' });
+// Update user with contextual status
+await inkress.users.update(userId, { 
+  first_name: 'Jane',
+  status: 'approved'      // Contextual: 'approved' instead of 'account_approved'
+});
 
 // Delete user
 await inkress.users.delete(userId);
@@ -284,6 +318,220 @@ await inkress.subscriptions.create({
     last_name: 'Doe'
   }
 });
+```
+
+## Advanced Query System
+
+The SDK includes a powerful type-based query system that automatically transforms clean, intuitive queries into the API-compatible format:
+
+### Query Types
+
+```typescript
+// Import query system
+import { InkressSDK, QueryParams, RangeQuery } from '@inkress/admin-sdk';
+
+// Simple equality queries
+await inkress.orders.query({
+  status: 'confirmed',     // Direct value → equality
+  kind: 'online'
+});
+
+// Array queries (IN operations)
+await inkress.orders.query({
+  status: ['confirmed', 'shipped'],  // Array → _in suffix
+  id: [1, 2, 3, 4]
+});
+
+// Range queries (min/max)
+await inkress.orders.query({
+  total: { min: 100, max: 1000 },   // Range → _min/_max suffixes
+  inserted_at: { after: '2024-01-01', before: '2024-12-31' }
+});
+
+// String search queries
+await inkress.orders.query({
+  reference_id: { contains: 'ORDER-2024' }  // String → contains. prefix
+});
+
+// Combined complex queries
+await inkress.orders.query({
+  status: ['confirmed', 'shipped'],
+  total: { min: 50 },
+  reference_id: { contains: 'MOBILE' },
+  inserted_at: { after: '2024-10-01' },
+  customer_id: 123,
+  page: 1,
+  page_size: 20,
+  q: 'electronics'
+});
+```
+
+### Query Builder Pattern
+
+For complex queries, use the fluent query builder:
+
+```typescript
+const orders = await inkress.orders
+  .createQueryBuilder()
+  .whereStatus('confirmed')
+  .whereKind(['online', 'subscription'])
+  .whereTotalRange(100, 1000)
+  .whereReferenceContains('PREMIUM')
+  .whereCreatedBetween('2024-01-01', '2024-12-31')
+  .paginate(1, 20)
+  .orderBy('inserted_at', 'desc')
+  .search('laptop')
+  .execute();
+```
+
+### Query Transformation Examples
+
+The SDK automatically transforms your clean queries:
+
+```typescript
+// You write:
+{ status: ['confirmed', 'shipped'], total: { min: 100 } }
+
+// SDK transforms to:
+{ status_in: [4, 7], total_min: 100 }
+
+// You write:
+{ reference_id: { contains: 'ORDER' }, inserted_at: { after: '2024-01-01' } }
+
+// SDK transforms to:
+{ "contains.reference_id": "ORDER", "after.inserted_at": "2024-01-01" }
+```
+
+### Available Query Operations
+
+| Operation | Input | API Output | Description |
+|-----------|-------|------------|-------------|
+| Equality | `field: value` | `field: value` | Direct equality match |
+| Array/IN | `field: [1,2,3]` | `field_in: [1,2,3]` | Value in array |
+| Range Min | `field: {min: 10}` | `field_min: 10` | Minimum value |
+| Range Max | `field: {max: 100}` | `field_max: 100` | Maximum value |
+| Contains | `field: {contains: 'text'}` | `"contains.field": "text"` | String contains |
+| Date After | `field: {after: 'date'}` | `"after.field": "date"` | Date after |
+| Date Before | `field: {before: 'date'}` | `"before.field": "date"` | Date before |
+| Date On | `field: {on: 'date'}` | `"on.field": "date"` | Exact date |
+
+## Search and Filtering
+
+All list operations support comprehensive search and filtering capabilities:
+
+### General Search with `q`
+
+Use the `q` parameter for intelligent searching across multiple relevant fields:
+
+```typescript
+// Search merchants - searches name, email, username, etc.
+await inkress.merchants.list({ q: 'john smith' });
+
+// Search products - searches title, description, etc.
+await inkress.products.list({ q: 'gaming laptop' });
+
+// Search orders - searches reference ID, customer details, etc.
+await inkress.orders.list({ q: 'ORDER-12345' });
+```
+
+### String-Based Status and Kind Values
+
+The SDK now supports human-readable string values instead of hard-to-remember integers:
+
+```typescript
+// ✅ NEW: Use descriptive strings
+await inkress.merchants.list({
+  status: 'account_approved',           // Instead of remembering "2"
+  platform_fee_structure: 'customer_pay',  // Instead of remembering "1"
+  q: 'electronics'
+});
+
+// ✅ NEW: Filter orders with readable values
+await inkress.orders.list({
+  status: 'order_confirmed',   // Instead of "4"
+  kind: 'order_online',        // Instead of "1"
+  q: 'laptop'
+});
+
+// ✅ NEW: Filter products by status
+await inkress.products.list({
+  status: 'product_published',  // Instead of "2"
+  q: 'smartphone'
+});
+
+// ✅ Backward compatible: integers still work
+await inkress.merchants.list({
+  status: 2,                    // Still works for backward compatibility
+  platform_fee_structure: 1    // Still works
+});
+```
+
+### Available String Values
+
+**Status Values:**
+- Orders: `order_pending`, `order_confirmed`, `order_shipped`, `order_delivered`, `order_cancelled`, etc.
+- Accounts: `account_pending`, `account_approved`, `account_suspended`, etc.
+- Products: `product_draft`, `product_published`, `product_archived`
+- Transactions: `transaction_pending`, `transaction_authorized`, `transaction_captured`, etc.
+
+**Kind Values:**
+- Orders: `order_online`, `order_offline`, `order_subscription`, `order_invoice`
+- Products: `product_draft`, `product_published`, `product_archived`
+- Users: `user_address`, `role_organisation`, `role_store`
+- Billing: `billing_plan_subscription`, `billing_plan_payout`
+
+**Fee Structure Values:**
+- `customer_pay` - Customer pays the fees
+- `merchant_absorb` - Merchant absorbs the fees
+
+### Database Field Filtering
+
+Filter by any database field for precise results:
+
+```typescript
+// Filter products by specific criteria
+await inkress.products.list({
+  status: 'product_published',  // Published only (string format)
+  category_id: 5,               // Specific category
+  price: 1000,                 // Exact price
+  unlimited: true,             // Unlimited quantity
+  inserted_at: '2024-01-01'    // Created after date
+});
+
+// Filter merchants by organization
+await inkress.merchants.list({
+  organisation_id: 123,
+  status: 'account_approved',
+  platform_fee_structure: 'customer_pay'
+});
+```
+
+### Combining Search and Filters
+
+Mix general search with specific filters for powerful queries:
+
+```typescript
+await inkress.products.list({
+  q: 'phone',                    // General search
+  status: 'product_published',   // Published only
+  category_id: 5,               // Electronics category
+  page: 1,                      // Pagination
+  per_page: 20,                 // Results per page
+  sort: 'price',                // Sort by price
+  order: 'desc'                 // Descending order
+});
+```
+
+### Legacy Search Field
+
+Many resources still support the legacy `search` field for backward compatibility:
+
+```typescript
+// Legacy approach (still works)
+await inkress.products.list({ search: 'laptop' });
+
+// Recommended approach
+await inkress.products.list({ q: 'laptop' });
 ```
 
 ## Error Handling

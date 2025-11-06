@@ -1,10 +1,25 @@
 import { HttpClient } from '../client';
-import { Subscription, SubscriptionPeriod, ApiResponse, PaginationParams } from '../types';
-export interface SubscriptionListParams extends PaginationParams {
-    status?: number;
+import { Subscription, SubscriptionPeriod, ApiResponse, PaginationParams, BaseFilterParams, SubscriptionStatus } from '../types';
+import { StatusKey } from '../utils/translators';
+export interface SubscriptionListParams extends BaseFilterParams {
+    status?: SubscriptionStatus | StatusKey | number;
     billing_plan_id?: number;
     customer_id?: number;
     limit?: number;
+    id?: number;
+    record_id?: number;
+    record?: string;
+    start_date?: string;
+    end_date?: string;
+    current_period_start?: string;
+    current_period_end?: string;
+    trial_end?: string;
+    canceled_at?: string;
+    uid?: string;
+    kind?: number;
+    token?: string;
+    inserted_at?: string;
+    updated_at?: string;
 }
 export interface SubscriptionListResponse {
     entries: Subscription[];
@@ -61,6 +76,10 @@ export interface SubscriptionPeriodsResponse {
 export declare class SubscriptionsResource {
     private client;
     constructor(client: HttpClient);
+    /**
+     * Convert filter parameters (strings to integers where needed)
+     */
+    private translateFilters;
     /**
      * List billing subscriptions with pagination and filtering
      * Requires Client-Id header to be set in the configuration

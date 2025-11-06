@@ -4,14 +4,30 @@ import {
   CreateCategoryData,
   UpdateCategoryData,
   ApiResponse,
-  PaginationParams,
+  BaseFilterParams,
+  InternalCategory,
+  CategoryKind,
 } from '../types';
+import {
+  KindTranslator,
+  KindKey,
+} from '../utils/translators';
 
-export interface CategoryListParams extends PaginationParams {
-  search?: string;
-  kind?: number;
+export interface CategoryFilterParams extends BaseFilterParams {
+  // Common filters
+  search?: string; // Legacy search field - consider using 'q' instead
+  kind?: CategoryKind | KindKey | number; // Accept contextual, full, and integer values
   parent_id?: number;
   limit?: number;
+  
+  // Database field filters - any field from the categories table can be filtered
+  id?: number;
+  name?: string;
+  description?: string;
+  kind_id?: number;
+  uid?: string;
+  inserted_at?: string;
+  updated_at?: string;
 }
 
 export interface CategoryListResponse {
@@ -28,11 +44,82 @@ export class CategoriesResource {
   constructor(private client: HttpClient) {}
 
   /**
+   * Convert internal category data (integers) to user-facing data (strings)
+   */
+  private translateCategoryToUserFacing(internal: InternalCategory): Category {
+    return {
+      ...internal,
+      kind: KindTranslator.toStringWithoutContext(internal.kind, 'product') as CategoryKind,
+    };
+  }
+
+  /**
+   * Convert user-facing category data (strings) to internal data (integers)
+   */
+  private translateCategoryToInternal(userFacing: CreateCategoryData | UpdateCategoryData): any {
+    const internal: any = { ...userFacing };
+    
+    if ('kind' in userFacing && userFacing.kind) {
+      if (typeof userFacing.kind === 'string') {
+        internal.kind = KindTranslator.toIntegerWithContext(userFacing.kind as CategoryKind | KindKey, 'product');
+      } else {
+        internal.kind = userFacing.kind;
+      }
+    }
+    
+    return internal;
+  }
+
+  /**
+   * Convert filter parameters (strings to integers where needed)
+   */
+  private translateFilters(params?: CategoryFilterParams): any {
+    if (!params) return params;
+    
+    const translated: any = { ...params };
+    
+    if (params.kind && typeof params.kind === 'string') {
+      translated.kind = KindTranslator.toIntegerWithContext(params.kind as CategoryKind | KindKey, 'product');
+    }
+    
+    return translated;
+  }
+
+  /**
    * List categories with pagination and filtering
    * Requires Client-Id header to be set in the configuration
    */
-  async list(params?: CategoryListParams): Promise<ApiResponse<CategoryListResponse>> {
-    return this.client.get<CategoryListResponse>('/categories', params);
+  async list(params?: CategoryFilterParams): Promise<ApiResponse<CategoryListResponse>> {
+    const translatedParams = this.translateFilters(params);
+    const response = await this.client.get<{ entries: InternalCategory[]; page_info: any }>('/categories', translatedParams);
+    
+    if (response.data?.entries) {
+      const translatedEntries = response.data.entries.map(category => this.translateCategoryToUserFacing(category));
+      return {
+        state: response.state,
+        data: {
+          entries: translatedEntries,
+          page_info: response.data.page_info
+        }
+      };
+    }
+    
+    if (response.result?.entries) {
+      const translatedEntries = response.result.entries.map(category => this.translateCategoryToUserFacing(category));
+      return {
+        state: response.state,
+        result: {
+          entries: translatedEntries,
+          page_info: response.result.page_info
+        }
+      };
+    }
+    
+    return {
+      state: response.state,
+      data: response.data as any,
+      result: response.result as any
+    };
   }
 
   /**
@@ -40,7 +127,29 @@ export class CategoriesResource {
    * Requires Client-Id header to be set in the configuration
    */
   async get(id: number): Promise<ApiResponse<Category>> {
-    return this.client.get<Category>(`/categories/${id}`);
+    const response = await this.client.get<InternalCategory>(`/categories/${id}`);
+    
+    if (response.data) {
+      const translatedCategory = this.translateCategoryToUserFacing(response.data);
+      return {
+        state: response.state,
+        data: translatedCategory
+      };
+    }
+    
+    if (response.result) {
+      const translatedCategory = this.translateCategoryToUserFacing(response.result);
+      return {
+        state: response.state,
+        result: translatedCategory
+      };
+    }
+    
+    return {
+      state: response.state,
+      data: response.data as any,
+      result: response.result as any
+    };
   }
 
   /**
@@ -48,7 +157,30 @@ export class CategoriesResource {
    * Requires Client-Id header to be set in the configuration
    */
   async create(data: CreateCategoryData): Promise<ApiResponse<Category>> {
-    return this.client.post<Category>('/categories', data);
+    const internalData = this.translateCategoryToInternal(data);
+    const response = await this.client.post<InternalCategory>('/categories', internalData);
+    
+    if (response.data) {
+      const translatedCategory = this.translateCategoryToUserFacing(response.data);
+      return {
+        state: response.state,
+        data: translatedCategory
+      };
+    }
+    
+    if (response.result) {
+      const translatedCategory = this.translateCategoryToUserFacing(response.result);
+      return {
+        state: response.state,
+        result: translatedCategory
+      };
+    }
+    
+    return {
+      state: response.state,
+      data: response.data as any,
+      result: response.result as any
+    };
   }
 
   /**
@@ -57,7 +189,30 @@ export class CategoriesResource {
    * Note: parent_id is immutable and cannot be changed after creation
    */
   async update(id: number, data: UpdateCategoryData): Promise<ApiResponse<Category>> {
-    return this.client.put<Category>(`/categories/${id}`, data);
+    const internalData = this.translateCategoryToInternal(data);
+    const response = await this.client.put<InternalCategory>(`/categories/${id}`, internalData);
+    
+    if (response.data) {
+      const translatedCategory = this.translateCategoryToUserFacing(response.data);
+      return {
+        state: response.state,
+        data: translatedCategory
+      };
+    }
+    
+    if (response.result) {
+      const translatedCategory = this.translateCategoryToUserFacing(response.result);
+      return {
+        state: response.state,
+        result: translatedCategory
+      };
+    }
+    
+    return {
+      state: response.state,
+      data: response.data as any,
+      result: response.result as any
+    };
   }
 
   /**

@@ -1,9 +1,13 @@
 import { HttpClient } from '../client';
-import { ApiResponse, PaginationParams } from '../types';
-export interface KycRequestListParams extends PaginationParams {
+import { ApiResponse, BaseFilterParams } from '../types';
+export interface KycRequestListParams extends BaseFilterParams {
     status?: number;
     subject_id?: number;
     user_id?: number;
+    id?: number;
+    kind?: number;
+    inserted_at?: string;
+    updated_at?: string;
 }
 export interface KycRequestListResponse {
     entries: KycRequest[];

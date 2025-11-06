@@ -106,3 +106,17 @@ export class InkressSDK {
 export * from './types';
 export * from './client';
 export { InkressSDK as default };
+
+// Export query system utilities and types
+export {
+  processQuery,
+  QueryBuilder,
+  type QueryParams,
+  type RangeQuery,
+  type StringQuery,
+  type DateQuery,
+  type JsonQueryParams,
+} from './utils/query-transformer';
+
+// Export resource query builders
+export { OrderQueryBuilder } from './resources/orders';

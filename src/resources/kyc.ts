@@ -3,14 +3,22 @@ import {
   Product,
   ApiResponse,
   PaginationParams,
+  BaseFilterParams,
   // CreateKycRequestData,
   // KycRequest,
 } from '../types';
 
-export interface KycRequestListParams extends PaginationParams {
+export interface KycRequestListParams extends BaseFilterParams {
+  // Common filters (note: 'q' field is available for general search via BaseFilterParams)
   status?: number;
   subject_id?: number;
   user_id?: number;
+  
+  // Database field filters - any field from the legal_requests table can be filtered
+  id?: number;
+  kind?: number;
+  inserted_at?: string;
+  updated_at?: string;
 }
 
 export interface KycRequestListResponse {

@@ -1,9 +1,30 @@
 import { HttpClient } from '../client';
-import { Merchant, CreateMerchantData, UpdateMerchantData, ApiResponse, PaginationParams } from '../types';
-export interface MerchantListParams extends PaginationParams {
+import { Merchant, CreateMerchantData, UpdateMerchantData, ApiResponse, BaseFilterParams, AccountStatus } from '../types';
+import { StatusKey, FeeStructureKey } from '../utils/translators';
+export interface MerchantFilterParams extends BaseFilterParams {
     search?: string;
-    status?: number;
+    status?: AccountStatus | StatusKey | number;
     limit?: number;
+    id?: number;
+    name?: string;
+    email?: string;
+    username?: string;
+    about?: string;
+    logo?: string;
+    sector?: string;
+    phone?: string;
+    business_type?: string;
+    theme_colour?: string;
+    uid?: string;
+    address_id?: number;
+    owner_id?: number;
+    domain_id?: number;
+    organisation_id?: number;
+    platform_fee_structure?: FeeStructureKey | number;
+    provider_fee_structure?: FeeStructureKey | number;
+    parent_merchant_id?: number;
+    inserted_at?: string;
+    updated_at?: string;
 }
 export interface MerchantListResponse {
     entries: Merchant[];
@@ -18,9 +39,21 @@ export declare class MerchantsResource {
     private client;
     constructor(client: HttpClient);
     /**
+     * Convert internal merchant data (integers) to user-facing data (strings)
+     */
+    private translateMerchantToUserFacing;
+    /**
+     * Convert user-facing merchant data (strings) to internal data (integers)
+     */
+    private translateMerchantToInternal;
+    /**
+     * Convert filter parameters (strings to integers where needed)
+     */
+    private translateFilters;
+    /**
      * List merchants with pagination and filtering
      */
-    list(params?: MerchantListParams): Promise<ApiResponse<MerchantListResponse>>;
+    list(params?: MerchantFilterParams): Promise<ApiResponse<MerchantListResponse>>;
     /**
      * Get a specific merchant by ID
      */

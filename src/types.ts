@@ -1,3 +1,118 @@
+// filepath: /Users/romario/projects/inkress/admin-sdk/src/types.ts
+// Configuration and base types
+
+// Import translator types for string-to-integer conversion
+import type { 
+  FeeStructureKey, 
+  KindKey, 
+  StatusKey,
+  AccessKey 
+} from './utils/translators';
+
+// Import query system types
+import type {
+  QueryParams,
+  RangeQuery,
+  StringQuery,
+  DateQuery,
+  JsonQueryParams
+} from './utils/query-transformer';
+
+/**
+ * IMPORTANT: Types have been updated to match the database schema:
+ * 
+ * 1. Field naming: Uses `inserted_at` and `updated_at` (not `created_at`)
+ * 2. Filtering: All list operations support filtering on any database field
+ * 3. Immutable fields: `id`, `uid`, `inserted_at`, and `updated_at` are never included in Create/Update types
+ * 4. Status/Kind values: Use contextual string codes (e.g., 'confirmed' instead of 'order_confirmed')
+ * 5. Fee structures: Use string codes that are automatically translated to integers
+ * 6. Translation: All status, kind, and fee structure fields accept contextual strings and return contextual strings
+ */
+
+// ============================================================================
+// CONTEXTUAL TYPES (Clean, context-aware string values)
+// ============================================================================
+
+// Order-specific contextual types
+export type OrderStatus = 'pending' | 'error' | 'paid' | 'partial' | 'confirmed' | 'cancelled' | 
+  'prepared' | 'shipped' | 'delivered' | 'completed' | 'returned' | 'refunded' | 'verifying' | 'stale' | 'archived';
+
+export type OrderKind = 'online' | 'payment_link' | 'cart' | 'subscription' | 'invoice' | 'offline';
+
+// Product-specific contextual types  
+export type ProductStatus = 'draft' | 'published' | 'archived';
+export type ProductKind = 'draft' | 'published' | 'archived';
+
+// Account/Merchant-specific contextual types
+export type AccountStatus = 'pending' | 'approved' | 'suspended' | 'rejected' | 'disabled';
+
+// User-specific contextual types
+export type UserKind = 'address' | 'preset' | 'organisation' | 'store';
+
+// Subscription-specific contextual types  
+export type SubscriptionStatus = 'pending' | 'active' | 'cancelled' | 'adhoc_charged';
+
+// Transaction-specific contextual types
+export type TransactionStatus = 'pending' | 'authorized' | 'hold' | 'captured' | 'voided' | 'refunded' | 'processed';
+
+// Billing-specific contextual types
+export type BillingPlanKind = 'subscription' | 'payout';
+export type BillingStatus = 'active' | 'inactive';
+
+// Category-specific contextual types (using product kinds for now)
+export type CategoryKind = ProductKind;
+
+// ============================================================================
+// ENHANCED QUERY SYSTEM TYPES
+// ============================================================================
+
+// Re-export query system types for easy access
+export type { 
+  QueryParams, 
+  RangeQuery, 
+  StringQuery, 
+  DateQuery, 
+  JsonQueryParams 
+} from './utils/query-transformer';
+
+// Enhanced filter types for each resource using the query system
+export type MerchantQueryParams = QueryParams<Merchant>;
+export type ProductQueryParams = QueryParams<Product>;
+export type CategoryQueryParams = QueryParams<Category>;
+export type UserQueryParams = QueryParams<User>;
+export type BillingPlanQueryParams = QueryParams<BillingPlan>;
+export type SubscriptionQueryParams = QueryParams<Subscription>;
+
+// Order query parameters - simplified for better type safety
+export interface OrderQueryParams {
+  // Direct field queries
+  id?: number | number[];
+  reference_id?: string | string[] | StringQuery;
+  total?: number | number[] | RangeQuery<number>;
+  status?: OrderStatus | OrderStatus[] | StringQuery;
+  kind?: OrderKind | OrderKind[] | StringQuery;
+  status_on?: number | number[] | RangeQuery<number>;
+  uid?: string | string[] | StringQuery;
+  cart_id?: number | number[];
+  inserted_at?: string | DateQuery;
+  updated_at?: string | DateQuery;
+  
+  // Special query fields
+  exclude?: string | number;
+  distinct?: string;
+  order_by?: string;
+  data?: JsonQueryParams;
+  page?: number;
+  page_size?: number;
+  per_page?: number;
+  limit?: number;
+  override_page?: string | boolean;
+  q?: string;
+  search?: string;
+  sort?: string;
+  order?: 'asc' | 'desc';
+}
+
 // Configuration and base types
 export interface InkressConfig {
   /** Bearer token for authentication */
@@ -19,8 +134,26 @@ export interface InkressConfig {
 export interface PaginationParams {
   page?: number;
   per_page?: number;
+  page_size?: number;  // Alternative to per_page
   sort?: string;
   order?: 'asc' | 'desc';
+  order_by?: string;   // Alternative to sort + order
+  limit?: number;      // Alternative pagination
+}
+
+// Base filtering interface that allows filtering on any field
+export interface BaseFilterParams extends PaginationParams {
+  /** General search query - searches across multiple fields automatically */
+  q?: string;
+  /** Legacy search field - use 'q' instead for new implementations */
+  search?: string;
+  /** Exclude specific records */
+  exclude?: string | number;
+  /** Return distinct values */
+  distinct?: string;
+  /** Override page behavior */
+  override_page?: string | boolean;
+  [key: string]: any;
 }
 
 export interface PaginatedResponse<T> {
@@ -88,51 +221,20 @@ export interface Merchant {
   about?: string;
   logo?: string;
   sector?: string;
-  status: number;
+  status: AccountStatus; // Contextual status (e.g., 'approved' instead of 'account_approved')
   phone?: string;
   business_type?: string;
   theme_colour?: string;
   uid: string;
-  is_pre_verified: boolean;
-  webhook_url?: string;
-  plan_id?: number;
-  payment_provider_plan_id?: number;
-  platform_fee_structure: 'customer_pay' | 'merchant_absorb';
-  provider_fee_structure: 'customer_pay' | 'merchant_absorb';
-  address?: {
-    street?: string;
-    street_optional?: string;
-    town?: string;
-    city?: string;
-    province?: string;
-    region?: string;
-  };
-  data?: {
-    pickup_locations?: Array<{
-      name: string;
-      address: string;
-    }>;
-    support_phone?: string;
-    support_email?: string;
-    business_setup?: string;
-    bank_info?: {
-      account_holder_name?: string;
-      account_holder_type?: 'Business' | 'Individual';
-      account_number?: string;
-      account_type?: 'Checking' | 'Savings';
-      bank_name?: string;
-      branch_name?: string;
-      branch_code?: string;
-      routing_number?: string;
-      swift_code?: string;
-    };
-    registration_webhook?: string;
-  };
-  organisation?: Organisation;
-  domain?: {
-    cname?: string;
-  };
-  created_at: string;
+  address_id?: number;
+  owner_id?: number;
+  domain_id?: number;
+  organisation_id?: number;
+  platform_fee_structure: FeeStructureKey; // Translated from integer to string
+  provider_fee_structure: FeeStructureKey; // Translated from integer to string
+  parent_merchant_id?: number;
+  data?: Record<string, any>;
+  inserted_at: string;
   updated_at: string;
 }
 
@@ -141,6 +243,19 @@ export interface CreateMerchantData {
   email: string;
   phone?: string;
   about?: string;
+  username?: string;
+  logo?: string;
+  sector?: string;
+  business_type?: string;
+  theme_colour?: string;
+  address_id?: number;
+  owner_id?: number;
+  domain_id?: number;
+  organisation_id?: number;
+  platform_fee_structure?: FeeStructureKey;
+  provider_fee_structure?: FeeStructureKey;
+  parent_merchant_id?: number;
+  data?: Record<string, any>;
 }
 
 export interface UpdateMerchantData {
@@ -148,6 +263,20 @@ export interface UpdateMerchantData {
   email?: string;
   phone?: string;
   about?: string;
+  username?: string;
+  logo?: string;
+  sector?: string;
+  status?: AccountStatus; // Contextual status
+  business_type?: string;
+  theme_colour?: string;
+  address_id?: number;
+  owner_id?: number;
+  domain_id?: number;
+  organisation_id?: number;
+  platform_fee_structure?: FeeStructureKey;
+  provider_fee_structure?: FeeStructureKey;
+  parent_merchant_id?: number;
+  data?: Record<string, any>;
 }
 
 export interface PublicMerchant {
@@ -167,31 +296,28 @@ export interface Category {
   id: number;
   name: string;
   description?: string | null;
-  kind: number;
+  kind: CategoryKind; // Contextual kind (e.g., 'published' instead of 'product_published')
   kind_id?: number | null;
   parent_id?: number | null;
-  parent?: {
-    id: number;
-    name: string;
-  } | null;
-  children?: {
-    id: number;
-    name: string;
-  }[];
-  created_at: string;
+  uid: string;
+  inserted_at: string;
   updated_at: string;
 }
 
 export interface CreateCategoryData {
   name: string;
   description?: string;
-  kind: number;
+  kind: CategoryKind; // Contextual kind
   kind_id?: number;
   parent_id?: number;
 }
 
-export interface UpdateCategoryData extends Partial<Omit<CreateCategoryData, 'parent_id'>> {
-  // parent_id is immutable after creation
+export interface UpdateCategoryData {
+  name?: string;
+  description?: string;
+  kind?: KindKey;
+  kind_id?: number;
+  // parent_id is typically immutable after creation for data integrity
 }
 
 // Product types
@@ -202,7 +328,7 @@ export interface Product {
   price: number;
   permalink: string;
   image?: string | null;
-  status: number;
+  status: ProductStatus; // Contextual status (e.g., 'published' instead of 'product_published')
   public: boolean;
   unlimited: boolean;
   units_remaining?: number | null;
@@ -212,11 +338,11 @@ export interface Product {
   tag_ids: number[];
   data?: Record<string, any>;
   meta?: Record<string, any>;
-  currency: Currency;
-  category?: Category;
-  merchant: Merchant;
-  organisation: Organisation;
-  created_at: string;
+  uid: string;
+  category_id?: number;
+  currency_id?: number;
+  user_id?: number;
+  inserted_at: string;
   updated_at: string;
 }
 
@@ -232,10 +358,27 @@ export interface CreateProductData {
   tag_ids?: number[];
   data?: Record<string, any>;
   meta?: Record<string, any>;
+  category_id?: number;
+  currency_id?: number;
+  user_id?: number;
 }
 
-export interface UpdateProductData extends Partial<CreateProductData> {
-  status?: number;
+export interface UpdateProductData {
+  title?: string;
+  teaser?: string;
+  price?: number;
+  permalink?: string;
+  image?: string;
+  status?: StatusKey;
+  public?: boolean;
+  unlimited?: boolean;
+  units_remaining?: number;
+  tag_ids?: number[];
+  data?: Record<string, any>;
+  meta?: Record<string, any>;
+  category_id?: number;
+  currency_id?: number;
+  user_id?: number;
 }
 
 // Order types
@@ -243,25 +386,19 @@ export interface Order {
   id: number;
   reference_id?: string;
   total: number;
-  kind: number; // 1=offline, 2=online, 3=subscription
-  status: number;
+  kind: OrderKind; // Contextual kind (e.g., 'online' instead of 'order_online')
+  status: OrderStatus; // Contextual status (e.g., 'confirmed' instead of 'order_confirmed')
   status_on: number;
   uid: string;
   cart_id?: number | null;
-  customer?: Customer;
-  currency: Currency;
-  billing_plan?: any | null;
-  order_detail?: Record<string, any>;
-  transactions?: any[];
-  payment_methods?: PaymentMethod[];
-  order_lines: OrderLine[];
-  merchant: Merchant;
-  organisation: Organisation;
-  payment_urls?: {
-    short_link: string;
-  };
+  currency_id?: number;
+  customer_id?: number;
+  payment_link_id?: number;
+  billing_plan_id?: number;
   meta_data?: Record<string, any>;
-  created_at: string;
+  session_id?: string;
+  data?: Record<string, any>;
+  inserted_at: string;
   updated_at: string;
 }
 
@@ -274,14 +411,33 @@ export interface OrderLine {
 export interface CreateOrderData {
   reference_id?: string;
   total: number;
-  kind?: number;
-  order_lines: OrderLine[];
+  kind?: OrderKind | KindKey | number; // Contextual kind
+  status?: OrderStatus | StatusKey | number; // Contextual status
+  status_on?: number;
+  cart_id?: number;
+  currency_id?: number;
+  customer_id?: number;
+  payment_link_id?: number;
+  billing_plan_id?: number;
   meta_data?: Record<string, any>;
+  session_id?: string;
+  data?: Record<string, any>;
 }
 
 export interface UpdateOrderData {
-  status?: number;
+  reference_id?: string;
+  total?: number;
+  kind?: OrderKind | KindKey | number; // Contextual kind
+  status?: OrderStatus | StatusKey | number; // Contextual status
+  status_on?: number;
+  cart_id?: number;
+  currency_id?: number;
+  customer_id?: number;
+  payment_link_id?: number;
+  billing_plan_id?: number;
   meta_data?: Record<string, any>;
+  session_id?: string;
+  data?: Record<string, any>;
 }
 
 export interface OrderStats {
@@ -322,14 +478,24 @@ export interface BillingPlan {
   transaction_minimum_fee: number;
   minimum_fee: number;
   duration: number;
-  status: number; // 1=active, 2=inactive
-  billing_cycle: number; // 1=daily, 2=weekly, 3=monthly, 4=yearly
+  status: StatusKey; // Translated from integer to string
+  billing_cycle?: number;
   trial_period: number;
-  charge_strategy: number; // 1=immediate, 2=delayed
-  kind: number; // 1=payments, 2=subscription
+  charge_strategy: number;
+  kind: BillingPlanKind; // Contextual kind (e.g., 'subscription' instead of 'billing_plan_subscription')
   auto_charge: boolean;
-  currency: Currency;
-  features?: string[];
+  public: boolean;
+  payout_period: number;
+  payout_value_limit: number;
+  payout_percentage_limit: number;
+  features?: Record<string, any>;
+  data?: Record<string, any>;
+  meta_data?: Record<string, any>;
+  uid: string;
+  currency_id: number;
+  payment_provider_id?: number;
+  inserted_at: string;
+  updated_at: string;
 }
 
 export interface CreateBillingPlanData {
@@ -342,39 +508,69 @@ export interface CreateBillingPlanData {
   transaction_minimum_fee?: number;
   minimum_fee?: number;
   duration: number;
-  billing_cycle: number;
+  billing_cycle?: number;
   trial_period?: number;
   charge_strategy?: number;
-  kind?: number;
+  kind?: BillingPlanKind | KindKey | number; // Contextual kind
   auto_charge?: boolean;
+  public?: boolean;
+  payout_period?: number;
+  payout_value_limit?: number;
+  payout_percentage_limit?: number;
+  features?: Record<string, any>;
+  data?: Record<string, any>;
+  meta_data?: Record<string, any>;
   currency_id: number;
-  features?: string[];
+  payment_provider_id?: number;
 }
 
-export interface UpdateBillingPlanData extends Partial<CreateBillingPlanData> {
-  status?: number;
+export interface UpdateBillingPlanData {
+  name?: string;
+  description?: string;
+  flat_rate?: number;
+  transaction_fee?: number;
+  transaction_percentage?: number;
+  transaction_percentage_additional?: number;
+  transaction_minimum_fee?: number;
+  minimum_fee?: number;
+  duration?: number;
+  status?: StatusKey;
+  billing_cycle?: number;
+  trial_period?: number;
+  charge_strategy?: number;
+  kind?: BillingPlanKind | KindKey | number; // Contextual kind
+  auto_charge?: boolean;
+  public?: boolean;
+  payout_period?: number;
+  payout_value_limit?: number;
+  payout_percentage_limit?: number;
+  features?: Record<string, any>;
+  data?: Record<string, any>;
+  meta_data?: Record<string, any>;
+  currency_id?: number;
+  payment_provider_id?: number;
 }
 
 // Subscription types
 export interface Subscription {
   id: number;
-  status: number; // 1=pending, 2=active, 3=cancelled
-  kind: number; // 1=invoice, 2=subscription
-  current_period_start: string;
-  current_period_end: string;
-  trial_end?: string;
-  canceled_at?: string;
+  status: StatusKey; // Translated from integer to string
+  kind: KindKey; // Translated from integer to string
+  record_id: number;
+  record: string;
   start_date: string;
   end_date?: string;
-  record: string; // e.g., "merchants", "users"
-  record_id: number;
-  customer_id?: number;
+  current_period_start?: string;
+  current_period_end?: string;
+  trial_end?: string;
+  canceled_at?: string;
   uid: string;
   token?: string;
   billing_plan_id: number;
-  has_token: boolean;
-  billing_plan: BillingPlan;
-  subscription_periods?: SubscriptionPeriod[];
+  customer_id?: number;
+  data?: Record<string, any>;
+  inserted_at: string;
+  updated_at: string;
 }
 
 export interface CreateSubscriptionData {
@@ -383,7 +579,14 @@ export interface CreateSubscriptionData {
   record_id: number;
   start_date: string;
   end_date?: string;
-  status: number;
+  status?: StatusKey;
+  kind?: KindKey;
+  current_period_start?: string;
+  current_period_end?: string;
+  trial_end?: string;
+  token?: string;
+  customer_id?: number;
+  data?: Record<string, any>;
 }
 
 export interface SubscriptionPeriod {
@@ -414,32 +617,36 @@ export interface User {
   id: number;
   email: string;
   phone?: string;
-  first_name?: string;
-  last_name?: string;
+  first_name: string;
+  last_name: string;
   username?: string;
-  status: number;
+  status: AccountStatus; // Contextual status (e.g., 'approved' instead of 'account_approved')
   level: number;
   dob?: number | null;
   sex?: number | null; // 1=male, 2=female, 3=other
   image?: string | null;
   uid: string;
-  role?: {
-    id: number;
-    name: string;
-  };
-  organisation?: Organisation;
-  merchant?: Merchant;
-  created_at: string;
+  kind?: UserKind; // Contextual kind (e.g., 'address' instead of 'user_address')
+  organisation_id?: number;
+  role_id?: number;
+  inserted_at: string;
   updated_at: string;
 }
 
 export interface CreateUserData {
   email: string;
   phone?: string;
-  first_name?: string;
-  last_name?: string;
+  first_name: string;
+  last_name: string;
   username?: string;
   password: string;
+  status?: AccountStatus | StatusKey | number; // Contextual status
+  level?: number;
+  dob?: number;
+  sex?: number;
+  image?: string;
+  kind?: UserKind | KindKey | number; // Contextual kind
+  organisation_id?: number;
   role_id?: number;
 }
 
@@ -449,8 +656,13 @@ export interface UpdateUserData {
   first_name?: string;
   last_name?: string;
   username?: string;
-  status?: number;
+  status?: AccountStatus | StatusKey | number; // Contextual status
   level?: number;
+  dob?: number;
+  sex?: number;
+  image?: string;
+  kind?: UserKind | KindKey | number; // Contextual kind
+  organisation_id?: number;
   role_id?: number;
 }
 
@@ -505,3 +717,283 @@ export interface PublicMerchantProducts {
   // Additional pagination or metadata
   [key: string]: any;
 }
+
+// KYC/Legal Request types
+export interface KycRequest {
+  id: number;
+  kind: KindKey; // Translated from integer to string
+  user_id?: number;
+  subject_id?: number;
+  data?: Record<string, any>;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface CreateKycRequestData {
+  kind: KindKey;
+  user_id?: number;
+  subject_id?: number;
+  data?: Record<string, any>;
+}
+
+export interface UpdateKycRequestData {
+  kind?: KindKey;
+  user_id?: number;
+  subject_id?: number;
+  data?: Record<string, any>;
+}
+
+// Payout types
+export interface PayoutRequest {
+  id: number;
+  total: number;
+  status: StatusKey; // Translated from integer to string
+  balance_on_request: number;
+  reference_id?: string;
+  evidence_file_id?: number;
+  merchant_id: number;
+  requester_id: number;
+  type: KindKey; // Translated from integer to string
+  sub_type: KindKey; // Translated from integer to string
+  reviewer_id?: number;
+  reviewed_at?: string;
+  due_at: string;
+  fee_total: number;
+  currency_id: number;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface CreatePayoutRequestData {
+  total: number;
+  type?: KindKey;
+  sub_type?: KindKey;
+  reference_id?: string;
+  evidence_file_id?: number;
+  due_at?: string;
+  currency_id?: number;
+}
+
+export interface UpdatePayoutRequestData {
+  total?: number;
+  status?: StatusKey;
+  type?: KindKey;
+  sub_type?: KindKey;
+  reference_id?: string;
+  evidence_file_id?: number;
+  reviewer_id?: number;
+  reviewed_at?: string;
+  due_at?: string;
+  fee_total?: number;
+  currency_id?: number;
+}
+
+// ============================================================================
+// INTERNAL API TYPES (Integer-based for actual API communication)
+// ============================================================================
+
+export interface InternalMerchant {
+  id: number;
+  name: string;
+  email: string;
+  username: string;
+  about?: string;
+  logo?: string;
+  sector?: string;
+  status: number; // Integer for API
+  phone?: string;
+  business_type?: string;
+  theme_colour?: string;
+  uid: string;
+  address_id?: number;
+  owner_id?: number;
+  domain_id?: number;
+  organisation_id?: number;
+  platform_fee_structure: number; // Integer for API
+  provider_fee_structure: number; // Integer for API
+  parent_merchant_id?: number;
+  data?: Record<string, any>;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface InternalCreateMerchantData {
+  name: string;
+  email: string;
+  phone?: string;
+  about?: string;
+  status?: number;
+  platform_fee_structure?: number;
+  provider_fee_structure?: number;
+  // ...existing fields without id, uid, inserted_at, updated_at
+}
+
+export interface InternalUpdateMerchantData {
+  name?: string;
+  email?: string;
+  phone?: string;
+  about?: string;
+  status?: number;
+  platform_fee_structure?: number;
+  provider_fee_structure?: number;
+  // ...existing fields without id, uid, inserted_at, updated_at
+}
+
+export interface InternalCategory {
+  id: number;
+  name: string;
+  description?: string | null;
+  kind: number; // Integer for API
+  kind_id?: number | null;
+  parent_id?: number | null;
+  uid: string;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface InternalProduct {
+  id: number;
+  title: string;
+  teaser?: string;
+  price: number;
+  permalink: string;
+  image?: string | null;
+  status: number; // Integer for API
+  public: boolean;
+  unlimited: boolean;
+  units_remaining?: number | null;
+  units_sold?: number | null;
+  rating_sum?: number | null;
+  rating_count?: number | null;
+  tag_ids: number[];
+  data?: Record<string, any>;
+  meta?: Record<string, any>;
+  uid: string;
+  category_id?: number;
+  currency_id?: number;
+  user_id?: number;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface InternalOrder {
+  id: number;
+  reference_id?: string;
+  total: number;
+  kind: number; // Integer for API
+  status: number; // Integer for API
+  status_on: number;
+  uid: string;
+  cart_id?: number | null;
+  customer?: Customer;
+  currency: Currency;
+  billing_plan?: any | null;
+  order_detail?: Record<string, any>;
+  transactions?: any[];
+  payment_methods?: PaymentMethod[];
+  order_lines: OrderLine[];
+  merchant: InternalMerchant;
+  organisation: Organisation;
+  payment_urls?: {
+    short_link: string;
+  };
+  meta_data?: Record<string, any>;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface InternalUser {
+  id: number;
+  email: string;
+  phone?: string;
+  first_name: string;
+  last_name: string;
+  username?: string;
+  status: number; // Integer for API
+  kind: number; // Integer for API
+  level: number;
+  dob?: number | null;
+  sex?: number | null;
+  image?: string | null;
+  uid: string;
+  organisation_id?: number;
+  role_id?: number;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface InternalBillingPlan {
+  id: number;
+  name: string;
+  description?: string;
+  flat_rate: number;
+  transaction_fee: number;
+  transaction_percentage: number;
+  transaction_percentage_additional: number;
+  transaction_minimum_fee: number;
+  minimum_fee: number;
+  duration: number;
+  status: number; // Integer for API
+  kind: number; // Integer for API
+  billing_cycle: number;
+  trial_period: number;
+  charge_strategy: number;
+  auto_charge: boolean;
+  currency: Currency;
+  features?: string[];
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface InternalSubscription {
+  id: number;
+  status: number; // Integer for API
+  kind: number; // Integer for API
+  current_period_start: string;
+  current_period_end: string;
+  trial_end?: string;
+  canceled_at?: string;
+  start_date: string;
+  end_date?: string;
+  record: string;
+  record_id: number;
+  customer_id?: number;
+  uid: string;
+  token?: string;
+  billing_plan_id: number;
+  has_token: boolean;
+  billing_plan: InternalBillingPlan;
+  subscription_periods?: SubscriptionPeriod[];
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface InternalKycRequest {
+  id: number;
+  kind: number; // Integer for API
+  status: number; // Integer for API
+  data?: Record<string, any>;
+  user_id: number;
+  merchant_id?: number;
+  uid: string;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface InternalPayoutRequest {
+  id: number;
+  amount: number;
+  currency_code: string;
+  status: number; // Integer for API
+  type: number; // Integer for API
+  sub_type: number; // Integer for API
+  data?: Record<string, any>;
+  merchant_id: number;
+  uid: string;
+  inserted_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
+// USER-FACING TYPES (String-based for better UX)
+// ============================================================================

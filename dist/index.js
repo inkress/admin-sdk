@@ -267,6 +267,7 @@ const mappings = {
     "Status": {
         "order_pending": 1,
         "order_error": 2,
+        "order_failed": 2,
         "order_paid": 3,
         "order_partial": 32,
         "order_confirmed": 4,

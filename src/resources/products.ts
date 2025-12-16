@@ -4,7 +4,6 @@ import {
   CreateProductData,
   UpdateProductData,
   ApiResponse,
-  BaseFilterParams,
   InternalProduct,
   ProductStatus,
 } from '../types';
@@ -12,44 +11,20 @@ import {
   StatusTranslator,
   StatusKey,
 } from '../utils/translators';
+import { processQuery } from '../utils/query-transformer';
+import { ProductQueryBuilder } from '../utils/query-builders';
+import {
+  ProductFilterParams,
+  ProductQueryParams,
+  ProductListResponse,
+  PRODUCT_FIELD_TYPES,
+} from '../types/resources';
 
-export interface ProductFilterParams extends BaseFilterParams {
-  // Common filters
-  search?: string; // Legacy search field - consider using 'q' instead
-  status?: ProductStatus | StatusKey | number; // Accept contextual, full, and integer values
-  category?: string;
-  limit?: number;
-  
-  // Database field filters - any field from the products table can be filtered
-  id?: number;
-  title?: string;
-  teaser?: string;
-  price?: number;
-  permalink?: string;
-  image?: string;
-  public?: boolean;
-  unlimited?: boolean;
-  units_remaining?: number;
-  units_sold?: number;
-  rating_sum?: number;
-  rating_count?: number;
-  tag_ids?: number[];
-  uid?: string;
-  category_id?: number;
-  currency_id?: number;
-  user_id?: number;
-  inserted_at?: string;
-  updated_at?: string;
-}
-
-export interface ProductListResponse {
-  entries: Product[];
-  page_info: {
-    current_page: number;
-    total_pages: number;
-    total_entries: number;
-    page_size: number;
-  };
+/**
+ * @deprecated Use ProductFilterParams from types/resources instead
+ */
+export interface LegacyProductFilterParams {
+  // Legacy interface - kept for backward compatibility
 }
 
 export class ProductsResource {
@@ -230,5 +205,87 @@ export class ProductsResource {
    */
   async delete(id: number): Promise<ApiResponse<void>> {
     return this.client.delete<void>(`/products/${id}`);
+  }
+
+  /**
+   * List products with enhanced query support
+   * Supports filtering by any database field using the new query system
+   * Requires Client-Id header to be set in the configuration
+   * 
+   * @example
+   * // Simple queries
+   * await products.query({ status: 'published', public: true })
+   * 
+   * // Array queries (IN operations)
+   * await products.query({ category_id: [1, 2, 3], status: ['published', 'draft'] })
+   * 
+   * // Range queries
+   * await products.query({ price: { min: 10, max: 100 } })
+   * 
+   * // String searches
+   * await products.query({ title: { contains: 'shirt' } })
+   * 
+   * // Combined queries
+   * await products.query({
+   *   status: 'published',
+   *   price: { min: 20 },
+   *   public: true,
+   *   page: 1,
+   *   page_size: 20
+   * })
+   */
+  async query(params?: ProductQueryParams): Promise<ApiResponse<ProductListResponse>> {
+    // Process the query through the transformation system with validation
+    const processedQuery = processQuery(params || {}, PRODUCT_FIELD_TYPES, { validate: true });
+    
+    // Apply contextual translations for status
+    const translatedQuery = this.translateFilters(processedQuery);
+    
+    const response = await this.client.get<{ entries: InternalProduct[]; page_info: any }>('/products', translatedQuery);
+    
+    if (response.data?.entries) {
+      const translatedEntries = response.data.entries.map(product => this.translateProductToUserFacing(product));
+      return {
+        state: response.state,
+        data: {
+          entries: translatedEntries,
+          page_info: response.data.page_info
+        }
+      };
+    }
+    
+    if (response.result?.entries) {
+      const translatedEntries = response.result.entries.map(product => this.translateProductToUserFacing(product));
+      return {
+        state: response.state,
+        result: {
+          entries: translatedEntries,
+          page_info: response.result.page_info
+        }
+      };
+    }
+    
+    return {
+      state: response.state,
+      data: response.data as any,
+      result: response.result as any
+    };
+  }
+
+  /**
+   * Create a query builder for products
+   * Provides a fluent interface for building complex queries
+   * 
+   * @example
+   * const products = await sdk.products.createQueryBuilder()
+   *   .whereStatus('published')
+   *   .wherePriceRange(10, 100)
+   *   .whereTitleContains('shirt')
+   *   .wherePublic(true)
+   *   .paginate(1, 20)
+   *   .execute();
+   */
+  createQueryBuilder(initialQuery?: ProductQueryParams): ProductQueryBuilder {
+    return new ProductQueryBuilder(this, initialQuery);
   }
 }

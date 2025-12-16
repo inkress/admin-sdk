@@ -1,7 +1,12 @@
 import { HttpClient } from '../client';
-import { Subscription, SubscriptionPeriod, ApiResponse, PaginationParams, BaseFilterParams, SubscriptionStatus } from '../types';
+import { Subscription, SubscriptionPeriod, CreateSubscriptionData, SubscriptionChargeData, SubscriptionUsageResponse, SubscriptionCancelResponse, ApiResponse, PaginationParams, SubscriptionStatus } from '../types';
 import { StatusKey } from '../utils/translators';
-export interface SubscriptionListParams extends BaseFilterParams {
+import { SubscriptionQueryBuilder } from '../utils/query-builders';
+import { SubscriptionQueryParams, SubscriptionListResponse } from '../types/resources';
+/**
+ * @deprecated Use SubscriptionFilterParams from types/resources instead
+ */
+export interface SubscriptionListParams {
     status?: SubscriptionStatus | StatusKey | number;
     billing_plan_id?: number;
     customer_id?: number;
@@ -20,15 +25,6 @@ export interface SubscriptionListParams extends BaseFilterParams {
     token?: string;
     inserted_at?: string;
     updated_at?: string;
-}
-export interface SubscriptionListResponse {
-    entries: Subscription[];
-    page_info: {
-        current_page: number;
-        total_pages: number;
-        total_entries: number;
-        page_size: number;
-    };
 }
 export interface CreateSubscriptionLinkData {
     reference_id: string;
@@ -58,7 +54,13 @@ export interface ChargeSubscriptionResponse {
     payment_urls: {
         short_link: string;
     };
-    transaction: any;
+    transaction: {
+        id: number;
+        amount: number;
+        status: string;
+        reference_id: string;
+        [key: string]: any;
+    };
 }
 export interface SubscriptionPeriodsParams extends PaginationParams {
     status?: 'pending' | 'paid' | 'failed' | 'cancelled';
@@ -81,6 +83,10 @@ export declare class SubscriptionsResource {
      */
     private translateFilters;
     /**
+     * Translate subscription data for API (contextual strings to integers)
+     */
+    private translateToInternal;
+    /**
      * List billing subscriptions with pagination and filtering
      * Requires Client-Id header to be set in the configuration
      */
@@ -90,6 +96,16 @@ export declare class SubscriptionsResource {
      * Requires Client-Id header to be set in the configuration
      */
     get(id?: number): Promise<ApiResponse<Subscription>>;
+    /**
+     * Create a new subscription
+     * Requires Client-Id header to be set in the configuration
+     */
+    create(data: CreateSubscriptionData): Promise<ApiResponse<Subscription>>;
+    /**
+     * Delete a subscription
+     * Requires Client-Id header to be set in the configuration
+     */
+    delete(id: number): Promise<ApiResponse<void>>;
     /**
      * Create a subscription payment link
      * Requires Client-Id header to be set in the configuration
@@ -101,6 +117,11 @@ export declare class SubscriptionsResource {
      */
     charge(uid: string, data: ChargeSubscriptionData): Promise<ApiResponse<ChargeSubscriptionResponse>>;
     /**
+     * Record usage for a subscription (for usage-based billing)
+     * Requires Client-Id header to be set in the configuration
+     */
+    usage(uid: string, data: SubscriptionChargeData): Promise<ApiResponse<SubscriptionUsageResponse>>;
+    /**
      * Get subscription billing periods
      * Requires Client-Id header to be set in the configuration
      */
@@ -109,6 +130,18 @@ export declare class SubscriptionsResource {
      * Cancel a subscription
      * Requires Client-Id header to be set in the configuration
      */
-    cancel(uid: number, code: string): Promise<ApiResponse<any>>;
+    cancel(uid: number, code: string): Promise<ApiResponse<SubscriptionCancelResponse>>;
+    /**
+     * Query subscriptions with enhanced query support
+     * @example
+     * await subscriptions.query({ status: 'active', billing_plan_id: 123 })
+     */
+    query(params?: SubscriptionQueryParams): Promise<ApiResponse<SubscriptionListResponse>>;
+    /**
+     * Create a query builder for subscriptions
+     * @example
+     * await sdk.subscriptions.createQueryBuilder().whereStatus('active').execute()
+     */
+    createQueryBuilder(initialQuery?: SubscriptionQueryParams): SubscriptionQueryBuilder;
 }
 //# sourceMappingURL=subscriptions.d.ts.map

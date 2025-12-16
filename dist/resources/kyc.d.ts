@@ -37,9 +37,11 @@ export interface BankInfoUpdateRequestData {
     branch_code?: string;
     routing_number?: string;
     swift_code?: string;
+    country_code: string;
+    currency_code: string;
 }
 export interface CreateKycRequestData<T> {
-    kind: 'limit_increase' | 'bank_info_update' | 'document_submission';
+    kind: 'limit_increase' | 'document_submission';
     data: T;
 }
 export interface KycRequest {
@@ -69,11 +71,6 @@ export declare class KycResource {
      * Requires Client-Id header to be set in the configuration
      */
     requestLimitIncrease(data: CreateKycRequestData<LimitIncreaseRequestData>): Promise<ApiResponse<KycRequest>>;
-    /**
-     * Request a bank information update
-     * Requires Client-Id header to be set in the configuration
-     */
-    requestBankInfoUpdate(data: CreateKycRequestData<BankInfoUpdateRequestData>): Promise<ApiResponse<KycRequest>>;
     /**
      * Upload a document for KYC verification
      * Requires Client-Id header to be set in the configuration

@@ -13,7 +13,7 @@ export interface PayoutRequestFilterParams extends BaseFilterParams {
   requester_id?: number;
   limit?: number;
   
-  // Database field filters - any field from the ledger_payouts table can be filtered
+  // Database field filters - any field from the financial_requests table can be filtered
   id?: number;
   total?: number;
   balance_on_request?: number;
@@ -72,7 +72,7 @@ export class PayoutResource {
    * Requires Client-Id header to be set in the configuration
    */
   async list(params?: PayoutRequestFilterParams): Promise<ApiResponse<PayoutRequestListResponse>> {
-    return this.client.get<PayoutRequestListResponse>('/ledger_payouts', params);
+    return this.client.get<PayoutRequestListResponse>('/financial_requests', params);
   }
 
   /**
@@ -80,7 +80,7 @@ export class PayoutResource {
    * Requires Client-Id header to be set in the configuration
    */
   async get(id: number): Promise<ApiResponse<PayoutRequest>> {
-    return this.client.get<PayoutRequest>(`/ledger_payouts/${id}`);
+    return this.client.get<PayoutRequest>(`/financial_requests/${id}`);
   }
 
   /**
@@ -88,6 +88,6 @@ export class PayoutResource {
    * Requires Client-Id header to be set in the configuration
    */
   async request(data: CreatePayoutRequestData): Promise<ApiResponse<PayoutRequest>> {
-    return this.client.post<PayoutRequest>('/ledger_payouts', data);
+    return this.client.post<PayoutRequest>('/financial_requests', data);
   }
 }

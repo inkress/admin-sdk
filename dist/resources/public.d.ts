@@ -37,6 +37,10 @@ export interface PublicMerchantParams {
     username?: string;
     'domain.cname'?: string;
 }
+export interface MerchantFeesParams {
+    currency: string;
+    total: number;
+}
 export declare class PublicResource {
     private client;
     constructor(client: HttpClient);
@@ -47,10 +51,7 @@ export declare class PublicResource {
     /**
      * Get merchant fees (public endpoint - no auth required)
      */
-    getMerchantFees(merchantUsername: string, params: {
-        currency: string;
-        total: number;
-    }): Promise<ApiResponse<PublicMerchantFees>>;
+    getMerchantFees(merchantUsername: string, params: MerchantFeesParams): Promise<ApiResponse<PublicMerchantFees>>;
     /**
      * Get merchant products (public endpoint - no auth required)
      */

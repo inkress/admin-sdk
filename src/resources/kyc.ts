@@ -52,10 +52,12 @@ export interface BankInfoUpdateRequestData {
   branch_code?: string;
   routing_number?: string;
   swift_code?: string;
+  country_code: string;
+  currency_code: string;
 }
 
 export interface CreateKycRequestData<T> {
-  kind: 'limit_increase' | 'bank_info_update' | 'document_submission';
+  kind: 'limit_increase' | 'document_submission';
   data: T;
 }
 
@@ -93,14 +95,6 @@ export class KycResource {
    * Requires Client-Id header to be set in the configuration
    */
   async requestLimitIncrease(data: CreateKycRequestData<LimitIncreaseRequestData>): Promise<ApiResponse<KycRequest>> {
-    return this.client.post<KycRequest>('/legal_requests', data);
-  }
-
-  /**
-   * Request a bank information update
-   * Requires Client-Id header to be set in the configuration
-   */
-  async requestBankInfoUpdate(data: CreateKycRequestData<BankInfoUpdateRequestData>): Promise<ApiResponse<KycRequest>> {
     return this.client.post<KycRequest>('/legal_requests', data);
   }
 

@@ -4,7 +4,6 @@ import {
   CreateCategoryData,
   UpdateCategoryData,
   ApiResponse,
-  BaseFilterParams,
   InternalCategory,
   CategoryKind,
 } from '../types';
@@ -12,32 +11,20 @@ import {
   KindTranslator,
   KindKey,
 } from '../utils/translators';
+import { processQuery } from '../utils/query-transformer';
+import { CategoryQueryBuilder } from '../utils/query-builders';
+import {
+  CategoryFilterParams,
+  CategoryQueryParams,
+  CategoryListResponse,
+  CATEGORY_FIELD_TYPES,
+} from '../types/resources';
 
-export interface CategoryFilterParams extends BaseFilterParams {
-  // Common filters
-  search?: string; // Legacy search field - consider using 'q' instead
-  kind?: CategoryKind | KindKey | number; // Accept contextual, full, and integer values
-  parent_id?: number;
-  limit?: number;
-  
-  // Database field filters - any field from the categories table can be filtered
-  id?: number;
-  name?: string;
-  description?: string;
-  kind_id?: number;
-  uid?: string;
-  inserted_at?: string;
-  updated_at?: string;
-}
-
-export interface CategoryListResponse {
-  entries: Category[];
-  page_info: {
-    current_page: number;
-    total_pages: number;
-    total_entries: number;
-    page_size: number;
-  };
+/**
+ * @deprecated Use CategoryFilterParams from types/resources instead
+ */
+export interface LegacyCategoryFilterParams {
+  // Legacy interface - kept for backward compatibility
 }
 
 export class CategoriesResource {
@@ -216,11 +203,40 @@ export class CategoriesResource {
   }
 
   /**
-   * Delete a category
-   * Requires Client-Id header to be set in the configuration
-   * Note: Categories with assigned products or child categories cannot be deleted
+   * Query categories with enhanced query support
+   * @example
+   * await categories.query({ kind: 'published', parent_id: null })
    */
-  async delete(id: number): Promise<ApiResponse<void>> {
-    return this.client.delete<void>(`/categories/${id}`);
+  async query(params?: CategoryQueryParams): Promise<ApiResponse<CategoryListResponse>> {
+    const processedQuery = processQuery(params || {}, CATEGORY_FIELD_TYPES, { validate: true });
+    const translatedQuery = this.translateFilters(processedQuery);
+    const response = await this.client.get<{ entries: InternalCategory[]; page_info: any }>('/categories', translatedQuery);
+    
+    if (response.data?.entries) {
+      const translatedEntries = response.data.entries.map(c => this.translateCategoryToUserFacing(c));
+      return {
+        state: response.state,
+        data: { entries: translatedEntries, page_info: response.data.page_info }
+      };
+    }
+    
+    if (response.result?.entries) {
+      const translatedEntries = response.result.entries.map(c => this.translateCategoryToUserFacing(c));
+      return {
+        state: response.state,
+        result: { entries: translatedEntries, page_info: response.result.page_info }
+      };
+    }
+    
+    return { state: response.state, data: response.data as any, result: response.result as any };
+  }
+
+  /**
+   * Create a query builder for categories
+   * @example
+   * await sdk.categories.createQueryBuilder().whereKind('published').execute()
+   */
+  createQueryBuilder(initialQuery?: CategoryQueryParams): CategoryQueryBuilder {
+    return new CategoryQueryBuilder(this, initialQuery);
   }
 }

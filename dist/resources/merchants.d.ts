@@ -1,39 +1,11 @@
 import { HttpClient } from '../client';
-import { Merchant, CreateMerchantData, UpdateMerchantData, ApiResponse, BaseFilterParams, AccountStatus } from '../types';
-import { StatusKey, FeeStructureKey } from '../utils/translators';
-export interface MerchantFilterParams extends BaseFilterParams {
-    search?: string;
-    status?: AccountStatus | StatusKey | number;
-    limit?: number;
-    id?: number;
-    name?: string;
-    email?: string;
-    username?: string;
-    about?: string;
-    logo?: string;
-    sector?: string;
-    phone?: string;
-    business_type?: string;
-    theme_colour?: string;
-    uid?: string;
-    address_id?: number;
-    owner_id?: number;
-    domain_id?: number;
-    organisation_id?: number;
-    platform_fee_structure?: FeeStructureKey | number;
-    provider_fee_structure?: FeeStructureKey | number;
-    parent_merchant_id?: number;
-    inserted_at?: string;
-    updated_at?: string;
-}
-export interface MerchantListResponse {
-    entries: Merchant[];
-    page_info: {
-        current_page: number;
-        total_pages: number;
-        total_entries: number;
-        page_size: number;
-    };
+import { Merchant, CreateMerchantData, UpdateMerchantData, ApiResponse, MerchantBalance, MerchantLimits, MerchantSubscription, MerchantInvoice } from '../types';
+import { MerchantQueryBuilder } from '../utils/query-builders';
+import { MerchantFilterParams, MerchantQueryParams, MerchantListResponse } from '../types/resources';
+/**
+ * @deprecated Use MerchantFilterParams from types/resources instead
+ */
+export interface LegacyMerchantFilterParams {
 }
 export declare class MerchantsResource {
     private client;
@@ -69,22 +41,34 @@ export declare class MerchantsResource {
     /**
      * Get merchant account balances
      */
-    balances(): Promise<ApiResponse>;
+    balances(): Promise<ApiResponse<MerchantBalance>>;
     /**
      * Get merchant account limits
      */
-    limits(): Promise<ApiResponse>;
+    limits(): Promise<ApiResponse<MerchantLimits>>;
     /**
      * Get merchant subscription plan details
      */
-    subscription(): Promise<ApiResponse>;
+    subscription(): Promise<ApiResponse<MerchantSubscription>>;
     /**
      * Get list of merchant account invoices
      */
-    invoices(): Promise<ApiResponse>;
+    invoices(): Promise<ApiResponse<MerchantInvoice[]>>;
     /**
      * Get a specific merchant invoice by ID
      */
-    invoice(invoiceId: string): Promise<ApiResponse>;
+    invoice(invoiceId: string): Promise<ApiResponse<MerchantInvoice>>;
+    /**
+     * Query merchants with enhanced query support
+     * @example
+     * await merchants.query({ status: 'approved', sector: 'retail' })
+     */
+    query(params?: MerchantQueryParams): Promise<ApiResponse<MerchantListResponse>>;
+    /**
+     * Create a query builder for merchants
+     * @example
+     * await sdk.merchants.createQueryBuilder().whereStatus('approved').execute()
+     */
+    createQueryBuilder(initialQuery?: MerchantQueryParams): MerchantQueryBuilder;
 }
 //# sourceMappingURL=merchants.d.ts.map

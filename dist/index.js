@@ -491,368 +491,6 @@ const StatusTranslator = {
     }
 };
 
-class MerchantsResource {
-    constructor(client) {
-        this.client = client;
-    }
-    /**
-     * Convert internal merchant data (integers) to user-facing data (strings)
-     */
-    translateMerchantToUserFacing(internal) {
-        return {
-            ...internal,
-            status: StatusTranslator.toStringWithoutContext(internal.status, 'account'),
-            platform_fee_structure: FeeStructureTranslator.toString(internal.platform_fee_structure),
-            provider_fee_structure: FeeStructureTranslator.toString(internal.provider_fee_structure),
-        };
-    }
-    /**
-     * Convert user-facing merchant data (strings) to internal data (integers)
-     */
-    translateMerchantToInternal(userFacing) {
-        const internal = { ...userFacing };
-        if ('status' in userFacing && userFacing.status) {
-            internal.status = typeof userFacing.status === 'string'
-                ? StatusTranslator.toIntegerWithContext(userFacing.status, 'account')
-                : userFacing.status;
-        }
-        if ('platform_fee_structure' in userFacing && userFacing.platform_fee_structure) {
-            internal.platform_fee_structure = typeof userFacing.platform_fee_structure === 'string'
-                ? FeeStructureTranslator.toInteger(userFacing.platform_fee_structure)
-                : userFacing.platform_fee_structure;
-        }
-        if ('provider_fee_structure' in userFacing && userFacing.provider_fee_structure) {
-            internal.provider_fee_structure = typeof userFacing.provider_fee_structure === 'string'
-                ? FeeStructureTranslator.toInteger(userFacing.provider_fee_structure)
-                : userFacing.provider_fee_structure;
-        }
-        return internal;
-    }
-    /**
-     * Convert filter parameters (strings to integers where needed)
-     */
-    translateFilters(params) {
-        if (!params)
-            return params;
-        const translated = { ...params };
-        if (params.status && typeof params.status === 'string') {
-            translated.status = StatusTranslator.toIntegerWithContext(params.status, 'account');
-        }
-        if (params.platform_fee_structure && typeof params.platform_fee_structure === 'string') {
-            translated.platform_fee_structure = FeeStructureTranslator.toInteger(params.platform_fee_structure);
-        }
-        if (params.provider_fee_structure && typeof params.provider_fee_structure === 'string') {
-            translated.provider_fee_structure = FeeStructureTranslator.toInteger(params.provider_fee_structure);
-        }
-        return translated;
-    }
-    /**
-     * List merchants with pagination and filtering
-     */
-    async list(params) {
-        var _a, _b;
-        const translatedParams = this.translateFilters(params);
-        const response = await this.client.get('/merchants', translatedParams);
-        if ((_a = response.data) === null || _a === void 0 ? void 0 : _a.entries) {
-            const translatedEntries = response.data.entries.map(merchant => this.translateMerchantToUserFacing(merchant));
-            return {
-                state: response.state,
-                data: {
-                    entries: translatedEntries,
-                    page_info: response.data.page_info
-                }
-            };
-        }
-        if ((_b = response.result) === null || _b === void 0 ? void 0 : _b.entries) {
-            const translatedEntries = response.result.entries.map(merchant => this.translateMerchantToUserFacing(merchant));
-            return {
-                state: response.state,
-                result: {
-                    entries: translatedEntries,
-                    page_info: response.result.page_info
-                }
-            };
-        }
-        return {
-            state: response.state,
-            data: response.data,
-            result: response.result
-        };
-    }
-    /**
-     * Get a specific merchant by ID
-     */
-    async get(id) {
-        const response = await this.client.get(`/merchants/${id}`);
-        if (response.data) {
-            const translatedMerchant = this.translateMerchantToUserFacing(response.data);
-            return {
-                state: response.state,
-                data: translatedMerchant
-            };
-        }
-        if (response.result) {
-            const translatedMerchant = this.translateMerchantToUserFacing(response.result);
-            return {
-                state: response.state,
-                result: translatedMerchant
-            };
-        }
-        return {
-            state: response.state,
-            data: response.data,
-            result: response.result
-        };
-    }
-    /**
-     * Create a new merchant
-     */
-    async create(data) {
-        const internalData = this.translateMerchantToInternal(data);
-        const response = await this.client.post('/merchants', internalData);
-        if (response.data) {
-            const translatedMerchant = this.translateMerchantToUserFacing(response.data);
-            return {
-                state: response.state,
-                data: translatedMerchant
-            };
-        }
-        if (response.result) {
-            const translatedMerchant = this.translateMerchantToUserFacing(response.result);
-            return {
-                state: response.state,
-                result: translatedMerchant
-            };
-        }
-        return {
-            state: response.state,
-            data: response.data,
-            result: response.result
-        };
-    }
-    /**
-     * Update an existing merchant
-     */
-    async update(id, data) {
-        const internalData = this.translateMerchantToInternal(data);
-        const response = await this.client.put(`/merchants/${id}`, internalData);
-        if (response.data) {
-            const translatedMerchant = this.translateMerchantToUserFacing(response.data);
-            return {
-                state: response.state,
-                data: translatedMerchant
-            };
-        }
-        if (response.result) {
-            const translatedMerchant = this.translateMerchantToUserFacing(response.result);
-            return {
-                state: response.state,
-                result: translatedMerchant
-            };
-        }
-        return {
-            state: response.state,
-            data: response.data,
-            result: response.result
-        };
-    }
-    /**
-     * Get merchant account balances
-     */
-    async balances() {
-        return this.client.post(`/merchants/account/balances`, {});
-    }
-    /**
-     * Get merchant account limits
-     */
-    async limits() {
-        return this.client.post(`/merchants/account/limits`, {});
-    }
-    /**
-     * Get merchant subscription plan details
-     */
-    async subscription() {
-        return this.client.post(`/merchants/account/plan`, {});
-    }
-    /**
-     * Get list of merchant account invoices
-     */
-    async invoices() {
-        return this.client.post(`/merchants/account/invoices`, {});
-    }
-    /**
-     * Get a specific merchant invoice by ID
-     */
-    async invoice(invoiceId) {
-        return this.client.post(`/merchants/account/invoice/${invoiceId}`, {});
-    }
-}
-
-class CategoriesResource {
-    constructor(client) {
-        this.client = client;
-    }
-    /**
-     * Convert internal category data (integers) to user-facing data (strings)
-     */
-    translateCategoryToUserFacing(internal) {
-        return {
-            ...internal,
-            kind: KindTranslator.toStringWithoutContext(internal.kind, 'product'),
-        };
-    }
-    /**
-     * Convert user-facing category data (strings) to internal data (integers)
-     */
-    translateCategoryToInternal(userFacing) {
-        const internal = { ...userFacing };
-        if ('kind' in userFacing && userFacing.kind) {
-            if (typeof userFacing.kind === 'string') {
-                internal.kind = KindTranslator.toIntegerWithContext(userFacing.kind, 'product');
-            }
-            else {
-                internal.kind = userFacing.kind;
-            }
-        }
-        return internal;
-    }
-    /**
-     * Convert filter parameters (strings to integers where needed)
-     */
-    translateFilters(params) {
-        if (!params)
-            return params;
-        const translated = { ...params };
-        if (params.kind && typeof params.kind === 'string') {
-            translated.kind = KindTranslator.toIntegerWithContext(params.kind, 'product');
-        }
-        return translated;
-    }
-    /**
-     * List categories with pagination and filtering
-     * Requires Client-Id header to be set in the configuration
-     */
-    async list(params) {
-        var _a, _b;
-        const translatedParams = this.translateFilters(params);
-        const response = await this.client.get('/categories', translatedParams);
-        if ((_a = response.data) === null || _a === void 0 ? void 0 : _a.entries) {
-            const translatedEntries = response.data.entries.map(category => this.translateCategoryToUserFacing(category));
-            return {
-                state: response.state,
-                data: {
-                    entries: translatedEntries,
-                    page_info: response.data.page_info
-                }
-            };
-        }
-        if ((_b = response.result) === null || _b === void 0 ? void 0 : _b.entries) {
-            const translatedEntries = response.result.entries.map(category => this.translateCategoryToUserFacing(category));
-            return {
-                state: response.state,
-                result: {
-                    entries: translatedEntries,
-                    page_info: response.result.page_info
-                }
-            };
-        }
-        return {
-            state: response.state,
-            data: response.data,
-            result: response.result
-        };
-    }
-    /**
-     * Get a specific category by ID
-     * Requires Client-Id header to be set in the configuration
-     */
-    async get(id) {
-        const response = await this.client.get(`/categories/${id}`);
-        if (response.data) {
-            const translatedCategory = this.translateCategoryToUserFacing(response.data);
-            return {
-                state: response.state,
-                data: translatedCategory
-            };
-        }
-        if (response.result) {
-            const translatedCategory = this.translateCategoryToUserFacing(response.result);
-            return {
-                state: response.state,
-                result: translatedCategory
-            };
-        }
-        return {
-            state: response.state,
-            data: response.data,
-            result: response.result
-        };
-    }
-    /**
-     * Create a new category
-     * Requires Client-Id header to be set in the configuration
-     */
-    async create(data) {
-        const internalData = this.translateCategoryToInternal(data);
-        const response = await this.client.post('/categories', internalData);
-        if (response.data) {
-            const translatedCategory = this.translateCategoryToUserFacing(response.data);
-            return {
-                state: response.state,
-                data: translatedCategory
-            };
-        }
-        if (response.result) {
-            const translatedCategory = this.translateCategoryToUserFacing(response.result);
-            return {
-                state: response.state,
-                result: translatedCategory
-            };
-        }
-        return {
-            state: response.state,
-            data: response.data,
-            result: response.result
-        };
-    }
-    /**
-     * Update an existing category
-     * Requires Client-Id header to be set in the configuration
-     * Note: parent_id is immutable and cannot be changed after creation
-     */
-    async update(id, data) {
-        const internalData = this.translateCategoryToInternal(data);
-        const response = await this.client.put(`/categories/${id}`, internalData);
-        if (response.data) {
-            const translatedCategory = this.translateCategoryToUserFacing(response.data);
-            return {
-                state: response.state,
-                data: translatedCategory
-            };
-        }
-        if (response.result) {
-            const translatedCategory = this.translateCategoryToUserFacing(response.result);
-            return {
-                state: response.state,
-                result: translatedCategory
-            };
-        }
-        return {
-            state: response.state,
-            data: response.data,
-            result: response.result
-        };
-    }
-    /**
-     * Delete a category
-     * Requires Client-Id header to be set in the configuration
-     * Note: Categories with assigned products or child categories cannot be deleted
-     */
-    async delete(id) {
-        return this.client.delete(`/categories/${id}`);
-    }
-}
-
 /**
  * Type-Based Query System
  */
@@ -1065,9 +703,1595 @@ class QueryBuilder {
     }
 }
 
-// Define field types for Orders to enable type validation
+/**
+ * Resource-specific query builders
+ *
+ * This file provides fluent query builder interfaces for each resource type,
+ * offering excellent IntelliSense and type safety for complex queries.
+ */
+/**
+ * Order Query Builder
+ * Provides a fluent interface for building complex order queries
+ *
+ * @example
+ * const orders = await sdk.orders.createQueryBuilder()
+ *   .whereStatus('confirmed')
+ *   .whereTotalRange(100, 1000)
+ *   .whereReferenceContains('ORDER-2024')
+ *   .paginate(1, 20)
+ *   .orderBy('inserted_at', 'desc')
+ *   .execute();
+ */
+class OrderQueryBuilder extends QueryBuilder {
+    constructor(resource, initialQuery) {
+        super(initialQuery);
+        this.resource = resource;
+    }
+    /**
+     * Execute the query and return the results
+     */
+    async execute() {
+        return this.resource.query(this.getRawQuery());
+    }
+    /**
+     * Filter by order status (contextual values)
+     */
+    whereStatus(status) {
+        if (Array.isArray(status)) {
+            return this.whereIn('status', status);
+        }
+        return this.where('status', status);
+    }
+    /**
+     * Filter by order kind/type (contextual values)
+     */
+    whereKind(kind) {
+        if (Array.isArray(kind)) {
+            return this.whereIn('kind', kind);
+        }
+        return this.where('kind', kind);
+    }
+    /**
+     * Filter by total amount range
+     */
+    whereTotalRange(min, max) {
+        return this.whereRange('total', min, max);
+    }
+    /**
+     * Filter by reference ID containing a string
+     */
+    whereReferenceContains(value) {
+        return this.whereContains('reference_id', value);
+    }
+    /**
+     * Filter by creation date range
+     */
+    whereCreatedBetween(after, before) {
+        return this.whereDateRange('inserted_at', after, before);
+    }
+    /**
+     * Filter by customer ID
+     */
+    whereCustomer(customerId) {
+        if (Array.isArray(customerId)) {
+            return this.whereIn('customer_id', customerId);
+        }
+        return this.where('customer_id', customerId);
+    }
+    /**
+     * Filter by billing plan ID
+     */
+    whereBillingPlan(planId) {
+        if (Array.isArray(planId)) {
+            return this.whereIn('billing_plan_id', planId);
+        }
+        return this.where('billing_plan_id', planId);
+    }
+}
+/**
+ * Product Query Builder
+ * Provides a fluent interface for building complex product queries
+ *
+ * @example
+ * const products = await sdk.products.createQueryBuilder()
+ *   .whereStatus('published')
+ *   .wherePriceRange(10, 100)
+ *   .whereTitleContains('shirt')
+ *   .wherePublic(true)
+ *   .paginate(1, 20)
+ *   .execute();
+ */
+class ProductQueryBuilder extends QueryBuilder {
+    constructor(resource, initialQuery) {
+        super(initialQuery);
+        this.resource = resource;
+    }
+    /**
+     * Execute the query and return the results
+     */
+    async execute() {
+        return this.resource.query(this.getRawQuery());
+    }
+    /**
+     * Filter by product status
+     */
+    whereStatus(status) {
+        if (Array.isArray(status)) {
+            return this.whereIn('status', status);
+        }
+        return this.where('status', status);
+    }
+    /**
+     * Filter by price range
+     */
+    wherePriceRange(min, max) {
+        return this.whereRange('price', min, max);
+    }
+    /**
+     * Filter by title containing a string
+     */
+    whereTitleContains(value) {
+        return this.whereContains('title', value);
+    }
+    /**
+     * Filter by public visibility
+     */
+    wherePublic(isPublic) {
+        return this.where('public', isPublic);
+    }
+    /**
+     * Filter by category
+     */
+    whereCategory(categoryId) {
+        if (Array.isArray(categoryId)) {
+            return this.whereIn('category_id', categoryId);
+        }
+        return this.where('category_id', categoryId);
+    }
+    /**
+     * Filter by availability (units remaining)
+     */
+    whereUnitsRemainingRange(min, max) {
+        return this.whereRange('units_remaining', min, max);
+    }
+    /**
+     * Filter by unlimited flag
+     */
+    whereUnlimited(isUnlimited) {
+        return this.where('unlimited', isUnlimited);
+    }
+}
+/**
+ * User Query Builder
+ * Provides a fluent interface for building complex user queries
+ *
+ * @example
+ * const users = await sdk.users.createQueryBuilder()
+ *   .whereStatus('approved')
+ *   .whereKind('organisation')
+ *   .whereEmailContains('@example.com')
+ *   .whereLevelRange(5, 10)
+ *   .paginate(1, 20)
+ *   .execute();
+ */
+class UserQueryBuilder extends QueryBuilder {
+    constructor(resource, initialQuery) {
+        super(initialQuery);
+        this.resource = resource;
+    }
+    /**
+     * Execute the query and return the results
+     */
+    async execute() {
+        return this.resource.query(this.getRawQuery());
+    }
+    /**
+     * Filter by account status
+     */
+    whereStatus(status) {
+        if (Array.isArray(status)) {
+            return this.whereIn('status', status);
+        }
+        return this.where('status', status);
+    }
+    /**
+     * Filter by user kind/type
+     */
+    whereKind(kind) {
+        if (Array.isArray(kind)) {
+            return this.whereIn('kind', kind);
+        }
+        return this.where('kind', kind);
+    }
+    /**
+     * Filter by email containing a string
+     */
+    whereEmailContains(value) {
+        return this.whereContains('email', value);
+    }
+    /**
+     * Filter by username containing a string
+     */
+    whereUsernameContains(value) {
+        return this.whereContains('username', value);
+    }
+    /**
+     * Filter by user level range
+     */
+    whereLevelRange(min, max) {
+        return this.whereRange('level', min, max);
+    }
+    /**
+     * Filter by organization
+     */
+    whereOrganisation(orgId) {
+        if (Array.isArray(orgId)) {
+            return this.whereIn('organisation_id', orgId);
+        }
+        return this.where('organisation_id', orgId);
+    }
+    /**
+     * Filter by role
+     */
+    whereRole(roleId) {
+        if (Array.isArray(roleId)) {
+            return this.whereIn('role_id', roleId);
+        }
+        return this.where('role_id', roleId);
+    }
+}
+/**
+ * Merchant Query Builder
+ * Provides a fluent interface for building complex merchant queries
+ *
+ * @example
+ * const merchants = await sdk.merchants.createQueryBuilder()
+ *   .whereStatus('approved')
+ *   .whereNameContains('Store')
+ *   .whereSector('retail')
+ *   .paginate(1, 20)
+ *   .execute();
+ */
+class MerchantQueryBuilder extends QueryBuilder {
+    constructor(resource, initialQuery) {
+        super(initialQuery);
+        this.resource = resource;
+    }
+    /**
+     * Execute the query and return the results
+     */
+    async execute() {
+        return this.resource.query(this.getRawQuery());
+    }
+    /**
+     * Filter by merchant status
+     */
+    whereStatus(status) {
+        if (Array.isArray(status)) {
+            return this.whereIn('status', status);
+        }
+        return this.where('status', status);
+    }
+    /**
+     * Filter by name containing a string
+     */
+    whereNameContains(value) {
+        return this.whereContains('name', value);
+    }
+    /**
+     * Filter by email containing a string
+     */
+    whereEmailContains(value) {
+        return this.whereContains('email', value);
+    }
+    /**
+     * Filter by sector
+     */
+    whereSector(sector) {
+        if (Array.isArray(sector)) {
+            return this.whereIn('sector', sector);
+        }
+        return this.where('sector', sector);
+    }
+    /**
+     * Filter by business type
+     */
+    whereBusinessType(type) {
+        if (Array.isArray(type)) {
+            return this.whereIn('business_type', type);
+        }
+        return this.where('business_type', type);
+    }
+    /**
+     * Filter by platform fee structure
+     */
+    wherePlatformFeeStructure(structure) {
+        if (Array.isArray(structure)) {
+            return this.whereIn('platform_fee_structure', structure);
+        }
+        return this.where('platform_fee_structure', structure);
+    }
+    /**
+     * Filter by organisation
+     */
+    whereOrganisation(orgId) {
+        if (Array.isArray(orgId)) {
+            return this.whereIn('organisation_id', orgId);
+        }
+        return this.where('organisation_id', orgId);
+    }
+}
+/**
+ * Category Query Builder
+ * Provides a fluent interface for building complex category queries
+ *
+ * @example
+ * const categories = await sdk.categories.createQueryBuilder()
+ *   .whereKind('published')
+ *   .whereNameContains('Electronics')
+ *   .whereParent(null)
+ *   .paginate(1, 20)
+ *   .execute();
+ */
+class CategoryQueryBuilder extends QueryBuilder {
+    constructor(resource, initialQuery) {
+        super(initialQuery);
+        this.resource = resource;
+    }
+    /**
+     * Execute the query and return the results
+     */
+    async execute() {
+        return this.resource.query(this.getRawQuery());
+    }
+    /**
+     * Filter by category kind
+     */
+    whereKind(kind) {
+        if (Array.isArray(kind)) {
+            return this.whereIn('kind', kind);
+        }
+        return this.where('kind', kind);
+    }
+    /**
+     * Filter by name containing a string
+     */
+    whereNameContains(value) {
+        return this.whereContains('name', value);
+    }
+    /**
+     * Filter by parent category
+     */
+    whereParent(parentId) {
+        if (parentId === null) {
+            return this.where('parent_id', null);
+        }
+        if (Array.isArray(parentId)) {
+            return this.whereIn('parent_id', parentId);
+        }
+        return this.where('parent_id', parentId);
+    }
+    /**
+     * Filter by root categories only (no parent)
+     */
+    whereRootOnly() {
+        return this.where('parent_id', null);
+    }
+}
+/**
+ * Billing Plan Query Builder
+ * Provides a fluent interface for building complex billing plan queries
+ *
+ * @example
+ * const plans = await sdk.billingPlans.createQueryBuilder()
+ *   .whereKind('subscription')
+ *   .wherePriceRange(10, 100)
+ *   .wherePublic(true)
+ *   .paginate(1, 20)
+ *   .execute();
+ */
+class BillingPlanQueryBuilder extends QueryBuilder {
+    constructor(resource, initialQuery) {
+        super(initialQuery);
+        this.resource = resource;
+    }
+    /**
+     * Execute the query and return the results
+     */
+    async execute() {
+        return this.resource.query(this.getRawQuery());
+    }
+    /**
+     * Filter by plan kind/type
+     */
+    whereKind(kind) {
+        if (Array.isArray(kind)) {
+            return this.whereIn('kind', kind);
+        }
+        return this.where('kind', kind);
+    }
+    /**
+     * Filter by flat rate range
+     */
+    whereFlatRateRange(min, max) {
+        return this.whereRange('flat_rate', min, max);
+    }
+    /**
+     * Filter by transaction fee range
+     */
+    whereTransactionFeeRange(min, max) {
+        return this.whereRange('transaction_fee', min, max);
+    }
+    /**
+     * Filter by public visibility
+     */
+    wherePublic(isPublic) {
+        return this.where('public', isPublic);
+    }
+    /**
+     * Filter by auto charge
+     */
+    whereAutoCharge(autoCharge) {
+        return this.where('auto_charge', autoCharge);
+    }
+    /**
+     * Filter by name containing a string
+     */
+    whereNameContains(value) {
+        return this.whereContains('name', value);
+    }
+    /**
+     * Filter by duration range (in days)
+     */
+    whereDurationRange(min, max) {
+        return this.whereRange('duration', min, max);
+    }
+}
+/**
+ * Subscription Query Builder
+ * Provides a fluent interface for building complex subscription queries
+ *
+ * @example
+ * const subscriptions = await sdk.subscriptions.createQueryBuilder()
+ *   .whereStatus('active')
+ *   .whereBillingPlan(123)
+ *   .whereStartDateAfter('2024-01-01')
+ *   .paginate(1, 20)
+ *   .execute();
+ */
+class SubscriptionQueryBuilder extends QueryBuilder {
+    constructor(resource, initialQuery) {
+        super(initialQuery);
+        this.resource = resource;
+    }
+    /**
+     * Execute the query and return the results
+     */
+    async execute() {
+        return this.resource.query(this.getRawQuery());
+    }
+    /**
+     * Filter by subscription status
+     */
+    whereStatus(status) {
+        if (Array.isArray(status)) {
+            return this.whereIn('status', status);
+        }
+        return this.where('status', status);
+    }
+    /**
+     * Filter by billing plan
+     */
+    whereBillingPlan(planId) {
+        if (Array.isArray(planId)) {
+            return this.whereIn('billing_plan_id', planId);
+        }
+        return this.where('billing_plan_id', planId);
+    }
+    /**
+     * Filter by customer
+     */
+    whereCustomer(customerId) {
+        if (Array.isArray(customerId)) {
+            return this.whereIn('customer_id', customerId);
+        }
+        return this.where('customer_id', customerId);
+    }
+    /**
+     * Filter by start date after a specific date
+     */
+    whereStartDateAfter(date) {
+        return this.whereDateRange('start_date', date, undefined);
+    }
+    /**
+     * Filter by start date before a specific date
+     */
+    whereStartDateBefore(date) {
+        return this.whereDateRange('start_date', undefined, date);
+    }
+    /**
+     * Filter by active subscriptions (not canceled)
+     */
+    whereActive() {
+        return this.where('canceled_at', null);
+    }
+    /**
+     * Filter by canceled subscriptions
+     */
+    whereCanceled() {
+        // This would need a "not null" check which might require additional logic
+        // For now, we can use a date range that's been filled
+        return this.whereDateRange('canceled_at', '1970-01-01', undefined);
+    }
+}
+/**
+ * Payment Link Query Builder
+ */
+class PaymentLinkQueryBuilder extends QueryBuilder {
+    constructor(resource, initialQuery) {
+        super(initialQuery);
+        this.resource = resource;
+    }
+    async execute() {
+        return this.resource.query(this.getRawQuery());
+    }
+    whereTotalGreaterThan(amount) {
+        return this.whereRange('total', amount, undefined);
+    }
+    whereTotalLessThan(amount) {
+        return this.whereRange('total', undefined, amount);
+    }
+    whereStatusIn(statuses) {
+        return this.whereIn('status', statuses);
+    }
+    whereKindIn(kinds) {
+        return this.whereIn('kind', kinds);
+    }
+}
+/**
+ * Financial Account Query Builder
+ */
+class FinancialAccountQueryBuilder extends QueryBuilder {
+    constructor(resource, initialQuery) {
+        super(initialQuery);
+        this.resource = resource;
+    }
+    async execute() {
+        return this.resource.query(this.getRawQuery());
+    }
+    whereTypeEquals(type) {
+        return this.where('type', type);
+    }
+    whereProviderContains(provider) {
+        return this.whereContains('provider', provider);
+    }
+    whereActiveEquals(active) {
+        return this.where('active', active);
+    }
+    whereIsExternalEquals(isExternal) {
+        return this.where('is_external', isExternal);
+    }
+}
+/**
+ * Financial Request Query Builder
+ */
+class FinancialRequestQueryBuilder extends QueryBuilder {
+    constructor(resource, initialQuery) {
+        super(initialQuery);
+        this.resource = resource;
+    }
+    async execute() {
+        return this.resource.query(this.getRawQuery());
+    }
+    whereStatusIn(statuses) {
+        return this.whereIn('status', statuses);
+    }
+    whereTotalGreaterThan(amount) {
+        return this.whereRange('total', amount, undefined);
+    }
+    whereTotalLessThan(amount) {
+        return this.whereRange('total', undefined, amount);
+    }
+    whereMerchantIdEquals(merchantId) {
+        return this.where('merchant_id', merchantId);
+    }
+}
+/**
+ * Webhook URL Query Builder
+ */
+class WebhookUrlQueryBuilder extends QueryBuilder {
+    constructor(resource, initialQuery) {
+        super(initialQuery);
+        this.resource = resource;
+    }
+    async execute() {
+        return this.resource.query(this.getRawQuery());
+    }
+    whereEventEquals(event) {
+        return this.where('event', event);
+    }
+    whereMerchantIdEquals(merchantId) {
+        return this.where('merchant_id', merchantId);
+    }
+    whereOrgIdEquals(orgId) {
+        return this.where('org_id', orgId);
+    }
+    whereUrlContains(url) {
+        return this.whereContains('url', url);
+    }
+}
+/**
+ * Token Query Builder
+ */
+class TokenQueryBuilder extends QueryBuilder {
+    constructor(resource, initialQuery) {
+        super(initialQuery);
+        this.resource = resource;
+    }
+    async execute() {
+        return this.resource.query(this.getRawQuery());
+    }
+    whereEnabledEquals(enabled) {
+        return this.where('enabled', enabled);
+    }
+    whereKindIn(kinds) {
+        return this.whereIn('kind', kinds);
+    }
+    whereUserIdEquals(userId) {
+        return this.where('user_id', userId);
+    }
+    whereProviderEquals(provider) {
+        return this.where('provider', provider);
+    }
+}
+/**
+ * Address Query Builder
+ */
+class AddressQueryBuilder extends QueryBuilder {
+    constructor(resource, initialQuery) {
+        super(initialQuery);
+        this.resource = resource;
+    }
+    async execute() {
+        return this.resource.query(this.getRawQuery());
+    }
+    whereCountryEquals(country) {
+        return this.where('country', country);
+    }
+    whereStateEquals(state) {
+        return this.where('state', state);
+    }
+    whereCityContains(city) {
+        return this.whereContains('city', city);
+    }
+    whereKindIn(kinds) {
+        return this.whereIn('kind', kinds);
+    }
+}
+/**
+ * Currency Query Builder
+ */
+class CurrencyQueryBuilder extends QueryBuilder {
+    constructor(resource, initialQuery) {
+        super(initialQuery);
+        this.resource = resource;
+    }
+    async execute() {
+        return this.resource.query(this.getRawQuery());
+    }
+    whereCodeIn(codes) {
+        return this.whereIn('code', codes);
+    }
+    whereIsFloatEquals(isFloat) {
+        return this.where('is_float', isFloat);
+    }
+}
+/**
+ * Exchange Rate Query Builder
+ */
+class ExchangeRateQueryBuilder extends QueryBuilder {
+    constructor(resource, initialQuery) {
+        super(initialQuery);
+        this.resource = resource;
+    }
+    async execute() {
+        return this.resource.query(this.getRawQuery());
+    }
+    whereSourceIdEquals(sourceId) {
+        return this.where('source_id', sourceId);
+    }
+    whereDestinationIdEquals(destinationId) {
+        return this.where('destination_id', destinationId);
+    }
+    whereRateGreaterThan(rate) {
+        return this.whereRange('rate', rate, undefined);
+    }
+}
+/**
+ * Fee Query Builder
+ */
+class FeeQueryBuilder extends QueryBuilder {
+    constructor(resource, initialQuery) {
+        super(initialQuery);
+        this.resource = resource;
+    }
+    async execute() {
+        return this.resource.query(this.getRawQuery());
+    }
+    whereKindIn(kinds) {
+        return this.whereIn('kind', kinds);
+    }
+    whereTotalGreaterThan(amount) {
+        return this.whereRange('total', amount, undefined);
+    }
+    whereCurrencyCodeEquals(code) {
+        return this.where('currency_code', code);
+    }
+    whereCompoundEquals(compound) {
+        return this.where('compound', compound);
+    }
+}
+/**
+ * Payment Method Query Builder
+ */
+class PaymentMethodQueryBuilder extends QueryBuilder {
+    constructor(resource, initialQuery) {
+        super(initialQuery);
+        this.resource = resource;
+    }
+    async execute() {
+        return this.resource.query(this.getRawQuery());
+    }
+    whereActiveEquals(active) {
+        return this.where('active', active);
+    }
+    whereProviderEquals(provider) {
+        return this.where('provider', provider);
+    }
+    whereCodeEquals(code) {
+        return this.where('code', code);
+    }
+}
+/**
+ * Post Query Builder
+ */
+class PostQueryBuilder extends QueryBuilder {
+    constructor(resource, initialQuery) {
+        super(initialQuery);
+        this.resource = resource;
+    }
+    async execute() {
+        return this.resource.query(this.getRawQuery());
+    }
+    whereStatusIn(statuses) {
+        return this.whereIn('status', statuses);
+    }
+    whereKindIn(kinds) {
+        return this.whereIn('kind', kinds);
+    }
+    whereAuthorIdEquals(authorId) {
+        return this.where('author_id', authorId);
+    }
+    whereTitleContains(title) {
+        return this.whereContains('title', title);
+    }
+}
+/**
+ * Transaction Entry Query Builder
+ */
+class TransactionEntryQueryBuilder extends QueryBuilder {
+    constructor(resource, initialQuery) {
+        super(initialQuery);
+        this.resource = resource;
+    }
+    async execute() {
+        return this.resource.query(this.getRawQuery());
+    }
+    whereAmountGreaterThan(amount) {
+        return this.whereRange('amount', amount, undefined);
+    }
+    whereAmountLessThan(amount) {
+        return this.whereRange('amount', undefined, amount);
+    }
+    whereTypeIn(types) {
+        return this.whereIn('type', types);
+    }
+    whereTransactionIdEquals(transactionId) {
+        return this.where('transaction_id', transactionId);
+    }
+    whereFinancialAccountIdEquals(accountId) {
+        return this.where('financial_account_id', accountId);
+    }
+}
+
+/**
+ * Resource-specific types and interfaces
+ *
+ * This file contains all filter parameters, list responses, and field type mappings
+ * for each resource in the SDK. This provides clear IntelliSense and type safety.
+ */
+// ============================================================================
+// FIELD TYPE MAPPINGS
+// ============================================================================
+// These define what operations are available on each field for type-safe querying
+/**
+ * Order field types - defines what operations are available on each field
+ */
 const ORDER_FIELD_TYPES = {
-    };
+    id: 'number',
+    reference_id: 'string',
+    total: 'number',
+    status: 'number',
+    kind: 'number',
+    status_on: 'number',
+    uid: 'string',
+    cart_id: 'number',
+    currency_id: 'number',
+    customer_id: 'number',
+    payment_link_id: 'number',
+    billing_plan_id: 'number',
+    session_id: 'string',
+    inserted_at: 'date',
+    updated_at: 'date',
+};
+/**
+ * Product field types
+ */
+const PRODUCT_FIELD_TYPES = {
+    id: 'number',
+    title: 'string',
+    teaser: 'string',
+    price: 'number',
+    permalink: 'string',
+    image: 'string',
+    status: 'number',
+    public: 'boolean',
+    unlimited: 'boolean',
+    units_remaining: 'number',
+    units_sold: 'number',
+    rating_sum: 'number',
+    rating_count: 'number',
+    tag_ids: 'array',
+    uid: 'string',
+    category_id: 'number',
+    currency_id: 'number',
+    user_id: 'number',
+    inserted_at: 'date',
+    updated_at: 'date',
+};
+/**
+ * User field types
+ */
+const USER_FIELD_TYPES = {
+    id: 'number',
+    email: 'string',
+    phone: 'string',
+    first_name: 'string',
+    last_name: 'string',
+    username: 'string',
+    status: 'number',
+    kind: 'number',
+    level: 'number',
+    dob: 'number',
+    sex: 'number',
+    image: 'string',
+    uid: 'string',
+    organisation_id: 'number',
+    role_id: 'number',
+    inserted_at: 'date',
+    updated_at: 'date',
+};
+/**
+ * Merchant field types
+ */
+const MERCHANT_FIELD_TYPES = {
+    id: 'number',
+    name: 'string',
+    email: 'string',
+    username: 'string',
+    about: 'string',
+    logo: 'string',
+    sector: 'string',
+    status: 'number',
+    phone: 'string',
+    business_type: 'string',
+    theme_colour: 'string',
+    uid: 'string',
+    address_id: 'number',
+    owner_id: 'number',
+    domain_id: 'number',
+    organisation_id: 'number',
+    platform_fee_structure: 'number',
+    provider_fee_structure: 'number',
+    parent_merchant_id: 'number',
+    inserted_at: 'date',
+    updated_at: 'date',
+};
+/**
+ * Category field types
+ */
+const CATEGORY_FIELD_TYPES = {
+    id: 'number',
+    name: 'string',
+    description: 'string',
+    kind: 'number',
+    kind_id: 'number',
+    parent_id: 'number',
+    uid: 'string',
+    inserted_at: 'date',
+    updated_at: 'date',
+};
+/**
+ * Billing Plan field types
+ */
+const BILLING_PLAN_FIELD_TYPES = {
+    id: 'number',
+    name: 'string',
+    description: 'string',
+    flat_rate: 'number',
+    transaction_fee: 'number',
+    transaction_percentage: 'number',
+    transaction_percentage_additional: 'number',
+    transaction_minimum_fee: 'number',
+    minimum_fee: 'number',
+    duration: 'number',
+    status: 'number',
+    kind: 'number',
+    billing_cycle: 'number',
+    trial_period: 'number',
+    charge_strategy: 'number',
+    auto_charge: 'boolean',
+    public: 'boolean',
+    payout_period: 'number',
+    payout_value_limit: 'number',
+    payout_percentage_limit: 'number',
+    uid: 'string',
+    currency_id: 'number',
+    payment_provider_id: 'number',
+    inserted_at: 'date',
+    updated_at: 'date',
+};
+/**
+ * Subscription field types
+ */
+const SUBSCRIPTION_FIELD_TYPES = {
+    id: 'number',
+    status: 'number',
+    kind: 'number',
+    record_id: 'number',
+    record: 'string',
+    start_date: 'date',
+    end_date: 'date',
+    current_period_start: 'date',
+    current_period_end: 'date',
+    trial_end: 'date',
+    canceled_at: 'date',
+    uid: 'string',
+    token: 'string',
+    billing_plan_id: 'number',
+    customer_id: 'number',
+    inserted_at: 'date',
+    updated_at: 'date',
+};
+/**
+ * Payment Link field types
+ */
+const PAYMENT_LINK_FIELD_TYPES = {
+    id: 'number',
+    uid: 'string',
+    title: 'string',
+    description: 'string',
+    total: 'number',
+    usage_limit: 'number',
+    expires_at: 'date',
+    status: 'number',
+    kind: 'number',
+    customer_id: 'number',
+    currency_id: 'number',
+    order_id: 'number',
+    inserted_at: 'date',
+    updated_at: 'date',
+};
+/**
+ * Financial Account field types
+ */
+const FINANCIAL_ACCOUNT_FIELD_TYPES = {
+    id: 'number',
+    name: 'string',
+    type: 'string',
+    provider: 'string',
+    is_external: 'boolean',
+    fingerprint: 'string',
+    record: 'string',
+    record_id: 'number',
+    active: 'boolean',
+    code: 'string',
+    adapter: 'string',
+    logo: 'string',
+    website: 'string',
+    inserted_at: 'date',
+    updated_at: 'date',
+};
+/**
+ * Financial Request field types
+ */
+const FINANCIAL_REQUEST_FIELD_TYPES = {
+    id: 'number',
+    total: 'number',
+    status: 'number',
+    type: 'number',
+    sub_type: 'number',
+    fee_total: 'number',
+    reference_id: 'string',
+    reviewed_at: 'date',
+    due_at: 'date',
+    balance_on_request: 'number',
+    source_id: 'number',
+    destination_id: 'number',
+    merchant_id: 'number',
+    requester_id: 'number',
+    reviewer_id: 'number',
+    currency_id: 'number',
+    evidence_file_id: 'number',
+    inserted_at: 'date',
+    updated_at: 'date',
+};
+/**
+ * Webhook URL field types
+ */
+const WEBHOOK_URL_FIELD_TYPES = {
+    id: 'number',
+    url: 'string',
+    event: 'string',
+    uid: 'string',
+    merchant_id: 'number',
+    org_id: 'number',
+    inserted_at: 'date',
+    updated_at: 'date',
+};
+/**
+ * Token field types
+ */
+const TOKEN_FIELD_TYPES = {
+    id: 'number',
+    public_key: 'string',
+    title: 'string',
+    provider: 'string',
+    kind: 'number',
+    enabled: 'boolean',
+    expires: 'number',
+    user_id: 'number',
+    role_id: 'number',
+    inserted_at: 'date',
+    updated_at: 'date',
+};
+/**
+ * Address field types
+ */
+const ADDRESS_FIELD_TYPES = {
+    id: 'number',
+    hash: 'string',
+    kind: 'number',
+    kind_id: 'number',
+    lang: 'number',
+    lat: 'number',
+    street: 'string',
+    street_optional: 'string',
+    city: 'string',
+    state: 'string',
+    country: 'string',
+    region: 'string',
+    town: 'string',
+    inserted_at: 'date',
+    updated_at: 'date',
+};
+/**
+ * Currency field types
+ */
+const CURRENCY_FIELD_TYPES = {
+    id: 'number',
+    code: 'string',
+    flag: 'string',
+    is_float: 'boolean',
+    inserted_at: 'date',
+    updated_at: 'date',
+};
+/**
+ * Exchange Rate field types
+ */
+const EXCHANGE_RATE_FIELD_TYPES = {
+    id: 'number',
+    source_id: 'number',
+    destination_id: 'number',
+    rate: 'number',
+    expires: 'number',
+    source: 'string',
+    user_id: 'number',
+    inserted_at: 'date',
+    updated_at: 'date',
+};
+/**
+ * Fee field types
+ */
+const FEE_FIELD_TYPES = {
+    id: 'number',
+    title: 'string',
+    total: 'number',
+    unit: 'number',
+    kind: 'number',
+    priority: 'number',
+    compound: 'boolean',
+    fee_payer: 'number',
+    currency_code: 'string',
+    hash: 'string',
+    fee_set_id: 'number',
+    currency_id: 'number',
+    user_id: 'number',
+    inserted_at: 'date',
+    updated_at: 'date',
+};
+/**
+ * Payment Method field types
+ */
+const PAYMENT_METHOD_FIELD_TYPES = {
+    id: 'number',
+    name: 'string',
+    code: 'string',
+    provider: 'string',
+    active: 'boolean',
+    payment_provider_id: 'number',
+    financial_account_id: 'number',
+    inserted_at: 'date',
+    updated_at: 'date',
+};
+/**
+ * Post field types
+ */
+const POST_FIELD_TYPES = {
+    id: 'number',
+    title: 'string',
+    content: 'string',
+    status: 'number',
+    kind: 'number',
+    author_id: 'number',
+    inserted_at: 'date',
+    updated_at: 'date',
+};
+/**
+ * Transaction Entry field types
+ */
+const TRANSACTION_ENTRY_FIELD_TYPES = {
+    id: 'number',
+    amount: 'number',
+    type: 'number',
+    transaction_id: 'number',
+    financial_account_id: 'number',
+    inserted_at: 'date',
+    updated_at: 'date',
+};
+
+class MerchantsResource {
+    constructor(client) {
+        this.client = client;
+    }
+    /**
+     * Convert internal merchant data (integers) to user-facing data (strings)
+     */
+    translateMerchantToUserFacing(internal) {
+        return {
+            ...internal,
+            status: StatusTranslator.toStringWithoutContext(internal.status, 'account'),
+            platform_fee_structure: FeeStructureTranslator.toString(internal.platform_fee_structure),
+            provider_fee_structure: FeeStructureTranslator.toString(internal.provider_fee_structure),
+        };
+    }
+    /**
+     * Convert user-facing merchant data (strings) to internal data (integers)
+     */
+    translateMerchantToInternal(userFacing) {
+        const internal = { ...userFacing };
+        if ('status' in userFacing && userFacing.status) {
+            internal.status = typeof userFacing.status === 'string'
+                ? StatusTranslator.toIntegerWithContext(userFacing.status, 'account')
+                : userFacing.status;
+        }
+        if ('platform_fee_structure' in userFacing && userFacing.platform_fee_structure) {
+            internal.platform_fee_structure = typeof userFacing.platform_fee_structure === 'string'
+                ? FeeStructureTranslator.toInteger(userFacing.platform_fee_structure)
+                : userFacing.platform_fee_structure;
+        }
+        if ('provider_fee_structure' in userFacing && userFacing.provider_fee_structure) {
+            internal.provider_fee_structure = typeof userFacing.provider_fee_structure === 'string'
+                ? FeeStructureTranslator.toInteger(userFacing.provider_fee_structure)
+                : userFacing.provider_fee_structure;
+        }
+        return internal;
+    }
+    /**
+     * Convert filter parameters (strings to integers where needed)
+     */
+    translateFilters(params) {
+        if (!params)
+            return params;
+        const translated = { ...params };
+        if (params.status && typeof params.status === 'string') {
+            translated.status = StatusTranslator.toIntegerWithContext(params.status, 'account');
+        }
+        if (params.platform_fee_structure && typeof params.platform_fee_structure === 'string') {
+            translated.platform_fee_structure = FeeStructureTranslator.toInteger(params.platform_fee_structure);
+        }
+        if (params.provider_fee_structure && typeof params.provider_fee_structure === 'string') {
+            translated.provider_fee_structure = FeeStructureTranslator.toInteger(params.provider_fee_structure);
+        }
+        return translated;
+    }
+    /**
+     * List merchants with pagination and filtering
+     */
+    async list(params) {
+        var _a, _b;
+        const translatedParams = this.translateFilters(params);
+        const response = await this.client.get('/merchants', translatedParams);
+        if ((_a = response.data) === null || _a === void 0 ? void 0 : _a.entries) {
+            const translatedEntries = response.data.entries.map(merchant => this.translateMerchantToUserFacing(merchant));
+            return {
+                state: response.state,
+                data: {
+                    entries: translatedEntries,
+                    page_info: response.data.page_info
+                }
+            };
+        }
+        if ((_b = response.result) === null || _b === void 0 ? void 0 : _b.entries) {
+            const translatedEntries = response.result.entries.map(merchant => this.translateMerchantToUserFacing(merchant));
+            return {
+                state: response.state,
+                result: {
+                    entries: translatedEntries,
+                    page_info: response.result.page_info
+                }
+            };
+        }
+        return {
+            state: response.state,
+            data: response.data,
+            result: response.result
+        };
+    }
+    /**
+     * Get a specific merchant by ID
+     */
+    async get(id) {
+        const response = await this.client.get(`/merchants/${id}`);
+        if (response.data) {
+            const translatedMerchant = this.translateMerchantToUserFacing(response.data);
+            return {
+                state: response.state,
+                data: translatedMerchant
+            };
+        }
+        if (response.result) {
+            const translatedMerchant = this.translateMerchantToUserFacing(response.result);
+            return {
+                state: response.state,
+                result: translatedMerchant
+            };
+        }
+        return {
+            state: response.state,
+            data: response.data,
+            result: response.result
+        };
+    }
+    /**
+     * Create a new merchant
+     */
+    async create(data) {
+        const internalData = this.translateMerchantToInternal(data);
+        const response = await this.client.post('/merchants', internalData);
+        if (response.data) {
+            const translatedMerchant = this.translateMerchantToUserFacing(response.data);
+            return {
+                state: response.state,
+                data: translatedMerchant
+            };
+        }
+        if (response.result) {
+            const translatedMerchant = this.translateMerchantToUserFacing(response.result);
+            return {
+                state: response.state,
+                result: translatedMerchant
+            };
+        }
+        return {
+            state: response.state,
+            data: response.data,
+            result: response.result
+        };
+    }
+    /**
+     * Update an existing merchant
+     */
+    async update(id, data) {
+        const internalData = this.translateMerchantToInternal(data);
+        const response = await this.client.put(`/merchants/${id}`, internalData);
+        if (response.data) {
+            const translatedMerchant = this.translateMerchantToUserFacing(response.data);
+            return {
+                state: response.state,
+                data: translatedMerchant
+            };
+        }
+        if (response.result) {
+            const translatedMerchant = this.translateMerchantToUserFacing(response.result);
+            return {
+                state: response.state,
+                result: translatedMerchant
+            };
+        }
+        return {
+            state: response.state,
+            data: response.data,
+            result: response.result
+        };
+    }
+    /**
+     * Get merchant account balances
+     */
+    async balances() {
+        return this.client.get('/merchants/account/balances');
+    }
+    /**
+     * Get merchant account limits
+     */
+    async limits() {
+        return this.client.get('/merchants/account/limits');
+    }
+    /**
+     * Get merchant subscription plan details
+     */
+    async subscription() {
+        return this.client.get('/merchants/account/plan');
+    }
+    /**
+     * Get list of merchant account invoices
+     */
+    async invoices() {
+        return this.client.get('/merchants/account/invoices');
+    }
+    /**
+     * Get a specific merchant invoice by ID
+     */
+    async invoice(invoiceId) {
+        return this.client.get(`/merchants/account/invoice/${invoiceId}`);
+    }
+    /**
+     * Query merchants with enhanced query support
+     * @example
+     * await merchants.query({ status: 'approved', sector: 'retail' })
+     */
+    async query(params) {
+        var _a, _b;
+        const processedQuery = processQuery(params || {}, MERCHANT_FIELD_TYPES, { });
+        const translatedQuery = this.translateFilters(processedQuery);
+        const response = await this.client.get('/merchants', translatedQuery);
+        if ((_a = response.data) === null || _a === void 0 ? void 0 : _a.entries) {
+            const translatedEntries = response.data.entries.map(m => this.translateMerchantToUserFacing(m));
+            return {
+                state: response.state,
+                data: { entries: translatedEntries, page_info: response.data.page_info }
+            };
+        }
+        if ((_b = response.result) === null || _b === void 0 ? void 0 : _b.entries) {
+            const translatedEntries = response.result.entries.map(m => this.translateMerchantToUserFacing(m));
+            return {
+                state: response.state,
+                result: { entries: translatedEntries, page_info: response.result.page_info }
+            };
+        }
+        return { state: response.state, data: response.data, result: response.result };
+    }
+    /**
+     * Create a query builder for merchants
+     * @example
+     * await sdk.merchants.createQueryBuilder().whereStatus('approved').execute()
+     */
+    createQueryBuilder(initialQuery) {
+        return new MerchantQueryBuilder(this, initialQuery);
+    }
+}
+
+class CategoriesResource {
+    constructor(client) {
+        this.client = client;
+    }
+    /**
+     * Convert internal category data (integers) to user-facing data (strings)
+     */
+    translateCategoryToUserFacing(internal) {
+        return {
+            ...internal,
+            kind: KindTranslator.toStringWithoutContext(internal.kind, 'product'),
+        };
+    }
+    /**
+     * Convert user-facing category data (strings) to internal data (integers)
+     */
+    translateCategoryToInternal(userFacing) {
+        const internal = { ...userFacing };
+        if ('kind' in userFacing && userFacing.kind) {
+            if (typeof userFacing.kind === 'string') {
+                internal.kind = KindTranslator.toIntegerWithContext(userFacing.kind, 'product');
+            }
+            else {
+                internal.kind = userFacing.kind;
+            }
+        }
+        return internal;
+    }
+    /**
+     * Convert filter parameters (strings to integers where needed)
+     */
+    translateFilters(params) {
+        if (!params)
+            return params;
+        const translated = { ...params };
+        if (params.kind && typeof params.kind === 'string') {
+            translated.kind = KindTranslator.toIntegerWithContext(params.kind, 'product');
+        }
+        return translated;
+    }
+    /**
+     * List categories with pagination and filtering
+     * Requires Client-Id header to be set in the configuration
+     */
+    async list(params) {
+        var _a, _b;
+        const translatedParams = this.translateFilters(params);
+        const response = await this.client.get('/categories', translatedParams);
+        if ((_a = response.data) === null || _a === void 0 ? void 0 : _a.entries) {
+            const translatedEntries = response.data.entries.map(category => this.translateCategoryToUserFacing(category));
+            return {
+                state: response.state,
+                data: {
+                    entries: translatedEntries,
+                    page_info: response.data.page_info
+                }
+            };
+        }
+        if ((_b = response.result) === null || _b === void 0 ? void 0 : _b.entries) {
+            const translatedEntries = response.result.entries.map(category => this.translateCategoryToUserFacing(category));
+            return {
+                state: response.state,
+                result: {
+                    entries: translatedEntries,
+                    page_info: response.result.page_info
+                }
+            };
+        }
+        return {
+            state: response.state,
+            data: response.data,
+            result: response.result
+        };
+    }
+    /**
+     * Get a specific category by ID
+     * Requires Client-Id header to be set in the configuration
+     */
+    async get(id) {
+        const response = await this.client.get(`/categories/${id}`);
+        if (response.data) {
+            const translatedCategory = this.translateCategoryToUserFacing(response.data);
+            return {
+                state: response.state,
+                data: translatedCategory
+            };
+        }
+        if (response.result) {
+            const translatedCategory = this.translateCategoryToUserFacing(response.result);
+            return {
+                state: response.state,
+                result: translatedCategory
+            };
+        }
+        return {
+            state: response.state,
+            data: response.data,
+            result: response.result
+        };
+    }
+    /**
+     * Create a new category
+     * Requires Client-Id header to be set in the configuration
+     */
+    async create(data) {
+        const internalData = this.translateCategoryToInternal(data);
+        const response = await this.client.post('/categories', internalData);
+        if (response.data) {
+            const translatedCategory = this.translateCategoryToUserFacing(response.data);
+            return {
+                state: response.state,
+                data: translatedCategory
+            };
+        }
+        if (response.result) {
+            const translatedCategory = this.translateCategoryToUserFacing(response.result);
+            return {
+                state: response.state,
+                result: translatedCategory
+            };
+        }
+        return {
+            state: response.state,
+            data: response.data,
+            result: response.result
+        };
+    }
+    /**
+     * Update an existing category
+     * Requires Client-Id header to be set in the configuration
+     * Note: parent_id is immutable and cannot be changed after creation
+     */
+    async update(id, data) {
+        const internalData = this.translateCategoryToInternal(data);
+        const response = await this.client.put(`/categories/${id}`, internalData);
+        if (response.data) {
+            const translatedCategory = this.translateCategoryToUserFacing(response.data);
+            return {
+                state: response.state,
+                data: translatedCategory
+            };
+        }
+        if (response.result) {
+            const translatedCategory = this.translateCategoryToUserFacing(response.result);
+            return {
+                state: response.state,
+                result: translatedCategory
+            };
+        }
+        return {
+            state: response.state,
+            data: response.data,
+            result: response.result
+        };
+    }
+    /**
+     * Query categories with enhanced query support
+     * @example
+     * await categories.query({ kind: 'published', parent_id: null })
+     */
+    async query(params) {
+        var _a, _b;
+        const processedQuery = processQuery(params || {}, CATEGORY_FIELD_TYPES, { });
+        const translatedQuery = this.translateFilters(processedQuery);
+        const response = await this.client.get('/categories', translatedQuery);
+        if ((_a = response.data) === null || _a === void 0 ? void 0 : _a.entries) {
+            const translatedEntries = response.data.entries.map(c => this.translateCategoryToUserFacing(c));
+            return {
+                state: response.state,
+                data: { entries: translatedEntries, page_info: response.data.page_info }
+            };
+        }
+        if ((_b = response.result) === null || _b === void 0 ? void 0 : _b.entries) {
+            const translatedEntries = response.result.entries.map(c => this.translateCategoryToUserFacing(c));
+            return {
+                state: response.state,
+                result: { entries: translatedEntries, page_info: response.result.page_info }
+            };
+        }
+        return { state: response.state, data: response.data, result: response.result };
+    }
+    /**
+     * Create a query builder for categories
+     * @example
+     * await sdk.categories.createQueryBuilder().whereKind('published').execute()
+     */
+    createQueryBuilder(initialQuery) {
+        return new CategoryQueryBuilder(this, initialQuery);
+    }
+}
+
 class OrdersResource {
     constructor(client) {
         this.client = client;
@@ -1185,6 +2409,13 @@ class OrdersResource {
         };
     }
     /**
+     * Delete an order
+     * Requires Client-Id header to be set in the configuration
+     */
+    async delete(id) {
+        return this.client.delete(`/orders/${id}`);
+    }
+    /**
      * Get order status (public endpoint - no auth required)
      */
     async getStatus(id) {
@@ -1251,22 +2482,22 @@ class OrdersResource {
      *
      * @example
      * // Simple queries
-     * orders.query({ status: 'confirmed', kind: 'online' })
+     * await orders.query({ status: 'confirmed', kind: 'online' })
      *
      * // Array queries (IN operations)
-     * orders.query({ id: [1, 2, 3], status: ['confirmed', 'shipped'] })
+     * await orders.query({ id: [1, 2, 3], status: ['confirmed', 'shipped'] })
      *
      * // Range queries
-     * orders.query({ total: { min: 100, max: 1000 } })
+     * await orders.query({ total: { min: 100, max: 1000 } })
      *
      * // String searches
-     * orders.query({ reference_id: { contains: 'ORDER-2024' } })
+     * await orders.query({ reference_id: { contains: 'ORDER-2024' } })
      *
      * // Date range queries
-     * orders.query({ inserted_at: { after: '2024-01-01', before: '2024-12-31' } })
+     * await orders.query({ inserted_at: { after: '2024-01-01', before: '2024-12-31' } })
      *
      * // Combined queries
-     * orders.query({
+     * await orders.query({
      *   status: 'confirmed',
      *   total: { min: 50 },
      *   inserted_at: { after: '2024-01-01' },
@@ -1313,67 +2544,15 @@ class OrdersResource {
      *
      * @example
      * const orders = await sdk.orders.createQueryBuilder()
-     *   .where('status', 'confirmed')
-     *   .whereRange('total', 100, 1000)
-     *   .whereContains('reference_id', 'ORDER-2024')
+     *   .whereStatus('confirmed')
+     *   .whereTotalRange(100, 1000)
+     *   .whereReferenceContains('ORDER-2024')
      *   .paginate(1, 20)
      *   .orderBy('inserted_at', 'desc')
      *   .execute();
      */
     createQueryBuilder(initialQuery) {
         return new OrderQueryBuilder(this, initialQuery);
-    }
-}
-/**
- * Query builder class for orders
- * Provides a fluent interface for building complex queries
- */
-class OrderQueryBuilder extends QueryBuilder {
-    constructor(ordersResource, initialQuery) {
-        super(initialQuery);
-        this.ordersResource = ordersResource;
-    }
-    /**
-     * Execute the query and return the results
-     */
-    async execute() {
-        return this.ordersResource.query(this.getRawQuery());
-    }
-    /**
-     * Add a status condition with contextual values
-     */
-    whereStatus(status) {
-        if (Array.isArray(status)) {
-            return this.whereIn('status', status);
-        }
-        return this.where('status', status);
-    }
-    /**
-     * Add a kind condition with contextual values
-     */
-    whereKind(kind) {
-        if (Array.isArray(kind)) {
-            return this.whereIn('kind', kind);
-        }
-        return this.where('kind', kind);
-    }
-    /**
-     * Add a total amount range condition
-     */
-    whereTotalRange(min, max) {
-        return this.whereRange('total', min, max);
-    }
-    /**
-     * Add a reference ID search condition
-     */
-    whereReferenceContains(value) {
-        return this.whereContains('reference_id', value);
-    }
-    /**
-     * Add a date range condition for creation date
-     */
-    whereCreatedBetween(after, before) {
-        return this.whereDateRange('inserted_at', after, before);
     }
 }
 
@@ -1535,6 +2714,82 @@ class ProductsResource {
     async delete(id) {
         return this.client.delete(`/products/${id}`);
     }
+    /**
+     * List products with enhanced query support
+     * Supports filtering by any database field using the new query system
+     * Requires Client-Id header to be set in the configuration
+     *
+     * @example
+     * // Simple queries
+     * await products.query({ status: 'published', public: true })
+     *
+     * // Array queries (IN operations)
+     * await products.query({ category_id: [1, 2, 3], status: ['published', 'draft'] })
+     *
+     * // Range queries
+     * await products.query({ price: { min: 10, max: 100 } })
+     *
+     * // String searches
+     * await products.query({ title: { contains: 'shirt' } })
+     *
+     * // Combined queries
+     * await products.query({
+     *   status: 'published',
+     *   price: { min: 20 },
+     *   public: true,
+     *   page: 1,
+     *   page_size: 20
+     * })
+     */
+    async query(params) {
+        var _a, _b;
+        // Process the query through the transformation system with validation
+        const processedQuery = processQuery(params || {}, PRODUCT_FIELD_TYPES, { });
+        // Apply contextual translations for status
+        const translatedQuery = this.translateFilters(processedQuery);
+        const response = await this.client.get('/products', translatedQuery);
+        if ((_a = response.data) === null || _a === void 0 ? void 0 : _a.entries) {
+            const translatedEntries = response.data.entries.map(product => this.translateProductToUserFacing(product));
+            return {
+                state: response.state,
+                data: {
+                    entries: translatedEntries,
+                    page_info: response.data.page_info
+                }
+            };
+        }
+        if ((_b = response.result) === null || _b === void 0 ? void 0 : _b.entries) {
+            const translatedEntries = response.result.entries.map(product => this.translateProductToUserFacing(product));
+            return {
+                state: response.state,
+                result: {
+                    entries: translatedEntries,
+                    page_info: response.result.page_info
+                }
+            };
+        }
+        return {
+            state: response.state,
+            data: response.data,
+            result: response.result
+        };
+    }
+    /**
+     * Create a query builder for products
+     * Provides a fluent interface for building complex queries
+     *
+     * @example
+     * const products = await sdk.products.createQueryBuilder()
+     *   .whereStatus('published')
+     *   .wherePriceRange(10, 100)
+     *   .whereTitleContains('shirt')
+     *   .wherePublic(true)
+     *   .paginate(1, 20)
+     *   .execute();
+     */
+    createQueryBuilder(initialQuery) {
+        return new ProductQueryBuilder(this, initialQuery);
+    }
 }
 
 class BillingPlansResource {
@@ -1557,6 +2812,21 @@ class BillingPlansResource {
         return translated;
     }
     /**
+     * Translate billing plan data for API (contextual strings to integers)
+     */
+    translateToInternal(data) {
+        const internal = { ...data };
+        // Translate kind if present and is a string
+        if ('kind' in data && data.kind && typeof data.kind === 'string') {
+            internal.kind = KindTranslator.toIntegerWithContext(data.kind, 'billing_plan');
+        }
+        // Translate status if present and is a string (for updates)
+        if ('status' in data && data.status && typeof data.status === 'string') {
+            internal.status = StatusTranslator.toInteger(data.status);
+        }
+        return internal;
+    }
+    /**
      * List billing plans with pagination and filtering
      * Requires Client-Id header to be set in the configuration
      */
@@ -1576,14 +2846,16 @@ class BillingPlansResource {
      * Requires Client-Id header to be set in the configuration
      */
     async create(data) {
-        return this.client.post('/billing_plans', data);
+        const internalData = this.translateToInternal(data);
+        return this.client.post('/billing_plans', internalData);
     }
     /**
      * Update an existing billing plan
      * Requires Client-Id header to be set in the configuration
      */
     async update(id, data) {
-        return this.client.put(`/billing_plans/${id}`, data);
+        const internalData = this.translateToInternal(data);
+        return this.client.put(`/billing_plans/${id}`, internalData);
     }
     /**
      * Delete a billing plan
@@ -1591,6 +2863,24 @@ class BillingPlansResource {
      */
     async delete(id) {
         return this.client.delete(`/billing_plans/${id}`);
+    }
+    /**
+     * Query billing plans with enhanced query support
+     * @example
+     * await billingPlans.query({ kind: 'subscription', public: true })
+     */
+    async query(params) {
+        const processedQuery = processQuery(params || {}, BILLING_PLAN_FIELD_TYPES, { });
+        const translatedQuery = this.translateFilters(processedQuery);
+        return this.client.get('/billing_plans', translatedQuery);
+    }
+    /**
+     * Create a query builder for billing plans
+     * @example
+     * await sdk.billingPlans.createQueryBuilder().whereKind('subscription').execute()
+     */
+    createQueryBuilder(initialQuery) {
+        return new BillingPlanQueryBuilder(this, initialQuery);
     }
 }
 
@@ -1611,6 +2901,21 @@ class SubscriptionsResource {
         return translated;
     }
     /**
+     * Translate subscription data for API (contextual strings to integers)
+     */
+    translateToInternal(data) {
+        const internal = { ...data };
+        // Translate status if present and is a string
+        if (data.status && typeof data.status === 'string') {
+            internal.status = StatusTranslator.toIntegerWithContext(data.status, 'billing_subscription');
+        }
+        // Translate kind if present and is a string
+        if (data.kind && typeof data.kind === 'string') {
+            internal.kind = KindTranslator.toInteger(data.kind);
+        }
+        return internal;
+    }
+    /**
      * List billing subscriptions with pagination and filtering
      * Requires Client-Id header to be set in the configuration
      */
@@ -1624,6 +2929,21 @@ class SubscriptionsResource {
      */
     async get(id) {
         return this.client.get(`/billing_subscriptions/${id}`);
+    }
+    /**
+     * Create a new subscription
+     * Requires Client-Id header to be set in the configuration
+     */
+    async create(data) {
+        const internalData = this.translateToInternal(data);
+        return this.client.post('/billing_subscriptions', internalData);
+    }
+    /**
+     * Delete a subscription
+     * Requires Client-Id header to be set in the configuration
+     */
+    async delete(id) {
+        return this.client.delete(`/billing_subscriptions/${id}`);
     }
     /**
      * Create a subscription payment link
@@ -1640,6 +2960,13 @@ class SubscriptionsResource {
         return this.client.post(`/billing_subscriptions/${uid}/charge`, data);
     }
     /**
+     * Record usage for a subscription (for usage-based billing)
+     * Requires Client-Id header to be set in the configuration
+     */
+    async usage(uid, data) {
+        return this.client.post(`/billing_subscriptions/${uid}/usage`, data);
+    }
+    /**
      * Get subscription billing periods
      * Requires Client-Id header to be set in the configuration
      */
@@ -1652,6 +2979,24 @@ class SubscriptionsResource {
      */
     async cancel(uid, code) {
         return this.client.post(`/billing_subscriptions/${uid}/cancel/${code}`);
+    }
+    /**
+     * Query subscriptions with enhanced query support
+     * @example
+     * await subscriptions.query({ status: 'active', billing_plan_id: 123 })
+     */
+    async query(params) {
+        const processedQuery = processQuery(params || {}, SUBSCRIPTION_FIELD_TYPES, { });
+        const translatedQuery = this.translateFilters(processedQuery);
+        return this.client.get('/billing_subscriptions', translatedQuery);
+    }
+    /**
+     * Create a query builder for subscriptions
+     * @example
+     * await sdk.subscriptions.createQueryBuilder().whereStatus('active').execute()
+     */
+    createQueryBuilder(initialQuery) {
+        return new SubscriptionQueryBuilder(this, initialQuery);
     }
 }
 
@@ -1727,7 +3072,8 @@ class UsersResource {
      * Requires Client-Id header to be set in the configuration
      */
     async create(data) {
-        return this.client.post('/users', data);
+        const internalData = this.translateUserToInternal(data);
+        return this.client.post('/users', internalData);
     }
     /**
      * Update an existing user
@@ -1743,6 +3089,40 @@ class UsersResource {
      */
     async delete(id) {
         return this.client.delete(`/users/${id}`);
+    }
+    /**
+     * Query users with enhanced query support
+     * @example
+     * await users.query({ status: 'approved', level: { min: 5 } })
+     */
+    async query(params) {
+        var _a, _b;
+        const processedQuery = processQuery(params || {}, USER_FIELD_TYPES, { });
+        const translatedQuery = this.translateFilters(processedQuery);
+        const response = await this.client.get('/users', translatedQuery);
+        if ((_a = response.data) === null || _a === void 0 ? void 0 : _a.entries) {
+            const translatedEntries = response.data.entries.map(user => this.translateUserToUserFacing(user));
+            return {
+                state: response.state,
+                data: { entries: translatedEntries, page_info: response.data.page_info }
+            };
+        }
+        if ((_b = response.result) === null || _b === void 0 ? void 0 : _b.entries) {
+            const translatedEntries = response.result.entries.map(user => this.translateUserToUserFacing(user));
+            return {
+                state: response.state,
+                result: { entries: translatedEntries, page_info: response.result.page_info }
+            };
+        }
+        return { state: response.state, data: response.data, result: response.result };
+    }
+    /**
+     * Create a query builder for users
+     * @example
+     * await sdk.users.createQueryBuilder().whereStatus('approved').execute()
+     */
+    createQueryBuilder(initialQuery) {
+        return new UserQueryBuilder(this, initialQuery);
     }
 }
 
@@ -1796,13 +3176,6 @@ class KycResource {
         return this.client.post('/legal_requests', data);
     }
     /**
-     * Request a bank information update
-     * Requires Client-Id header to be set in the configuration
-     */
-    async requestBankInfoUpdate(data) {
-        return this.client.post('/legal_requests', data);
-    }
-    /**
      * Upload a document for KYC verification
      * Requires Client-Id header to be set in the configuration
      */
@@ -1820,21 +3193,945 @@ class PayoutResource {
      * Requires Client-Id header to be set in the configuration
      */
     async list(params) {
-        return this.client.get('/ledger_payouts', params);
+        return this.client.get('/financial_requests', params);
     }
     /**
      * Get a specific payout request by ID
      * Requires Client-Id header to be set in the configuration
      */
     async get(id) {
-        return this.client.get(`/ledger_payouts/${id}`);
+        return this.client.get(`/financial_requests/${id}`);
     }
     /**
      * Create a new payout request
      * Requires Client-Id header to be set in the configuration
      */
     async request(data) {
-        return this.client.post('/ledger_payouts', data);
+        return this.client.post('/financial_requests', data);
+    }
+}
+
+class PaymentLinksResource {
+    constructor(client) {
+        this.client = client;
+    }
+    /**
+     * Convert filter parameters (strings to integers where needed)
+     */
+    translateFilters(params) {
+        if (!params)
+            return params;
+        const translated = { ...params };
+        if (params.status && typeof params.status === 'string') {
+            translated.status = StatusTranslator.toIntegerWithContext(params.status, 'payment_link');
+        }
+        if (params.kind && typeof params.kind === 'string') {
+            translated.kind = KindTranslator.toIntegerWithContext(params.kind, 'payment_link');
+        }
+        return translated;
+    }
+    /**
+     * Convert user-facing data to internal format
+     */
+    translateToInternal(data) {
+        const internal = { ...data };
+        if ('status' in data && data.status && typeof data.status === 'string') {
+            internal.status = StatusTranslator.toIntegerWithContext(data.status, 'payment_link');
+        }
+        if ('kind' in data && data.kind && typeof data.kind === 'string') {
+            internal.kind = KindTranslator.toIntegerWithContext(data.kind, 'payment_link');
+        }
+        return internal;
+    }
+    /**
+     * List payment links with filtering
+     */
+    async list(params) {
+        const translatedParams = this.translateFilters(params);
+        return this.client.get('/payment_links', translatedParams);
+    }
+    /**
+     * Get payment link by ID
+     */
+    async get(id) {
+        return this.client.get(`/payment_links/${id}`);
+    }
+    /**
+     * Create a new payment link
+     */
+    async create(data) {
+        const internalData = this.translateToInternal(data);
+        return this.client.post('/payment_links', internalData);
+    }
+    /**
+     * Update a payment link
+     */
+    async update(id, data) {
+        const internalData = this.translateToInternal(data);
+        return this.client.put(`/payment_links/${id}`, internalData);
+    }
+    /**
+     * Delete a payment link
+     */
+    async delete(id) {
+        return this.client.delete(`/payment_links/${id}`);
+    }
+    /**
+     * Advanced query interface with full type safety
+     * Returns a QueryBuilder that compiles to the appropriate filter format
+     *
+     * @example
+     * const links = await sdk.paymentLinks.query({
+     *   total: { gte: 1000 },
+     *   status: [1, 2],
+     *   inserted_at: { gte: '2024-01-01' }
+     * });
+     */
+    async query(params) {
+        const processedQuery = processQuery(params);
+        return this.list(processedQuery);
+    }
+    /**
+     * Create a fluent query builder for payment links
+     *
+     * @example
+     * const links = await sdk.paymentLinks.createQueryBuilder()
+     *   .whereTotalGreaterThan(1000)
+     *   .whereStatusIn([1, 2])
+     *   .orderBy('inserted_at', 'desc')
+     *   .limit(50)
+     *   .execute();
+     */
+    createQueryBuilder() {
+        return new PaymentLinkQueryBuilder(this);
+    }
+}
+
+class FinancialAccountsResource {
+    constructor(client) {
+        this.client = client;
+    }
+    /**
+     * List financial accounts with filtering
+     */
+    async list(params) {
+        return this.client.get('/financial_accounts', params);
+    }
+    /**
+     * Get financial account by ID
+     */
+    async get(id) {
+        return this.client.get(`/financial_accounts/${id}`);
+    }
+    /**
+     * Create a new financial account
+     */
+    async create(data) {
+        return this.client.post('/financial_accounts', data);
+    }
+    /**
+     * Update a financial account
+     */
+    async update(id, data) {
+        return this.client.put(`/financial_accounts/${id}`, data);
+    }
+    /**
+     * Advanced query interface with full type safety
+     *
+     * @example
+     * const accounts = await sdk.financialAccounts.query({
+     *   type: 'bank',
+     *   active: true,
+     *   provider: { contains: 'stripe' }
+     * });
+     */
+    async query(params) {
+        const processedQuery = processQuery(params);
+        return this.list(processedQuery);
+    }
+    /**
+     * Create a fluent query builder for financial accounts
+     *
+     * @example
+     * const accounts = await sdk.financialAccounts.createQueryBuilder()
+     *   .whereTypeEquals('bank')
+     *   .whereActiveEquals(true)
+     *   .orderBy('inserted_at', 'desc')
+     *   .execute();
+     */
+    createQueryBuilder() {
+        return new FinancialAccountQueryBuilder(this);
+    }
+}
+
+class FinancialRequestsResource {
+    constructor(client) {
+        this.client = client;
+    }
+    /**
+     * Convert filter parameters (strings to integers where needed)
+     */
+    translateFilters(params) {
+        if (!params)
+            return params;
+        const translated = { ...params };
+        if (params.status && typeof params.status === 'string') {
+            translated.status = StatusTranslator.toIntegerWithContext(params.status, 'financial_request');
+        }
+        return translated;
+    }
+    /**
+     * Convert user-facing data to internal format
+     */
+    translateToInternal(data) {
+        const internal = { ...data };
+        if ('status' in data && data.status && typeof data.status === 'string') {
+            internal.status = StatusTranslator.toIntegerWithContext(data.status, 'financial_request');
+        }
+        return internal;
+    }
+    /**
+     * List financial requests with filtering
+     */
+    async list(params) {
+        const translatedParams = this.translateFilters(params);
+        return this.client.get('/financial_requests', translatedParams);
+    }
+    /**
+     * Get financial request by ID
+     */
+    async get(id) {
+        return this.client.get(`/financial_requests/${id}`);
+    }
+    /**
+     * Create a new financial request
+     */
+    async create(data) {
+        const internalData = this.translateToInternal(data);
+        return this.client.post('/financial_requests', internalData);
+    }
+    /**
+     * Advanced query interface with full type safety
+     *
+     * @example
+     * const requests = await sdk.financialRequests.query({
+     *   status: [1, 2],
+     *   total: { gte: 5000 },
+     *   merchant_id: 123
+     * });
+     */
+    async query(params) {
+        const processedQuery = processQuery(params);
+        return this.list(processedQuery);
+    }
+    /**
+     * Create a fluent query builder for financial requests
+     *
+     * @example
+     * const requests = await sdk.financialRequests.createQueryBuilder()
+     *   .whereStatusIn([1, 2])
+     *   .whereTotalGreaterThan(5000)
+     *   .orderBy('inserted_at', 'desc')
+     *   .execute();
+     */
+    createQueryBuilder() {
+        return new FinancialRequestQueryBuilder(this);
+    }
+}
+
+class WebhookUrlsResource {
+    constructor(client) {
+        this.client = client;
+    }
+    /**
+     * List webhook URLs with filtering
+     */
+    async list(params) {
+        return this.client.get('/webhook_urls', params);
+    }
+    /**
+     * Get webhook URL by ID
+     */
+    async get(id) {
+        return this.client.get(`/webhook_urls/${id}`);
+    }
+    /**
+     * Create a new webhook URL
+     */
+    async create(data) {
+        return this.client.post('/webhook_urls', data);
+    }
+    /**
+     * Update a webhook URL
+     */
+    async update(id, data) {
+        return this.client.put(`/webhook_urls/${id}`, data);
+    }
+    /**
+     * Delete a webhook URL
+     */
+    async delete(id) {
+        return this.client.delete(`/webhook_urls/${id}`);
+    }
+    /**
+     * Advanced query interface with full type safety
+     *
+     * @example
+     * const webhooks = await sdk.webhookUrls.query({
+     *   event: 'order.created',
+     *   merchant_id: 123
+     * });
+     */
+    async query(params) {
+        const processedQuery = processQuery(params);
+        return this.list(processedQuery);
+    }
+    /**
+     * Create a fluent query builder for webhook URLs
+     *
+     * @example
+     * const webhooks = await sdk.webhookUrls.createQueryBuilder()
+     *   .whereEventEquals('order.created')
+     *   .whereMerchantIdEquals(123)
+     *   .execute();
+     */
+    createQueryBuilder() {
+        return new WebhookUrlQueryBuilder(this);
+    }
+}
+
+/**
+ * Tokens Resource
+ *
+ * ⚠️ LIMITED ACCESS WARNING:
+ * This resource is primarily for super_admin and platform_affiliate roles.
+ * organisation_admin has limited access (view/list/create/delete only, no update).
+ * Use with caution and be aware of permission restrictions.
+ */
+class TokensResource {
+    constructor(client) {
+        this.client = client;
+    }
+    /**
+     * Convert filter parameters (strings to integers where needed)
+     */
+    translateFilters(params) {
+        if (!params)
+            return params;
+        const translated = { ...params };
+        if (params.kind && typeof params.kind === 'string') {
+            translated.kind = KindTranslator.toIntegerWithContext(params.kind, 'token');
+        }
+        return translated;
+    }
+    /**
+     * Convert user-facing data to internal format
+     */
+    translateToInternal(data) {
+        const internal = { ...data };
+        if ('kind' in data && data.kind && typeof data.kind === 'string') {
+            internal.kind = KindTranslator.toIntegerWithContext(data.kind, 'token');
+        }
+        return internal;
+    }
+    /**
+     * List tokens with filtering
+     */
+    async list(params) {
+        const translatedParams = this.translateFilters(params);
+        return this.client.get('/tokens', translatedParams);
+    }
+    /**
+     * Get token by ID
+     */
+    async get(id) {
+        return this.client.get(`/tokens/${id}`);
+    }
+    /**
+     * Create a new token
+     */
+    async create(data) {
+        const internalData = this.translateToInternal(data);
+        return this.client.post('/tokens', internalData);
+    }
+    /**
+     * Delete a token
+     */
+    async delete(id) {
+        return this.client.delete(`/tokens/${id}`);
+    }
+    /**
+     * Advanced query interface with full type safety
+     *
+     * @example
+     * const tokens = await sdk.tokens.query({
+     *   enabled: true,
+     *   kind: [1, 2],
+     *   user_id: 123
+     * });
+     */
+    async query(params) {
+        const processedQuery = processQuery(params);
+        return this.list(processedQuery);
+    }
+    /**
+     * Create a fluent query builder for tokens
+     *
+     * @example
+     * const tokens = await sdk.tokens.createQueryBuilder()
+     *   .whereEnabledEquals(true)
+     *   .whereKindIn([1, 2])
+     *   .execute();
+     */
+    createQueryBuilder() {
+        return new TokenQueryBuilder(this);
+    }
+}
+
+class AddressesResource {
+    constructor(client) {
+        this.client = client;
+    }
+    /**
+     * Convert filter parameters (strings to integers where needed)
+     */
+    translateFilters(params) {
+        if (!params)
+            return params;
+        const translated = { ...params };
+        if (params.kind && typeof params.kind === 'string') {
+            translated.kind = KindTranslator.toIntegerWithContext(params.kind, 'address');
+        }
+        return translated;
+    }
+    /**
+     * Convert user-facing data to internal format
+     */
+    translateToInternal(data) {
+        const internal = { ...data };
+        if ('kind' in data && data.kind && typeof data.kind === 'string') {
+            internal.kind = KindTranslator.toIntegerWithContext(data.kind, 'address');
+        }
+        return internal;
+    }
+    /**
+     * List addresses with filtering
+     */
+    async list(params) {
+        const translatedParams = this.translateFilters(params);
+        return this.client.get('/addresses', translatedParams);
+    }
+    /**
+     * Get address by ID
+     */
+    async get(id) {
+        return this.client.get(`/addresses/${id}`);
+    }
+    /**
+     * Create a new address
+     */
+    async create(data) {
+        const internalData = this.translateToInternal(data);
+        return this.client.post('/addresses', internalData);
+    }
+    /**
+     * Update an address
+     */
+    async update(id, data) {
+        const internalData = this.translateToInternal(data);
+        return this.client.put(`/addresses/${id}`, internalData);
+    }
+    /**
+     * Delete an address
+     */
+    async delete(id) {
+        return this.client.delete(`/addresses/${id}`);
+    }
+    /**
+     * Advanced query interface with full type safety
+     *
+     * @example
+     * const addresses = await sdk.addresses.query({
+     *   country: 'US',
+     *   state: 'CA',
+     *   kind: [1, 2]
+     * });
+     */
+    async query(params) {
+        const processedQuery = processQuery(params);
+        return this.list(processedQuery);
+    }
+    /**
+     * Create a fluent query builder for addresses
+     *
+     * @example
+     * const addresses = await sdk.addresses.createQueryBuilder()
+     *   .whereCountryEquals('US')
+     *   .whereStateEquals('CA')
+     *   .execute();
+     */
+    createQueryBuilder() {
+        return new AddressQueryBuilder(this);
+    }
+}
+
+class CurrenciesResource {
+    constructor(client) {
+        this.client = client;
+    }
+    /**
+     * List currencies with filtering
+     */
+    async list(params) {
+        return this.client.get('/currencies', params);
+    }
+    /**
+     * Get currency by ID
+     */
+    async get(id) {
+        return this.client.get(`/currencies/${id}`);
+    }
+    /**
+     * Create a new currency
+     */
+    async create(data) {
+        return this.client.post('/currencies', data);
+    }
+    /**
+     * Advanced query interface with full type safety
+     *
+     * @example
+     * const currencies = await sdk.currencies.query({
+     *   code: ['USD', 'EUR'],
+     *   is_float: true
+     * });
+     */
+    async query(params) {
+        const processedQuery = processQuery(params);
+        return this.list(processedQuery);
+    }
+    /**
+     * Create a fluent query builder for currencies
+     *
+     * @example
+     * const currencies = await sdk.currencies.createQueryBuilder()
+     *   .whereCodeIn(['USD', 'EUR'])
+     *   .whereIsFloatEquals(true)
+     *   .execute();
+     */
+    createQueryBuilder() {
+        return new CurrencyQueryBuilder(this);
+    }
+}
+
+class ExchangeRatesResource {
+    constructor(client) {
+        this.client = client;
+    }
+    /**
+     * List exchange rates with filtering
+     */
+    async list(params) {
+        return this.client.get('/exchange_rates', params);
+    }
+    /**
+     * Get exchange rate by ID
+     */
+    async get(id) {
+        return this.client.get(`/exchange_rates/${id}`);
+    }
+    /**
+     * Create a new exchange rate
+     */
+    async create(data) {
+        return this.client.post('/exchange_rates', data);
+    }
+    /**
+     * Update an exchange rate
+     */
+    async update(id, data) {
+        return this.client.put(`/exchange_rates/${id}`, data);
+    }
+    /**
+     * Delete an exchange rate
+     */
+    async delete(id) {
+        return this.client.delete(`/exchange_rates/${id}`);
+    }
+    /**
+     * Advanced query interface with full type safety
+     *
+     * @example
+     * const rates = await sdk.exchangeRates.query({
+     *   source_id: 1,
+     *   destination_id: 2,
+     *   rate: { gte: 1.0 }
+     * });
+     */
+    async query(params) {
+        const processedQuery = processQuery(params);
+        return this.list(processedQuery);
+    }
+    /**
+     * Create a fluent query builder for exchange rates
+     *
+     * @example
+     * const rates = await sdk.exchangeRates.createQueryBuilder()
+     *   .whereSourceIdEquals(1)
+     *   .whereDestinationIdEquals(2)
+     *   .execute();
+     */
+    createQueryBuilder() {
+        return new ExchangeRateQueryBuilder(this);
+    }
+}
+
+class FeesResource {
+    constructor(client) {
+        this.client = client;
+    }
+    /**
+     * Convert filter parameters (strings to integers where needed)
+     */
+    translateFilters(params) {
+        if (!params)
+            return params;
+        const translated = { ...params };
+        if (params.kind && typeof params.kind === 'string') {
+            translated.kind = KindTranslator.toIntegerWithContext(params.kind, 'fee');
+        }
+        return translated;
+    }
+    /**
+     * Convert user-facing data to internal format
+     */
+    translateToInternal(data) {
+        const internal = { ...data };
+        if ('kind' in data && data.kind && typeof data.kind === 'string') {
+            internal.kind = KindTranslator.toIntegerWithContext(data.kind, 'fee');
+        }
+        return internal;
+    }
+    /**
+     * List fees with filtering
+     */
+    async list(params) {
+        const translatedParams = this.translateFilters(params);
+        return this.client.get('/fees', translatedParams);
+    }
+    /**
+     * Get fee by ID
+     */
+    async get(id) {
+        return this.client.get(`/fees/${id}`);
+    }
+    /**
+     * Create a new fee
+     */
+    async create(data) {
+        const internalData = this.translateToInternal(data);
+        return this.client.post('/fees', internalData);
+    }
+    /**
+     * Update a fee
+     */
+    async update(id, data) {
+        const internalData = this.translateToInternal(data);
+        return this.client.put(`/fees/${id}`, internalData);
+    }
+    /**
+     * Delete a fee
+     */
+    async delete(id) {
+        return this.client.delete(`/fees/${id}`);
+    }
+    /**
+     * Advanced query interface with full type safety
+     *
+     * @example
+     * const fees = await sdk.fees.query({
+     *   kind: [1, 2],
+     *   total: { gte: 100 },
+     *   currency_code: 'USD'
+     * });
+     */
+    async query(params) {
+        const processedQuery = processQuery(params);
+        return this.list(processedQuery);
+    }
+    /**
+     * Create a fluent query builder for fees
+     *
+     * @example
+     * const fees = await sdk.fees.createQueryBuilder()
+     *   .whereKindIn([1, 2])
+     *   .whereTotalGreaterThan(100)
+     *   .execute();
+     */
+    createQueryBuilder() {
+        return new FeeQueryBuilder(this);
+    }
+}
+
+class PaymentMethodsResource {
+    constructor(client) {
+        this.client = client;
+    }
+    /**
+     * List payment methods with filtering
+     */
+    async list(params) {
+        return this.client.get('/payment_methods', params);
+    }
+    /**
+     * Get payment method by ID
+     */
+    async get(id) {
+        return this.client.get(`/payment_methods/${id}`);
+    }
+    /**
+     * Create a new payment method
+     */
+    async create(data) {
+        return this.client.post('/payment_methods', data);
+    }
+    /**
+     * Update a payment method
+     */
+    async update(id, data) {
+        return this.client.put(`/payment_methods/${id}`, data);
+    }
+    /**
+     * Delete a payment method
+     */
+    async delete(id) {
+        return this.client.delete(`/payment_methods/${id}`);
+    }
+    /**
+     * Advanced query interface with full type safety
+     *
+     * @example
+     * const methods = await sdk.paymentMethods.query({
+     *   active: true,
+     *   provider: { contains: 'stripe' }
+     * });
+     */
+    async query(params) {
+        const processedQuery = processQuery(params);
+        return this.list(processedQuery);
+    }
+    /**
+     * Create a fluent query builder for payment methods
+     *
+     * @example
+     * const methods = await sdk.paymentMethods.createQueryBuilder()
+     *   .whereActiveEquals(true)
+     *   .execute();
+     */
+    createQueryBuilder() {
+        return new PaymentMethodQueryBuilder(this);
+    }
+}
+
+class PostsResource {
+    constructor(client) {
+        this.client = client;
+    }
+    /**
+     * Convert filter parameters (strings to integers where needed)
+     */
+    translateFilters(params) {
+        if (!params)
+            return params;
+        const translated = { ...params };
+        if (params.status && typeof params.status === 'string') {
+            translated.status = StatusTranslator.toIntegerWithContext(params.status, 'post');
+        }
+        if (params.kind && typeof params.kind === 'string') {
+            translated.kind = KindTranslator.toIntegerWithContext(params.kind, 'post');
+        }
+        return translated;
+    }
+    /**
+     * Convert user-facing data to internal format
+     */
+    translateToInternal(data) {
+        const internal = { ...data };
+        if ('status' in data && data.status && typeof data.status === 'string') {
+            internal.status = StatusTranslator.toIntegerWithContext(data.status, 'post');
+        }
+        if ('kind' in data && data.kind && typeof data.kind === 'string') {
+            internal.kind = KindTranslator.toIntegerWithContext(data.kind, 'post');
+        }
+        return internal;
+    }
+    /**
+     * List posts with filtering
+     */
+    async list(params) {
+        const translatedParams = this.translateFilters(params);
+        return this.client.get('/posts', translatedParams);
+    }
+    /**
+     * Get post by ID
+     */
+    async get(id) {
+        return this.client.get(`/posts/${id}`);
+    }
+    /**
+     * Create a new post
+     */
+    async create(data) {
+        const internalData = this.translateToInternal(data);
+        return this.client.post('/posts', internalData);
+    }
+    /**
+     * Update a post
+     */
+    async update(id, data) {
+        const internalData = this.translateToInternal(data);
+        return this.client.put(`/posts/${id}`, internalData);
+    }
+    /**
+     * Delete a post
+     */
+    async delete(id) {
+        return this.client.delete(`/posts/${id}`);
+    }
+    /**
+     * Advanced query interface with full type safety
+     *
+     * @example
+     * const posts = await sdk.posts.query({
+     *   status: [1, 2],
+     *   kind: [1],
+     *   author_id: 123
+     * });
+     */
+    async query(params) {
+        const processedQuery = processQuery(params);
+        return this.list(processedQuery);
+    }
+    /**
+     * Create a fluent query builder for posts
+     *
+     * @example
+     * const posts = await sdk.posts.createQueryBuilder()
+     *   .whereStatusIn([1, 2])
+     *   .whereAuthorIdEquals(123)
+     *   .execute();
+     */
+    createQueryBuilder() {
+        return new PostQueryBuilder(this);
+    }
+}
+
+/**
+ * Transaction Entries Resource
+ *
+ * ⚠️ READ-ONLY RESOURCE:
+ * This resource is READ-ONLY for organisation_admin and owner roles.
+ * Only view and list operations are supported.
+ * Create/update/delete operations require super_admin privileges.
+ */
+class TransactionEntriesResource {
+    constructor(client) {
+        this.client = client;
+    }
+    /**
+     * List transaction entries with filtering
+     */
+    async list(params) {
+        return this.client.get('/transaction_entries', params);
+    }
+    /**
+     * Get transaction entry by ID
+     */
+    async get(id) {
+        return this.client.get(`/transaction_entries/${id}`);
+    }
+    /**
+     * Advanced query interface with full type safety
+     * Note: Transaction entries are read-only for organisation_admin.
+     * Create/update/delete operations require super_admin privileges.
+     *
+     * @example
+     * const entries = await sdk.transactionEntries.query({
+     *   amount: { gte: 100 },
+     *   type: [1, 2],
+     *   transaction_id: 123
+     * });
+     */
+    async query(params) {
+        const processedQuery = processQuery(params);
+        return this.list(processedQuery);
+    }
+    /**
+     * Create a fluent query builder for transaction entries
+     *
+     * @example
+     * const entries = await sdk.transactionEntries.createQueryBuilder()
+     *   .whereAmountGreaterThan(100)
+     *   .whereTypeIn([1, 2])
+     *   .execute();
+     */
+    createQueryBuilder() {
+        return new TransactionEntryQueryBuilder(this);
+    }
+}
+
+/**
+ * Generic resource handler for any endpoint
+ * Provides CRUD operations for resources not yet implemented with specific types
+ */
+class GenericsResource {
+    constructor(client) {
+        this.client = client;
+    }
+    /**
+     * List resources from a generic endpoint
+     *
+     * @example
+     * const data = await sdk.generics.list('/subscription_periods', { status: 1 });
+     */
+    async list(endpoint, params) {
+        return this.client.get(endpoint, params);
+    }
+    /**
+     * Get a single resource by ID from a generic endpoint
+     *
+     * @example
+     * const data = await sdk.generics.get('/subscription_periods', 123);
+     */
+    async get(endpoint, id) {
+        return this.client.get(`${endpoint}/${id}`);
+    }
+    /**
+     * Create a new resource on a generic endpoint
+     *
+     * @example
+     * const data = await sdk.generics.create('/subscription_periods', { name: 'Monthly', days: 30 });
+     */
+    async create(endpoint, data) {
+        return this.client.post(endpoint, data);
+    }
+    /**
+     * Update a resource on a generic endpoint
+     *
+     * @example
+     * const data = await sdk.generics.update('/subscription_periods', 123, { name: 'Monthly Premium' });
+     */
+    async update(endpoint, id, data) {
+        return this.client.put(`${endpoint}/${id}`, data);
+    }
+    /**
+     * Delete a resource from a generic endpoint
+     *
+     * @example
+     * await sdk.generics.delete('/subscription_periods', 123);
+     */
+    async delete(endpoint, id) {
+        return this.client.delete(`${endpoint}/${id}`);
     }
 }
 
@@ -1895,6 +4192,19 @@ class InkressSDK {
         this.public = new PublicResource(this.client);
         this.kyc = new KycResource(this.client);
         this.payout = new PayoutResource(this.client);
+        this.paymentLinks = new PaymentLinksResource(this.client);
+        this.financialAccounts = new FinancialAccountsResource(this.client);
+        this.financialRequests = new FinancialRequestsResource(this.client);
+        this.webhookUrls = new WebhookUrlsResource(this.client);
+        this.tokens = new TokensResource(this.client);
+        this.addresses = new AddressesResource(this.client);
+        this.currencies = new CurrenciesResource(this.client);
+        this.exchangeRates = new ExchangeRatesResource(this.client);
+        this.fees = new FeesResource(this.client);
+        this.paymentMethods = new PaymentMethodsResource(this.client);
+        this.posts = new PostsResource(this.client);
+        this.transactionEntries = new TransactionEntriesResource(this.client);
+        this.generics = new GenericsResource(this.client);
     }
     /**
      * Update the SDK configuration
@@ -1910,11 +4220,48 @@ class InkressSDK {
     }
 }
 
+exports.ADDRESS_FIELD_TYPES = ADDRESS_FIELD_TYPES;
+exports.AddressQueryBuilder = AddressQueryBuilder;
+exports.BILLING_PLAN_FIELD_TYPES = BILLING_PLAN_FIELD_TYPES;
+exports.BillingPlanQueryBuilder = BillingPlanQueryBuilder;
+exports.CATEGORY_FIELD_TYPES = CATEGORY_FIELD_TYPES;
+exports.CURRENCY_FIELD_TYPES = CURRENCY_FIELD_TYPES;
+exports.CategoryQueryBuilder = CategoryQueryBuilder;
+exports.CurrencyQueryBuilder = CurrencyQueryBuilder;
+exports.EXCHANGE_RATE_FIELD_TYPES = EXCHANGE_RATE_FIELD_TYPES;
+exports.ExchangeRateQueryBuilder = ExchangeRateQueryBuilder;
+exports.FEE_FIELD_TYPES = FEE_FIELD_TYPES;
+exports.FINANCIAL_ACCOUNT_FIELD_TYPES = FINANCIAL_ACCOUNT_FIELD_TYPES;
+exports.FINANCIAL_REQUEST_FIELD_TYPES = FINANCIAL_REQUEST_FIELD_TYPES;
+exports.FeeQueryBuilder = FeeQueryBuilder;
+exports.FinancialAccountQueryBuilder = FinancialAccountQueryBuilder;
+exports.FinancialRequestQueryBuilder = FinancialRequestQueryBuilder;
 exports.HttpClient = HttpClient;
 exports.InkressApiError = InkressApiError;
 exports.InkressSDK = InkressSDK;
+exports.MERCHANT_FIELD_TYPES = MERCHANT_FIELD_TYPES;
+exports.MerchantQueryBuilder = MerchantQueryBuilder;
+exports.ORDER_FIELD_TYPES = ORDER_FIELD_TYPES;
 exports.OrderQueryBuilder = OrderQueryBuilder;
+exports.PAYMENT_LINK_FIELD_TYPES = PAYMENT_LINK_FIELD_TYPES;
+exports.PAYMENT_METHOD_FIELD_TYPES = PAYMENT_METHOD_FIELD_TYPES;
+exports.POST_FIELD_TYPES = POST_FIELD_TYPES;
+exports.PRODUCT_FIELD_TYPES = PRODUCT_FIELD_TYPES;
+exports.PaymentLinkQueryBuilder = PaymentLinkQueryBuilder;
+exports.PaymentMethodQueryBuilder = PaymentMethodQueryBuilder;
+exports.PostQueryBuilder = PostQueryBuilder;
+exports.ProductQueryBuilder = ProductQueryBuilder;
 exports.QueryBuilder = QueryBuilder;
+exports.SUBSCRIPTION_FIELD_TYPES = SUBSCRIPTION_FIELD_TYPES;
+exports.SubscriptionQueryBuilder = SubscriptionQueryBuilder;
+exports.TOKEN_FIELD_TYPES = TOKEN_FIELD_TYPES;
+exports.TRANSACTION_ENTRY_FIELD_TYPES = TRANSACTION_ENTRY_FIELD_TYPES;
+exports.TokenQueryBuilder = TokenQueryBuilder;
+exports.TransactionEntryQueryBuilder = TransactionEntryQueryBuilder;
+exports.USER_FIELD_TYPES = USER_FIELD_TYPES;
+exports.UserQueryBuilder = UserQueryBuilder;
+exports.WEBHOOK_URL_FIELD_TYPES = WEBHOOK_URL_FIELD_TYPES;
+exports.WebhookUrlQueryBuilder = WebhookUrlQueryBuilder;
 exports.default = InkressSDK;
 exports.processQuery = processQuery;
 //# sourceMappingURL=index.js.map

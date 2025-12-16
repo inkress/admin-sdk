@@ -9,6 +9,11 @@ dist/
 build/
 *.tsbuildinfo
 
+openapi.yaml
+rbac.yaml
+fac/
+*.sql
+*.txt
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov

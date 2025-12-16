@@ -1,27 +1,11 @@
 import { HttpClient } from '../client';
-import { Category, CreateCategoryData, UpdateCategoryData, ApiResponse, BaseFilterParams, CategoryKind } from '../types';
-import { KindKey } from '../utils/translators';
-export interface CategoryFilterParams extends BaseFilterParams {
-    search?: string;
-    kind?: CategoryKind | KindKey | number;
-    parent_id?: number;
-    limit?: number;
-    id?: number;
-    name?: string;
-    description?: string;
-    kind_id?: number;
-    uid?: string;
-    inserted_at?: string;
-    updated_at?: string;
-}
-export interface CategoryListResponse {
-    entries: Category[];
-    page_info: {
-        current_page: number;
-        total_pages: number;
-        total_entries: number;
-        page_size: number;
-    };
+import { Category, CreateCategoryData, UpdateCategoryData, ApiResponse } from '../types';
+import { CategoryQueryBuilder } from '../utils/query-builders';
+import { CategoryFilterParams, CategoryQueryParams, CategoryListResponse } from '../types/resources';
+/**
+ * @deprecated Use CategoryFilterParams from types/resources instead
+ */
+export interface LegacyCategoryFilterParams {
 }
 export declare class CategoriesResource {
     private client;
@@ -60,10 +44,16 @@ export declare class CategoriesResource {
      */
     update(id: number, data: UpdateCategoryData): Promise<ApiResponse<Category>>;
     /**
-     * Delete a category
-     * Requires Client-Id header to be set in the configuration
-     * Note: Categories with assigned products or child categories cannot be deleted
+     * Query categories with enhanced query support
+     * @example
+     * await categories.query({ kind: 'published', parent_id: null })
      */
-    delete(id: number): Promise<ApiResponse<void>>;
+    query(params?: CategoryQueryParams): Promise<ApiResponse<CategoryListResponse>>;
+    /**
+     * Create a query builder for categories
+     * @example
+     * await sdk.categories.createQueryBuilder().whereKind('published').execute()
+     */
+    createQueryBuilder(initialQuery?: CategoryQueryParams): CategoryQueryBuilder;
 }
 //# sourceMappingURL=categories.d.ts.map

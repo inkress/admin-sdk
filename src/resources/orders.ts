@@ -4,11 +4,9 @@ import {
   CreateOrderData,
   UpdateOrderData,
   ApiResponse,
-  BaseFilterParams,
   InternalOrder,
   OrderStatus,
   OrderKind,
-  OrderQueryParams,
 } from '../types';
 import {
   StatusTranslator,
@@ -16,59 +14,14 @@ import {
   StatusKey,
   KindKey,
 } from '../utils/translators';
-import { processQuery, QueryBuilder } from '../utils/query-transformer';
-
-// Define field types for Orders to enable type validation
-const ORDER_FIELD_TYPES: Partial<Record<keyof InternalOrder, 'string' | 'number' | 'boolean' | 'date' | 'array'>> = {
-  id: 'number',
-  reference_id: 'string',
-  total: 'number',
-  status_on: 'number',
-  uid: 'string',
-  cart_id: 'number',
-  kind: 'number',
-  status: 'number',
-  inserted_at: 'date',
-  updated_at: 'date',
-  // Note: currency, customer, merchant etc. are objects, not primitive fields
-} as const;
-
-// Legacy filter interface for backward compatibility
-export interface OrderFilterParams extends BaseFilterParams {
-  // Common filters
-  search?: string; // Legacy search field - consider using 'q' instead
-  status?: OrderStatus | StatusKey | number; // Accept contextual, full, and integer values
-  kind?: OrderKind | KindKey | number; // Accept contextual, full, and integer values
-  limit?: number;
-  
-  // Database field filters - any field from the orders table can be filtered
-  id?: number;
-  reference_id?: string;
-  total?: number;
-  status_on?: number;
-  uid?: string;
-  cart_id?: number;
-  currency_id?: number;
-  customer_id?: number;
-  payment_link_id?: number;
-  billing_plan_id?: number;
-  session_id?: string;
-  inserted_at?: string;
-  updated_at?: string;
-}
-
-// Enhanced query interface using the new query system
-export type OrderQuery = OrderQueryParams;
-
-export interface OrderListResponse {
-  entries: Order[];
-  page_info: {
-    current_page: number;
-    total_pages: number;
-    total_entries: number;
-    page_size: number;
-  };
-}
+import { processQuery } from '../utils/query-transformer';
+import { OrderQueryBuilder } from '../utils/query-builders';
+import {
+  OrderFilterParams,
+  OrderQueryParams,
+  OrderListResponse,
+  ORDER_FIELD_TYPES,
+} from '../types/resources';
 
 export interface CreateOrderRequestData {
   currency_code: string;
@@ -233,6 +186,14 @@ export class OrdersResource {
   }
 
   /**
+   * Delete an order
+   * Requires Client-Id header to be set in the configuration
+   */
+  async delete(id: number): Promise<ApiResponse<void>> {
+    return this.client.delete<void>(`/orders/${id}`);
+  }
+
+  /**
    * Get order status (public endpoint - no auth required)
    */
   async getStatus(id: number): Promise<ApiResponse<Order>> {
@@ -306,22 +267,22 @@ export class OrdersResource {
    * 
    * @example
    * // Simple queries
-   * orders.query({ status: 'confirmed', kind: 'online' })
+   * await orders.query({ status: 'confirmed', kind: 'online' })
    * 
    * // Array queries (IN operations)
-   * orders.query({ id: [1, 2, 3], status: ['confirmed', 'shipped'] })
+   * await orders.query({ id: [1, 2, 3], status: ['confirmed', 'shipped'] })
    * 
    * // Range queries
-   * orders.query({ total: { min: 100, max: 1000 } })
+   * await orders.query({ total: { min: 100, max: 1000 } })
    * 
    * // String searches
-   * orders.query({ reference_id: { contains: 'ORDER-2024' } })
+   * await orders.query({ reference_id: { contains: 'ORDER-2024' } })
    * 
    * // Date range queries
-   * orders.query({ inserted_at: { after: '2024-01-01', before: '2024-12-31' } })
+   * await orders.query({ inserted_at: { after: '2024-01-01', before: '2024-12-31' } })
    * 
    * // Combined queries
-   * orders.query({
+   * await orders.query({
    *   status: 'confirmed',
    *   total: { min: 50 },
    *   inserted_at: { after: '2024-01-01' },
@@ -329,7 +290,7 @@ export class OrdersResource {
    *   page_size: 20
    * })
    */
-  async query(params?: OrderQuery): Promise<ApiResponse<OrderListResponse>> {
+  async query(params?: OrderQueryParams): Promise<ApiResponse<OrderListResponse>> {
     // Process the query through the transformation system with validation
     const processedQuery = processQuery(params || {}, ORDER_FIELD_TYPES, { validate: true });
     
@@ -373,72 +334,14 @@ export class OrdersResource {
    * 
    * @example
    * const orders = await sdk.orders.createQueryBuilder()
-   *   .where('status', 'confirmed')
-   *   .whereRange('total', 100, 1000)
-   *   .whereContains('reference_id', 'ORDER-2024')
+   *   .whereStatus('confirmed')
+   *   .whereTotalRange(100, 1000)
+   *   .whereReferenceContains('ORDER-2024')
    *   .paginate(1, 20)
    *   .orderBy('inserted_at', 'desc')
    *   .execute();
    */
-  createQueryBuilder(initialQuery?: OrderQuery): OrderQueryBuilder {
+  createQueryBuilder(initialQuery?: OrderQueryParams): OrderQueryBuilder {
     return new OrderQueryBuilder(this, initialQuery);
-  }
-}
-
-/**
- * Query builder class for orders
- * Provides a fluent interface for building complex queries
- */
-export class OrderQueryBuilder extends QueryBuilder<Order> {
-  constructor(private ordersResource: OrdersResource, initialQuery?: OrderQuery) {
-    super(initialQuery);
-  }
-
-  /**
-   * Execute the query and return the results
-   */
-  async execute(): Promise<ApiResponse<OrderListResponse>> {
-    return this.ordersResource.query(this.getRawQuery());
-  }
-
-  /**
-   * Add a status condition with contextual values
-   */
-  whereStatus(status: OrderStatus | OrderStatus[]): this {
-    if (Array.isArray(status)) {
-      return this.whereIn('status', status as any);
-    }
-    return this.where('status', status as any);
-  }
-
-  /**
-   * Add a kind condition with contextual values
-   */
-  whereKind(kind: OrderKind | OrderKind[]): this {
-    if (Array.isArray(kind)) {
-      return this.whereIn('kind', kind as any);
-    }
-    return this.where('kind', kind as any);
-  }
-
-  /**
-   * Add a total amount range condition
-   */
-  whereTotalRange(min?: number, max?: number): this {
-    return this.whereRange('total', min, max);
-  }
-
-  /**
-   * Add a reference ID search condition
-   */
-  whereReferenceContains(value: string): this {
-    return this.whereContains('reference_id', value);
-  }
-
-  /**
-   * Add a date range condition for creation date
-   */
-  whereCreatedBetween(after?: string, before?: string): this {
-    return this.whereDateRange('inserted_at', after, before);
   }
 }

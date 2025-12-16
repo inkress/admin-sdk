@@ -1,42 +1,11 @@
 import { HttpClient } from '../client';
-import { BillingPlan, CreateBillingPlanData, UpdateBillingPlanData, ApiResponse, BaseFilterParams, BillingPlanKind } from '../types';
-import { StatusKey, KindKey } from '../utils/translators';
-export interface BillingPlanFilterParams extends BaseFilterParams {
-    status?: StatusKey | number;
-    kind?: BillingPlanKind | KindKey | number;
-    limit?: number;
-    id?: number;
-    name?: string;
-    description?: string;
-    flat_rate?: number;
-    transaction_fee?: number;
-    transaction_percentage?: number;
-    transaction_percentage_additional?: number;
-    transaction_minimum_fee?: number;
-    minimum_fee?: number;
-    duration?: number;
-    billing_cycle?: number;
-    trial_period?: number;
-    charge_strategy?: number;
-    auto_charge?: boolean;
-    public?: boolean;
-    payout_period?: number;
-    payout_value_limit?: number;
-    payout_percentage_limit?: number;
-    uid?: string;
-    currency_id?: number;
-    payment_provider_id?: number;
-    inserted_at?: string;
-    updated_at?: string;
-}
-export interface BillingPlanListResponse {
-    entries: BillingPlan[];
-    page_info: {
-        current_page: number;
-        total_pages: number;
-        total_entries: number;
-        page_size: number;
-    };
+import { BillingPlan, CreateBillingPlanData, UpdateBillingPlanData, ApiResponse } from '../types';
+import { BillingPlanQueryBuilder } from '../utils/query-builders';
+import { BillingPlanFilterParams, BillingPlanQueryParams, BillingPlanListResponse } from '../types/resources';
+/**
+ * @deprecated Use BillingPlanFilterParams from types/resources instead
+ */
+export interface LegacyBillingPlanFilterParams {
 }
 export declare class BillingPlansResource {
     private client;
@@ -45,6 +14,10 @@ export declare class BillingPlansResource {
      * Convert filter parameters (strings to integers where needed)
      */
     private translateFilters;
+    /**
+     * Translate billing plan data for API (contextual strings to integers)
+     */
+    private translateToInternal;
     /**
      * List billing plans with pagination and filtering
      * Requires Client-Id header to be set in the configuration
@@ -70,5 +43,17 @@ export declare class BillingPlansResource {
      * Requires Client-Id header to be set in the configuration
      */
     delete(id: number): Promise<ApiResponse<void>>;
+    /**
+     * Query billing plans with enhanced query support
+     * @example
+     * await billingPlans.query({ kind: 'subscription', public: true })
+     */
+    query(params?: BillingPlanQueryParams): Promise<ApiResponse<BillingPlanListResponse>>;
+    /**
+     * Create a query builder for billing plans
+     * @example
+     * await sdk.billingPlans.createQueryBuilder().whereKind('subscription').execute()
+     */
+    createQueryBuilder(initialQuery?: BillingPlanQueryParams): BillingPlanQueryBuilder;
 }
 //# sourceMappingURL=billing-plans.d.ts.map

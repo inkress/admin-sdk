@@ -4,11 +4,14 @@ import {
   CreateMerchantData,
   UpdateMerchantData,
   ApiResponse,
-  BaseFilterParams,
   InternalMerchant,
   InternalCreateMerchantData,
   InternalUpdateMerchantData,
   AccountStatus,
+  MerchantBalance,
+  MerchantLimits,
+  MerchantSubscription,
+  MerchantInvoice,
 } from '../types';
 import {
   StatusTranslator,
@@ -16,44 +19,20 @@ import {
   StatusKey,
   FeeStructureKey,
 } from '../utils/translators';
+import { processQuery } from '../utils/query-transformer';
+import { MerchantQueryBuilder } from '../utils/query-builders';
+import {
+  MerchantFilterParams,
+  MerchantQueryParams,
+  MerchantListResponse,
+  MERCHANT_FIELD_TYPES,
+} from '../types/resources';
 
-export interface MerchantFilterParams extends BaseFilterParams {
-  // Common filters
-  search?: string; // Legacy search field - consider using 'q' instead
-  status?: AccountStatus | StatusKey | number; // Accept contextual, full, and integer values
-  limit?: number;
-  
-  // Database field filters - any field from the merchants table can be filtered
-  id?: number;
-  name?: string;
-  email?: string;
-  username?: string;
-  about?: string;
-  logo?: string;
-  sector?: string;
-  phone?: string;
-  business_type?: string;
-  theme_colour?: string;
-  uid?: string;
-  address_id?: number;
-  owner_id?: number;
-  domain_id?: number;
-  organisation_id?: number;
-  platform_fee_structure?: FeeStructureKey | number; // Accept both string and integer
-  provider_fee_structure?: FeeStructureKey | number; // Accept both string and integer
-  parent_merchant_id?: number;
-  inserted_at?: string;
-  updated_at?: string;
-}
-
-export interface MerchantListResponse {
-  entries: Merchant[];
-  page_info: {
-    current_page: number;
-    total_pages: number;
-    total_entries: number;
-    page_size: number;
-  };
+/**
+ * @deprecated Use MerchantFilterParams from types/resources instead
+ */
+export interface LegacyMerchantFilterParams {
+  // Legacy interface - kept for backward compatibility
 }
 
 export class MerchantsResource {
@@ -249,36 +228,74 @@ export class MerchantsResource {
   /**
    * Get merchant account balances
    */
-  async balances(): Promise<ApiResponse> {
-    return this.client.post(`/merchants/account/balances`, {});
+  async balances(): Promise<ApiResponse<MerchantBalance>> {
+    return this.client.get<MerchantBalance>('/merchants/account/balances');
   }
 
   /**
    * Get merchant account limits
    */
-  async limits(): Promise<ApiResponse> {
-    return this.client.post(`/merchants/account/limits`, {});
+  async limits(): Promise<ApiResponse<MerchantLimits>> {
+    return this.client.get<MerchantLimits>('/merchants/account/limits');
   }
 
   /**
    * Get merchant subscription plan details
    */
-  async subscription(): Promise<ApiResponse> {
-    return this.client.post(`/merchants/account/plan`, {});
+  async subscription(): Promise<ApiResponse<MerchantSubscription>> {
+    return this.client.get<MerchantSubscription>('/merchants/account/plan');
   }
 
   /**
    * Get list of merchant account invoices
    */
-  async invoices(): Promise<ApiResponse> {
-    return this.client.post(`/merchants/account/invoices`, {});
+  async invoices(): Promise<ApiResponse<MerchantInvoice[]>> {
+    return this.client.get<MerchantInvoice[]>('/merchants/account/invoices');
   }
 
   /**
    * Get a specific merchant invoice by ID
    */
-  async invoice(invoiceId: string): Promise<ApiResponse> {
-    return this.client.post(`/merchants/account/invoice/${invoiceId}`, {});
+  async invoice(invoiceId: string): Promise<ApiResponse<MerchantInvoice>> {
+    return this.client.get<MerchantInvoice>(`/merchants/account/invoice/${invoiceId}`);
+  }
+
+  /**
+   * Query merchants with enhanced query support
+   * @example
+   * await merchants.query({ status: 'approved', sector: 'retail' })
+   */
+  async query(params?: MerchantQueryParams): Promise<ApiResponse<MerchantListResponse>> {
+    const processedQuery = processQuery(params || {}, MERCHANT_FIELD_TYPES, { validate: true });
+    const translatedQuery = this.translateFilters(processedQuery);
+    const response = await this.client.get<{ entries: InternalMerchant[]; page_info: any }>('/merchants', translatedQuery);
+    
+    if (response.data?.entries) {
+      const translatedEntries = response.data.entries.map(m => this.translateMerchantToUserFacing(m));
+      return {
+        state: response.state,
+        data: { entries: translatedEntries, page_info: response.data.page_info }
+      };
+    }
+    
+    if (response.result?.entries) {
+      const translatedEntries = response.result.entries.map(m => this.translateMerchantToUserFacing(m));
+      return {
+        state: response.state,
+        result: { entries: translatedEntries, page_info: response.result.page_info }
+      };
+    }
+    
+    return { state: response.state, data: response.data as any, result: response.result as any };
+  }
+
+  /**
+   * Create a query builder for merchants
+   * @example
+   * await sdk.merchants.createQueryBuilder().whereStatus('approved').execute()
+   */
+  createQueryBuilder(initialQuery?: MerchantQueryParams): MerchantQueryBuilder {
+    return new MerchantQueryBuilder(this, initialQuery);
   }
   
 }

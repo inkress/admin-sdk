@@ -75,43 +75,16 @@ export type {
   JsonQueryParams 
 } from './utils/query-transformer';
 
-// Enhanced filter types for each resource using the query system
-export type MerchantQueryParams = QueryParams<Merchant>;
-export type ProductQueryParams = QueryParams<Product>;
-export type CategoryQueryParams = QueryParams<Category>;
-export type UserQueryParams = QueryParams<User>;
-export type BillingPlanQueryParams = QueryParams<BillingPlan>;
-export type SubscriptionQueryParams = QueryParams<Subscription>;
-
-// Order query parameters - simplified for better type safety
-export interface OrderQueryParams {
-  // Direct field queries
-  id?: number | number[];
-  reference_id?: string | string[] | StringQuery;
-  total?: number | number[] | RangeQuery<number>;
-  status?: OrderStatus | OrderStatus[] | StringQuery;
-  kind?: OrderKind | OrderKind[] | StringQuery;
-  status_on?: number | number[] | RangeQuery<number>;
-  uid?: string | string[] | StringQuery;
-  cart_id?: number | number[];
-  inserted_at?: string | DateQuery;
-  updated_at?: string | DateQuery;
-  
-  // Special query fields
-  exclude?: string | number;
-  distinct?: string;
-  order_by?: string;
-  data?: JsonQueryParams;
-  page?: number;
-  page_size?: number;
-  per_page?: number;
-  limit?: number;
-  override_page?: string | boolean;
-  q?: string;
-  search?: string;
-  sort?: string;
-  order?: 'asc' | 'desc';
-}
+// Re-export resource-specific query types from centralized location
+export type {
+  OrderQueryParams,
+  ProductQueryParams,
+  CategoryQueryParams,
+  UserQueryParams,
+  MerchantQueryParams,
+  BillingPlanQueryParams,
+  SubscriptionQueryParams,
+} from './types/resources';
 
 // Configuration and base types
 export interface InkressConfig {
@@ -193,23 +166,91 @@ export interface Currency {
   code: string;
   symbol: string;
   name: string;
+  flag?: string;
+  is_float: boolean;
+  inserted_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateCurrencyData {
+  code: string;
+  symbol: string;
+  name: string;
+  flag?: string;
+  is_float: boolean;
+}
+
+export interface UpdateCurrencyData {
+  code?: string;
+  symbol?: string;
+  name?: string;
+  flag?: string;
+  is_float?: boolean;
 }
 
 // Organisation type
 export interface Organisation {
   id: number;
+  uid: string;
   name: string;
-  description: string;
+  email?: string;
+  phone?: string;
+  about?: string;
+  logo?: string;
+  business_type?: string;
+  status: AccountStatus;
+  timezone?: string;
+  data?: Record<string, any>;
+  domain_id?: number;
+  owner_id?: number;
+  default_merchant_id?: number;
+  inserted_at: string;
+  updated_at: string;
 }
 
-// Address type
+// Address type (full schema from OpenAPI)
 export interface Address {
-  address: string;
-  address2?: string;
+  id?: number;
+  hash?: string;
+  kind: number;
+  kind_id: number;
+  lang?: number; // Longitude
+  lat?: number; // Latitude
+  street: string;
+  street_optional?: string;
   city: string;
-  state?: string;
-  postal_code: string;
+  state: string;
   country: string;
+  region: string;
+  town: string;
+  inserted_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateAddressData {
+  kind: number;
+  kind_id: number;
+  lang?: number;
+  lat?: number;
+  street: string;
+  street_optional?: string;
+  city: string;
+  state: string;
+  country: string;
+  region: string;
+  town: string;
+}
+
+export interface UpdateAddressData {
+  lang?: number;
+  lat?: number;
+  street?: string;
+  street_optional?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  region?: string;
+  town?: string;
 }
 
 // Merchant types
@@ -277,6 +318,40 @@ export interface UpdateMerchantData {
   provider_fee_structure?: FeeStructureKey;
   parent_merchant_id?: number;
   data?: Record<string, any>;
+}
+
+export interface MerchantBalance {
+  available: number;
+  pending: number;
+  currency: string;
+}
+
+export interface MerchantLimits {
+  transaction_limit: number;
+  daily_limit: number;
+  monthly_limit: number;
+  currency: string;
+}
+
+export interface MerchantSubscription {
+  plan_name: string;
+  status: string;
+  billing_cycle: string;
+  price: number;
+  currency: string;
+  features: string[];
+  next_billing_date?: string;
+}
+
+export interface MerchantInvoice {
+  id: string;
+  invoice_number: string;
+  amount: number;
+  currency: string;
+  status: string;
+  due_date: string;
+  issued_date: string;
+  paid_date?: string;
 }
 
 export interface PublicMerchant {
@@ -449,9 +524,27 @@ export interface OrderStats {
 export interface PaymentMethod {
   id: number;
   name: string;
-  code: string;
-  provider: string;
+  code?: string;
+  provider?: string;
   active: boolean;
+  payment_provider_id: number;
+  financial_account_id?: number;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface CreatePaymentMethodData {
+  name: string;
+  payment_provider_id: number;
+  financial_account_id?: number;
+  active?: boolean;
+}
+
+export interface UpdatePaymentMethodData {
+  name?: string;
+  payment_provider_id?: number;
+  financial_account_id?: number;
+  active?: boolean;
 }
 
 // Customer types
@@ -462,8 +555,364 @@ export interface Customer {
   last_name?: string;
   name?: string;
   phone?: string;
-  created_at: string;
-  metadata?: Record<string, any>;
+  uid?: string;
+  dob?: number;
+  sex?: number;
+  image?: string;
+  status?: number;
+  level?: number;
+  data?: Record<string, any>;
+  merchant_id?: number;
+  organisation_id?: number;
+  inserted_at: string;
+  updated_at: string;
+}
+
+// Payment Link types
+export interface PaymentLink {
+  id: number;
+  uid: string;
+  title: string;
+  description?: string;
+  total: number;
+  usage_limit: number;
+  expires_at?: string;
+  status: number;
+  kind: number;
+  data?: Record<string, any>;
+  customer_id?: number;
+  currency_id: number;
+  order_id?: number;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface CreatePaymentLinkData {
+  title: string;
+  description?: string;
+  total?: number;
+  usage_limit?: number;
+  expires_at?: string;
+  status?: number;
+  kind?: number;
+  data?: Record<string, any>;
+  customer_id?: number;
+  currency_id: number;
+  order_id?: number;
+}
+
+export interface UpdatePaymentLinkData {
+  title?: string;
+  description?: string;
+  total?: number;
+  usage_limit?: number;
+  expires_at?: string;
+  status?: number;
+  kind?: number;
+  data?: Record<string, any>;
+  customer_id?: number;
+  currency_id?: number;
+  order_id?: number;
+}
+
+// Financial Account types
+export interface FinancialAccount {
+  id: number;
+  name: string;
+  type: string;
+  provider: string;
+  is_external: boolean;
+  fingerprint?: string;
+  data?: Record<string, any>;
+  record: string;
+  record_id: number;
+  active: boolean;
+  code?: string;
+  adapter?: string;
+  logo?: string;
+  website?: string;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface CreateFinancialAccountData {
+  name: string;
+  type: string;
+  provider: string;
+  is_external?: boolean;
+  fingerprint?: string;
+  data?: Record<string, any>;
+  record: string;
+  record_id: number;
+  active?: boolean;
+  code?: string;
+  adapter?: string;
+  logo?: string;
+  website?: string;
+}
+
+export interface UpdateFinancialAccountData {
+  name?: string;
+  type?: string;
+  provider?: string;
+  is_external?: boolean;
+  fingerprint?: string;
+  data?: Record<string, any>;
+  active?: boolean;
+  code?: string;
+  adapter?: string;
+  logo?: string;
+  website?: string;
+}
+
+// Financial Request types (Payouts and other financial requests)
+export interface FinancialRequest {
+  id: number;
+  total: number;
+  status: number;
+  type: number;
+  sub_type?: number;
+  fee_total: number;
+  reference_id?: string;
+  reviewed_at?: string;
+  due_at?: string;
+  balance_on_request: number;
+  data?: Record<string, any>;
+  source_id?: number;
+  destination_id?: number;
+  merchant_id: number;
+  requester_id: number;
+  reviewer_id?: number;
+  currency_id: number;
+  evidence_file_id?: number;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface CreateFinancialRequestData {
+  total: number;
+  type: number;
+  sub_type?: number;
+  reference_id?: string;
+  due_at?: string;
+  data?: Record<string, any>;
+  source_id?: number;
+  destination_id?: number;
+  currency_id: number;
+  evidence_file_id?: number;
+}
+
+export interface UpdateFinancialRequestData {
+  total?: number;
+  status?: number;
+  type?: number;
+  sub_type?: number;
+  fee_total?: number;
+  reference_id?: string;
+  reviewed_at?: string;
+  due_at?: string;
+  data?: Record<string, any>;
+  source_id?: number;
+  destination_id?: number;
+  reviewer_id?: number;
+  currency_id?: number;
+  evidence_file_id?: number;
+}
+
+// Webhook URL types
+export interface WebhookUrl {
+  id: number;
+  url: string;
+  event: string;
+  uid: string;
+  merchant_id?: number;
+  org_id?: number;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface CreateWebhookUrlData {
+  url: string;
+  event: string;
+  merchant_id?: number;
+  org_id?: number;
+}
+
+export interface UpdateWebhookUrlData {
+  url?: string;
+  event?: string;
+  merchant_id?: number;
+  org_id?: number;
+}
+
+// Token types
+export interface Token {
+  id: number;
+  public_key: string;
+  title?: string;
+  provider: string;
+  kind: number;
+  enabled: boolean;
+  expires?: number;
+  user_id: number;
+  role_id?: number;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface CreateTokenData {
+  title?: string;
+  provider: string;
+  kind: number;
+  enabled?: boolean;
+  expires?: number;
+  user_id: number;
+  role_id?: number;
+}
+
+export interface UpdateTokenData {
+  title?: string;
+  enabled?: boolean;
+  expires?: number;
+  role_id?: number;
+}
+
+// Exchange Rate types
+export interface ExchangeRate {
+  id: number;
+  source_id: number;
+  destination_id: number;
+  rate: number;
+  expires?: number;
+  source?: string;
+  user_id?: number;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface CreateExchangeRateData {
+  source_id: number;
+  destination_id: number;
+  rate: number;
+  expires?: number;
+  source?: string;
+  user_id?: number;
+}
+
+export interface UpdateExchangeRateData {
+  rate?: number;
+  expires?: number;
+  source?: string;
+}
+
+// Fee types
+export interface Fee {
+  id: number;
+  title?: string;
+  total: number;
+  unit: number; // 1 = fixed, 2 = percentage
+  kind: number; // 1 - payment_provider, 2 - platform, 3 - tax, 4 - custom
+  priority: number;
+  compound: boolean;
+  fee_payer: number; // 1 = customer, 2 = merchant
+  currency_code?: string;
+  hash?: string;
+  fee_set_id?: number;
+  currency_id?: number;
+  user_id?: number;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface CreateFeeData {
+  title?: string;
+  total: number;
+  unit: number;
+  kind: number;
+  priority?: number;
+  compound?: boolean;
+  fee_payer?: number;
+  currency_code?: string;
+  fee_set_id?: number;
+  currency_id?: number;
+  user_id?: number;
+}
+
+export interface UpdateFeeData {
+  title?: string;
+  total?: number;
+  unit?: number;
+  kind?: number;
+  priority?: number;
+  compound?: boolean;
+  fee_payer?: number;
+  currency_code?: string;
+  fee_set_id?: number;
+  currency_id?: number;
+  user_id?: number;
+}
+
+// Post types
+export interface Post {
+  id: number;
+  title: string;
+  content: string;
+  status: number;
+  kind: number;
+  author_id: number;
+  data?: Record<string, any>;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface CreatePostData {
+  title: string;
+  content: string;
+  status?: number;
+  kind?: number;
+  author_id: number;
+  data?: Record<string, any>;
+}
+
+export interface UpdatePostData {
+  title?: string;
+  content?: string;
+  status?: number;
+  kind?: number;
+  data?: Record<string, any>;
+}
+
+// Transaction Entry types
+export interface TransactionEntry {
+  id: number;
+  amount: number;
+  type: number;
+  transaction_id: number;
+  financial_account_id: number;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface CreateTransactionEntryData {
+  amount: number;
+  type: number;
+  transaction_id: number;
+  financial_account_id: number;
+}
+
+export interface UpdateTransactionEntryData {
+  amount?: number;
+  type?: number;
+  transaction_id?: number;
+  financial_account_id?: number;
+}
+
+// Generic Resource type for dynamic endpoints
+export interface GenericResource {
+  id: number;
+  [key: string]: any;
+  inserted_at?: string;
+  updated_at?: string;
 }
 
 // Billing Plan types
@@ -594,12 +1043,25 @@ export interface SubscriptionPeriod {
   subscription_id: string;
   start_date: string;
   end_date: string;
-  amount: number;
-  currency: Currency;
-  status: 'pending' | 'paid' | 'failed' | 'cancelled';
-  charged_at?: string;
-  created_at: string;
-  metadata?: Record<string, any>;
+  status: string;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface SubscriptionUsageResponse {
+  id: number;
+  subscription_id: string;
+  usage_amount: number;
+  recorded_at: string;
+  description?: string;
+}
+
+export interface SubscriptionCancelResponse {
+  id: number;
+  uid: string;
+  status: string;
+  canceled_at: string;
+  cancellation_reason?: string;
 }
 
 export interface SubscriptionLinkData {

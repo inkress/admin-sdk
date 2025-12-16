@@ -4,7 +4,6 @@ import {
   CreateUserData,
   UpdateUserData,
   ApiResponse,
-  BaseFilterParams,
   InternalUser,
   AccountStatus,
   UserKind,
@@ -15,40 +14,20 @@ import {
   StatusKey,
   KindKey,
 } from '../utils/translators';
+import { processQuery } from '../utils/query-transformer';
+import { UserQueryBuilder } from '../utils/query-builders';
+import {
+  UserFilterParams,
+  UserQueryParams,
+  UserListResponse,
+  USER_FIELD_TYPES,
+} from '../types/resources';
 
-export interface UserFilterParams extends BaseFilterParams {
-  // Common filters
-  search?: string; // Legacy search field - consider using 'q' instead
-  status?: AccountStatus | StatusKey | number; // Accept contextual, full string, and integer for compatibility
-  kind?: UserKind | KindKey | number; // Accept contextual, full string, and integer for compatibility
-  level?: number;
-  role_id?: number;
-  organisation_id?: number;
-  limit?: number;
-  
-  // Database field filters - any field from the users table can be filtered
-  id?: number;
-  email?: string;
-  phone?: string;
-  first_name?: string;
-  last_name?: string;
-  username?: string;
-  dob?: number;
-  sex?: number;
-  image?: string;
-  uid?: string;
-  inserted_at?: string;
-  updated_at?: string;
-}
-
-export interface UserListResponse {
-  entries: User[];
-  page_info: {
-    current_page: number;
-    total_pages: number;
-    total_entries: number;
-    page_size: number;
-  };
+/**
+ * @deprecated Use UserFilterParams from types/resources instead
+ */
+export interface LegacyUserFilterParams {
+  // Legacy interface - kept for backward compatibility
 }
 
 export interface CreateUserRequestData {
@@ -147,8 +126,9 @@ export class UsersResource {
    * Create a new user
    * Requires Client-Id header to be set in the configuration
    */
-  async create(data: CreateUserRequestData): Promise<ApiResponse<User>> {
-    return this.client.post<User>('/users', data);
+  async create(data: CreateUserData): Promise<ApiResponse<User>> {
+    const internalData = this.translateUserToInternal(data);
+    return this.client.post<User>('/users', internalData);
   }
 
   /**
@@ -166,5 +146,43 @@ export class UsersResource {
    */
   async delete(id: number): Promise<ApiResponse<void>> {
     return this.client.delete<void>(`/users/${id}`);
+  }
+
+  /**
+   * Query users with enhanced query support
+   * @example
+   * await users.query({ status: 'approved', level: { min: 5 } })
+   */
+  async query(params?: UserQueryParams): Promise<ApiResponse<UserListResponse>> {
+    const processedQuery = processQuery(params || {}, USER_FIELD_TYPES, { validate: true });
+    const translatedQuery = this.translateFilters(processedQuery);
+    const response = await this.client.get<{ entries: InternalUser[]; page_info: any }>('/users', translatedQuery);
+    
+    if (response.data?.entries) {
+      const translatedEntries = response.data.entries.map(user => this.translateUserToUserFacing(user));
+      return {
+        state: response.state,
+        data: { entries: translatedEntries, page_info: response.data.page_info }
+      };
+    }
+    
+    if (response.result?.entries) {
+      const translatedEntries = response.result.entries.map(user => this.translateUserToUserFacing(user));
+      return {
+        state: response.state,
+        result: { entries: translatedEntries, page_info: response.result.page_info }
+      };
+    }
+    
+    return { state: response.state, data: response.data as any, result: response.result as any };
+  }
+
+  /**
+   * Create a query builder for users
+   * @example
+   * await sdk.users.createQueryBuilder().whereStatus('approved').execute()
+   */
+  createQueryBuilder(initialQuery?: UserQueryParams): UserQueryBuilder {
+    return new UserQueryBuilder(this, initialQuery);
   }
 }

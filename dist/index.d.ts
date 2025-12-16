@@ -9,6 +9,19 @@ import { UsersResource } from './resources/users';
 import { PublicResource } from './resources/public';
 import { KycResource } from './resources/kyc';
 import { PayoutResource } from './resources/payout';
+import { PaymentLinksResource } from './resources/payment-links';
+import { FinancialAccountsResource } from './resources/financial-accounts';
+import { FinancialRequestsResource } from './resources/financial-requests';
+import { WebhookUrlsResource } from './resources/webhook-urls';
+import { TokensResource } from './resources/tokens';
+import { AddressesResource } from './resources/addresses';
+import { CurrenciesResource } from './resources/currencies';
+import { ExchangeRatesResource } from './resources/exchange-rates';
+import { FeesResource } from './resources/fees';
+import { PaymentMethodsResource } from './resources/payment-methods';
+import { PostsResource } from './resources/posts';
+import { TransactionEntriesResource } from './resources/transaction-entries';
+import { GenericsResource } from './resources/generics';
 /**
  * Main Inkress Commerce API SDK class
  *
@@ -64,6 +77,19 @@ export declare class InkressSDK {
     readonly public: PublicResource;
     readonly kyc: KycResource;
     readonly payout: PayoutResource;
+    readonly paymentLinks: PaymentLinksResource;
+    readonly financialAccounts: FinancialAccountsResource;
+    readonly financialRequests: FinancialRequestsResource;
+    readonly webhookUrls: WebhookUrlsResource;
+    readonly tokens: TokensResource;
+    readonly addresses: AddressesResource;
+    readonly currencies: CurrenciesResource;
+    readonly exchangeRates: ExchangeRatesResource;
+    readonly fees: FeesResource;
+    readonly paymentMethods: PaymentMethodsResource;
+    readonly posts: PostsResource;
+    readonly transactionEntries: TransactionEntriesResource;
+    readonly generics: GenericsResource;
     constructor(config: InkressConfig);
     /**
      * Update the SDK configuration
@@ -77,6 +103,8 @@ export declare class InkressSDK {
 export * from './types';
 export * from './client';
 export { InkressSDK as default };
+export type { OrderQueryParams, ProductQueryParams, UserQueryParams, MerchantQueryParams, CategoryQueryParams, BillingPlanQueryParams, SubscriptionQueryParams, PaymentLinkQueryParams, FinancialAccountQueryParams, FinancialRequestQueryParams, WebhookUrlQueryParams, TokenQueryParams, AddressQueryParams, CurrencyQueryParams, ExchangeRateQueryParams, FeeQueryParams, PaymentMethodQueryParams, PostQueryParams, TransactionEntryQueryParams, OrderFilterParams, ProductFilterParams, UserFilterParams, MerchantFilterParams, CategoryFilterParams, BillingPlanFilterParams, SubscriptionFilterParams, PaymentLinkFilterParams, FinancialAccountFilterParams, FinancialRequestFilterParams, WebhookUrlFilterParams, TokenFilterParams, AddressFilterParams, CurrencyFilterParams, ExchangeRateFilterParams, FeeFilterParams, PaymentMethodFilterParams, PostFilterParams, TransactionEntryFilterParams, OrderListResponse, ProductListResponse, UserListResponse, MerchantListResponse, CategoryListResponse, BillingPlanListResponse, SubscriptionListResponse, PaymentLinkListResponse, FinancialAccountListResponse, FinancialRequestListResponse, WebhookUrlListResponse, TokenListResponse, AddressListResponse, CurrencyListResponse, ExchangeRateListResponse, FeeListResponse, PaymentMethodListResponse, PostListResponse, TransactionEntryListResponse, PageInfo, } from './types/resources';
+export { ORDER_FIELD_TYPES, PRODUCT_FIELD_TYPES, USER_FIELD_TYPES, MERCHANT_FIELD_TYPES, CATEGORY_FIELD_TYPES, BILLING_PLAN_FIELD_TYPES, SUBSCRIPTION_FIELD_TYPES, PAYMENT_LINK_FIELD_TYPES, FINANCIAL_ACCOUNT_FIELD_TYPES, FINANCIAL_REQUEST_FIELD_TYPES, WEBHOOK_URL_FIELD_TYPES, TOKEN_FIELD_TYPES, ADDRESS_FIELD_TYPES, CURRENCY_FIELD_TYPES, EXCHANGE_RATE_FIELD_TYPES, FEE_FIELD_TYPES, PAYMENT_METHOD_FIELD_TYPES, POST_FIELD_TYPES, TRANSACTION_ENTRY_FIELD_TYPES, } from './types/resources';
 export { processQuery, QueryBuilder, type QueryParams, type RangeQuery, type StringQuery, type DateQuery, type JsonQueryParams, } from './utils/query-transformer';
-export { OrderQueryBuilder } from './resources/orders';
+export { OrderQueryBuilder, ProductQueryBuilder, UserQueryBuilder, MerchantQueryBuilder, CategoryQueryBuilder, BillingPlanQueryBuilder, SubscriptionQueryBuilder, PaymentLinkQueryBuilder, FinancialAccountQueryBuilder, FinancialRequestQueryBuilder, WebhookUrlQueryBuilder, TokenQueryBuilder, AddressQueryBuilder, CurrencyQueryBuilder, ExchangeRateQueryBuilder, FeeQueryBuilder, PaymentMethodQueryBuilder, PostQueryBuilder, TransactionEntryQueryBuilder, type Queryable, } from './utils/query-builders';
 //# sourceMappingURL=index.d.ts.map

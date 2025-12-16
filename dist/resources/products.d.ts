@@ -1,39 +1,11 @@
 import { HttpClient } from '../client';
-import { Product, CreateProductData, UpdateProductData, ApiResponse, BaseFilterParams, ProductStatus } from '../types';
-import { StatusKey } from '../utils/translators';
-export interface ProductFilterParams extends BaseFilterParams {
-    search?: string;
-    status?: ProductStatus | StatusKey | number;
-    category?: string;
-    limit?: number;
-    id?: number;
-    title?: string;
-    teaser?: string;
-    price?: number;
-    permalink?: string;
-    image?: string;
-    public?: boolean;
-    unlimited?: boolean;
-    units_remaining?: number;
-    units_sold?: number;
-    rating_sum?: number;
-    rating_count?: number;
-    tag_ids?: number[];
-    uid?: string;
-    category_id?: number;
-    currency_id?: number;
-    user_id?: number;
-    inserted_at?: string;
-    updated_at?: string;
-}
-export interface ProductListResponse {
-    entries: Product[];
-    page_info: {
-        current_page: number;
-        total_pages: number;
-        total_entries: number;
-        page_size: number;
-    };
+import { Product, CreateProductData, UpdateProductData, ApiResponse } from '../types';
+import { ProductQueryBuilder } from '../utils/query-builders';
+import { ProductFilterParams, ProductQueryParams, ProductListResponse } from '../types/resources';
+/**
+ * @deprecated Use ProductFilterParams from types/resources instead
+ */
+export interface LegacyProductFilterParams {
 }
 export declare class ProductsResource {
     private client;
@@ -75,5 +47,47 @@ export declare class ProductsResource {
      * Requires Client-Id header to be set in the configuration
      */
     delete(id: number): Promise<ApiResponse<void>>;
+    /**
+     * List products with enhanced query support
+     * Supports filtering by any database field using the new query system
+     * Requires Client-Id header to be set in the configuration
+     *
+     * @example
+     * // Simple queries
+     * await products.query({ status: 'published', public: true })
+     *
+     * // Array queries (IN operations)
+     * await products.query({ category_id: [1, 2, 3], status: ['published', 'draft'] })
+     *
+     * // Range queries
+     * await products.query({ price: { min: 10, max: 100 } })
+     *
+     * // String searches
+     * await products.query({ title: { contains: 'shirt' } })
+     *
+     * // Combined queries
+     * await products.query({
+     *   status: 'published',
+     *   price: { min: 20 },
+     *   public: true,
+     *   page: 1,
+     *   page_size: 20
+     * })
+     */
+    query(params?: ProductQueryParams): Promise<ApiResponse<ProductListResponse>>;
+    /**
+     * Create a query builder for products
+     * Provides a fluent interface for building complex queries
+     *
+     * @example
+     * const products = await sdk.products.createQueryBuilder()
+     *   .whereStatus('published')
+     *   .wherePriceRange(10, 100)
+     *   .whereTitleContains('shirt')
+     *   .wherePublic(true)
+     *   .paginate(1, 20)
+     *   .execute();
+     */
+    createQueryBuilder(initialQuery?: ProductQueryParams): ProductQueryBuilder;
 }
 //# sourceMappingURL=products.d.ts.map

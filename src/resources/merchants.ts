@@ -190,35 +190,35 @@ export class MerchantsResource {
    * Get merchant account balances
    */
   async balances(): Promise<ApiResponse<MerchantBalance>> {
-    return this.client.get<MerchantBalance>('/merchants/account/balances');
+    return this.client.post<MerchantBalance>('/merchants/account/balances');
   }
 
   /**
    * Get merchant account limits
    */
   async limits(): Promise<ApiResponse<MerchantLimits>> {
-    return this.client.get<MerchantLimits>('/merchants/account/limits');
+    return this.client.post<MerchantLimits>('/merchants/account/limits');
   }
 
   /**
    * Get merchant subscription plan details
    */
   async subscription(): Promise<ApiResponse<MerchantSubscription>> {
-    return this.client.get<MerchantSubscription>('/merchants/account/plan');
+    return this.client.post<MerchantSubscription>('/merchants/account/plan');
   }
 
   /**
    * Get list of merchant account invoices
    */
   async invoices(): Promise<ApiResponse<MerchantInvoice[]>> {
-    return this.client.get<MerchantInvoice[]>('/merchants/account/invoices');
+    return this.client.post<MerchantInvoice[]>('/merchants/account/invoices');
   }
 
   /**
    * Get a specific merchant invoice by ID
    */
   async invoice(invoiceId: string): Promise<ApiResponse<MerchantInvoice>> {
-    return this.client.get<MerchantInvoice>(`/merchants/account/invoice/${invoiceId}`);
+    return this.client.post<MerchantInvoice>(`/merchants/account/invoice/${invoiceId}`);
   }
 
   /**

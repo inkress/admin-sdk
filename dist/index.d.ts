@@ -30,9 +30,9 @@ import { GenericsResource } from './resources/generics';
  * import { InkressSDK } from '@inkress/admin-sdk';
  *
  * const inkress = new InkressSDK({
- *   bearerToken: 'your-jwt-token',
- *   clientId: 'm-merchant-username', // Required for merchant-specific endpoints
- *   endpoint: 'https://api.inkress.com', // Optional, defaults to production
+ *   accessToken: 'your-jwt-token',
+ *   username: 'merchant-username', // Optional - automatically prepended with 'm-'
+ *   mode: 'live', // Optional - 'live' (default) or 'sandbox'
  *   apiVersion: 'v1', // Optional, defaults to v1
  * });
  *
@@ -98,7 +98,7 @@ export declare class InkressSDK {
     /**
      * Get current configuration (without sensitive data)
      */
-    getConfig(): Omit<InkressConfig, 'bearerToken'>;
+    getConfig(): Omit<InkressConfig, 'accessToken'>;
 }
 export * from './types';
 export * from './client';

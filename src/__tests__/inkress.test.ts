@@ -2,9 +2,9 @@ import { InkressSDK } from '../index';
 
 describe('InkressSDK', () => {
   const mockConfig = {
-    bearerToken: 'test-token',
-    endpoint: 'https://api-test.inkress.com',
-    clientId: 'test-client-id'
+    accessToken: 'test-token',
+    mode: 'sandbox' as const,
+    username: 'test-merchant'
   };
 
   let inkress: InkressSDK;
@@ -15,28 +15,44 @@ describe('InkressSDK', () => {
 
   test('should initialize with config', () => {
     expect(inkress).toBeInstanceOf(InkressSDK);
+    
+    // Core resources
     expect(inkress.merchants).toBeDefined();
     expect(inkress.products).toBeDefined();
     expect(inkress.orders).toBeDefined();
-    expect(inkress.payments).toBeDefined();
-    expect(inkress.customers).toBeDefined();
-    expect(inkress.subscriptions).toBeDefined();
     expect(inkress.users).toBeDefined();
+    expect(inkress.categories).toBeDefined();
+    
+    // Billing resources
+    expect(inkress.billingPlans).toBeDefined();
+    expect(inkress.subscriptions).toBeDefined();
+    expect(inkress.paymentLinks).toBeDefined();
+    expect(inkress.paymentMethods).toBeDefined();
+    
+    // Financial resources
+    expect(inkress.financialAccounts).toBeDefined();
+    expect(inkress.financialRequests).toBeDefined();
+    expect(inkress.transactionEntries).toBeDefined();
+    expect(inkress.fees).toBeDefined();
+    expect(inkress.currencies).toBeDefined();
+    expect(inkress.exchangeRates).toBeDefined();
+    
+    // Identity resources
+    expect(inkress.addresses).toBeDefined();
     expect(inkress.tokens).toBeDefined();
-    expect(inkress.webhooks).toBeDefined();
-    expect(inkress.analytics).toBeDefined();
-    expect(inkress.settlements).toBeDefined();
-    expect(inkress.rates).toBeDefined();
+    expect(inkress.webhookUrls).toBeDefined();
+    
+    // Other resources
+    expect(inkress.posts).toBeDefined();
+    expect(inkress.public).toBeDefined();
+    expect(inkress.kyc).toBeDefined();
+    expect(inkress.payout).toBeDefined();
+    expect(inkress.generics).toBeDefined();
   });
 
-  test('should provide access to HTTP client', () => {
-    const client = inkress.getHttpClient();
-    expect(client).toBeDefined();
-  });
-
-  test('should throw error without bearer token', () => {
+  test('should throw error without access token', () => {
     expect(() => {
-      new InkressSDK({ bearerToken: '' });
-    }).toThrow('Bearer token is required');
+      new InkressSDK({ accessToken: '' });
+    }).toThrow('Access token is required');
   });
 });

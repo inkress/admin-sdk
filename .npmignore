@@ -1,8 +1,13 @@
 # Source files
 src/
+examples/
+fac/
 tests/
+__tests__/
 *.test.ts
 *.test.js
+*.spec.ts
+*.spec.js
 
 # Development files
 .git/
@@ -16,7 +21,8 @@ yarn-error.log*
 # Build tools
 rollup.config.js
 tsconfig.json
-jest.config.js
+jest.config.cjs
+jest.setup.js
 .eslintrc.*
 
 # Development artifacts
@@ -46,3 +52,19 @@ pnpm-lock.yaml
 .env.local
 .env.test
 .env.production
+
+# Documentation files not needed in package
+docs/
+IMPLEMENTATION.md
+PUBLISHING.md
+SCHEMA_UPDATES.md
+SDK_TRANSFORMATION_COMPLETE.md
+TRANSLATION_COMPLETE.md
+CONTEXTUAL_STRINGS_COMPLETE.md
+CONSISTENCY_IMPROVEMENTS.md
+claude-guide-to-query.txt
+commerce-schema.sql
+openapi.yaml
+rbac.yaml
+test-module.ts
+

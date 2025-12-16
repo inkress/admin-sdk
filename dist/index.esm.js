@@ -2,14 +2,19 @@ import fetch from 'cross-fetch';
 
 class HttpClient {
     constructor(config) {
+        // Compute endpoint from mode
+        const endpoint = config.mode === 'sandbox'
+            ? 'https://api-dev.inkress.com'
+            : 'https://api.inkress.com';
         this.config = {
-            endpoint: 'https://api.inkress.com',
-            apiVersion: 'v1',
-            clientId: '',
-            timeout: 30000,
-            retries: 0,
-            headers: {},
-            ...config,
+            accessToken: config.accessToken,
+            mode: config.mode || 'live',
+            apiVersion: config.apiVersion || 'v1',
+            username: config.username || '',
+            timeout: config.timeout || 30000,
+            retries: config.retries || 0,
+            headers: config.headers || {},
+            endpoint, // computed from mode
         };
     }
     getBaseUrl() {
@@ -19,13 +24,13 @@ class HttpClient {
     getHeaders(additionalHeaders = {}) {
         const headers = {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.config.bearerToken}`,
+            'Authorization': `Bearer ${this.config.accessToken}`,
             ...this.config.headers,
             ...additionalHeaders,
         };
-        // Add Client-Id header if provided
-        if (this.config.clientId) {
-            headers['Client-Id'] = this.config.clientId;
+        // Add Client-Id header if username is provided (prepend with 'm-')
+        if (this.config.username) {
+            headers['Client-Id'] = `m-${this.config.username}`;
         }
         return headers;
     }
@@ -127,12 +132,23 @@ class HttpClient {
     }
     // Update configuration
     updateConfig(newConfig) {
-        this.config = { ...this.config, ...newConfig };
+        // Recompute endpoint if mode changes
+        if (newConfig.mode) {
+            const endpoint = newConfig.mode === 'sandbox'
+                ? 'https://api-dev.inkress.com'
+                : 'https://api.inkress.com';
+            this.config = { ...this.config, ...newConfig, endpoint };
+        }
+        else {
+            this.config = { ...this.config, ...newConfig };
+        }
     }
     // Get current configuration (without sensitive data)
     getConfig() {
-        const { bearerToken, ...config } = this.config;
-        return config;
+        const { accessToken, ...config } = this.config;
+        // Remove computed endpoint from config
+        const { endpoint, ...publicConfig } = config;
+        return publicConfig;
     }
 }
 class InkressApiError extends Error {
@@ -4139,9 +4155,9 @@ class GenericsResource {
  * import { InkressSDK } from '@inkress/admin-sdk';
  *
  * const inkress = new InkressSDK({
- *   bearerToken: 'your-jwt-token',
- *   clientId: 'm-merchant-username', // Required for merchant-specific endpoints
- *   endpoint: 'https://api.inkress.com', // Optional, defaults to production
+ *   accessToken: 'your-jwt-token',
+ *   username: 'merchant-username', // Optional - automatically prepended with 'm-'
+ *   mode: 'live', // Optional - 'live' (default) or 'sandbox'
  *   apiVersion: 'v1', // Optional, defaults to v1
  * });
  *

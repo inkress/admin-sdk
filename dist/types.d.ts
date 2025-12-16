@@ -23,14 +23,14 @@ export type CategoryKind = ProductKind;
 export type { QueryParams, RangeQuery, StringQuery, DateQuery, JsonQueryParams } from './utils/query-transformer';
 export type { OrderQueryParams, ProductQueryParams, CategoryQueryParams, UserQueryParams, MerchantQueryParams, BillingPlanQueryParams, SubscriptionQueryParams, } from './types/resources';
 export interface InkressConfig {
-    /** Bearer token for authentication */
-    bearerToken: string;
-    /** API endpoint URL */
-    endpoint?: string;
+    /** Access token for authentication */
+    accessToken: string;
+    /** API mode - 'live' (https://api.inkress.com) or 'sandbox' (https://api-dev.inkress.com) */
+    mode?: 'live' | 'sandbox';
     /** API version */
     apiVersion?: string;
-    /** Client ID for request identification (format: m-{merchant.username}) */
-    clientId?: string;
+    /** Merchant username (will be prepended with 'm-' for client ID) */
+    username?: string;
     /** Request timeout in milliseconds */
     timeout?: number;
     /** Number of retry attempts */

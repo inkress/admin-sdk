@@ -26,51 +26,69 @@ export interface WebhookVerificationOptions {
 export class WebhookUtils {
   /**
    * Verify webhook signature using HMAC SHA256
+   * Inkress webhooks use the format: crypto.mac(:hmac, :sha256, secret, body) |> Base.encode64()
+   * The signature is sent in the X-Inkress-Webhook-Signature header
    */
   static verifySignature(
-    payload: string | any,
+    body: string,
     signature: string,
-    secret: string,
-    options: WebhookVerificationOptions = {}
+    secret: string
   ): boolean {
+    if (!crypto) {
+      throw new Error('Node.js crypto module not available. Cannot verify webhook signature.');
+    }
+
     try {
-      const { tolerance = 300 } = options;
-      
-      // Parse signature header (format: "t=timestamp,v1=signature")
-      const elements = signature.split(',');
-      const timestamp = elements.find(el => el.startsWith('t='))?.slice(2);
-      const sig = elements.find(el => el.startsWith('v1='))?.slice(3);
-      
-      if (!timestamp || !sig) {
-        throw new Error('Invalid signature format');
-      }
-      
-      // Check timestamp tolerance
-      const timestampInt = parseInt(timestamp, 10);
-      const currentTime = Math.floor(Date.now() / 1000);
-      
-      if (Math.abs(currentTime - timestampInt) > tolerance) {
-        throw new Error('Timestamp outside tolerance');
-      }
-      
-      // Construct signed payload
-      const signedPayload = `${timestamp}.${payload}`;
-      
-      // Calculate expected signature
-      const expectedSig = crypto
+      // Generate expected signature using HMAC SHA256
+      const expectedSignature = crypto
         .createHmac('sha256', secret)
-        .update(signedPayload, 'utf8')
-        .digest('hex');
+        .update(body, 'utf8')
+        .digest('base64');
       
-      // Compare signatures using constant-time comparison
+      // Use constant-time comparison to prevent timing attacks
       return crypto.timingSafeEqual(
-        Buffer.from(sig, 'hex'),
-        Buffer.from(expectedSig, 'hex')
+        Buffer.from(signature),
+        Buffer.from(expectedSignature)
       );
     } catch (error) {
       console.error('Webhook signature verification failed:', error);
       return false;
     }
+  }
+
+  /**
+   * Verify webhook from an HTTP request object
+   * Automatically extracts signature from headers and body from request
+   * Returns both verification status and body (since body can only be read once)
+   */
+  static verifyRequest(
+    request: {
+      headers: Record<string, string | string[] | undefined>;
+      body: string | any;
+    },
+    secret: string
+  ): { isValid: boolean; body: string } {
+    // Extract signature from headers (case-insensitive)
+    const signature = 
+      request.headers['x-inkress-webhook-signature'] || 
+      request.headers['X-Inkress-Webhook-Signature'];
+    
+    if (!signature || typeof signature !== 'string') {
+      throw new Error('Missing X-Inkress-Webhook-Signature header');
+    }
+    
+    // Ensure body is a string
+    let body: string;
+    if (typeof request.body === 'string') {
+      body = request.body;
+    } else if (typeof request.body === 'object') {
+      body = JSON.stringify(request.body);
+    } else {
+      throw new Error('Invalid request body format');
+    }
+    
+    const isValid = this.verifySignature(body, signature, secret);
+    return { isValid, body };
   }
 
   /**
@@ -94,31 +112,30 @@ export class WebhookUtils {
    * Verify and parse webhook payload in one step
    */
   static verifyAndParse(
-    payload: string,
+    body: string,
     signature: string,
-    secret: string,
-    options?: WebhookVerificationOptions
+    secret: string
   ): WebhookPayload {
-    if (!this.verifySignature(payload, signature, secret, options)) {
+    if (!this.verifySignature(body, signature, secret)) {
       throw new Error('Webhook signature verification failed');
     }
     
-    return this.parsePayload(payload);
+    return this.parsePayload(body);
   }
 
   /**
    * Generate webhook signature for testing
+   * Matches Inkress signature generation: crypto.mac(:hmac, :sha256, secret, body) |> Base.encode64()
    */
-  static generateSignature(payload: string, secret: string, timestamp?: number): string {
-    const ts = timestamp || Math.floor(Date.now() / 1000);
-    const signedPayload = `${ts}.${payload}`;
-    
-    const signature = crypto
+  static generateSignature(body: string, secret: string): string {
+    if (!crypto) {
+      throw new Error('Node.js crypto module not available. Cannot generate signature.');
+    }
+
+    return crypto
       .createHmac('sha256', secret)
-      .update(signedPayload, 'utf8')
-      .digest('hex');
-    
-    return `t=${ts},v1=${signature}`;
+      .update(body, 'utf8')
+      .digest('base64');
   }
 
   /**
@@ -164,21 +181,25 @@ export class WebhookUtils {
 }
 
 // Express.js middleware for webhook verification
-export function createWebhookMiddleware(secret: string, options?: WebhookVerificationOptions) {
+export function createWebhookMiddleware(secret: string) {
   return (req: any, res: any, next: any) => {
     try {
-      const signature = req.headers['inkress-signature'] || req.headers['x-inkress-signature'];
+      const signature = req.headers['x-inkress-webhook-signature'];
       
       if (!signature) {
-        return res.status(400).json({ error: 'Missing signature header' });
+        return res.status(400).json({ error: 'Missing X-Inkress-Webhook-Signature header' });
       }
       
-      let payload = req.body;
-      if (typeof payload === 'object') {
-        payload = JSON.stringify(payload);
+      let body: string;
+      if (typeof req.body === 'string') {
+        body = req.body;
+      } else if (typeof req.body === 'object') {
+        body = JSON.stringify(req.body);
+      } else {
+        return res.status(400).json({ error: 'Invalid request body format' });
       }
       
-      const webhookPayload = WebhookUtils.verifyAndParse(payload, signature, secret, options);
+      const webhookPayload = WebhookUtils.verifyAndParse(body, signature, secret);
       
       // Attach parsed payload to request
       req.webhookPayload = webhookPayload;

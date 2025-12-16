@@ -1,7 +1,7 @@
 {
   "name": "@inkress/admin-sdk",
-  "version": "1.0.0",
-  "description": "Official Inkress Commerce API SDK for JavaScript/TypeScript",
+  "version": "1.1.0",
+  "description": "Official Inkress Commerce API SDK for JavaScript/TypeScript - Fully typed with 23+ resources",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
@@ -22,14 +22,17 @@
   ],
   "scripts": {
     "build": "rollup -c",
+    "build:clean": "npm run clean && npm run build",
     "dev": "rollup -c -w",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "lint": "eslint src --ext .ts,.js",
     "lint:fix": "eslint src --ext .ts,.js --fix",
     "type-check": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "prepare": "npm run clean && npm run build"
+    "prepare": "npm run clean && npm run build",
+    "prepublishOnly": "npm run test && npm run lint && npm run type-check && npm run build:clean"
   },
   "keywords": [
     "inkress",
@@ -46,7 +49,15 @@
     "storefront",
     "orders",
     "products",
-    "merchants"
+    "merchants",
+    "subscriptions",
+    "billing",
+    "type-safe",
+    "query-builder",
+    "contextual-api",
+    "financial",
+    "webhooks",
+    "fully-typed"
   ],
   "author": {
     "name": "Inkress",

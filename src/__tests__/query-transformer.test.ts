@@ -119,6 +119,44 @@ describe('Query Transformer', () => {
       });
     });
 
+    it('should transform date queries with min/max to _min/_max suffixes', () => {
+      const query: QueryParams<TestEntity> = {
+        created_at: {
+          min: '2024-01-01T00:00:00Z',
+          max: '2024-12-31T23:59:59Z'
+        }
+      };
+
+      const result = transformQuery(query);
+
+      expect(result).toEqual({
+        created_at: {
+          created_at_min: '2024-01-01T00:00:00Z',
+          created_at_max: '2024-12-31T23:59:59Z'
+        }
+      });
+    });
+
+    it('should handle combined date query operators', () => {
+      const query: QueryParams<TestEntity> = {
+        created_at: {
+          min: '2024-01-01T00:00:00Z',
+          max: '2024-12-31T23:59:59Z',
+          after: '2024-06-01'
+        }
+      };
+
+      const result = transformQuery(query);
+
+      expect(result).toEqual({
+        created_at: {
+          created_at_min: '2024-01-01T00:00:00Z',
+          created_at_max: '2024-12-31T23:59:59Z',
+          'after.created_at': '2024-06-01'
+        }
+      });
+    });
+
     it('should transform direct values as equality', () => {
       const query: QueryParams<TestEntity> = {
         id: 5,

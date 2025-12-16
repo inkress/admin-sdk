@@ -18,8 +18,8 @@
 import { InkressSDK } from '../src/index';
 
 const inkress = new InkressSDK({
-  bearerToken: 'your-jwt-token',
-  clientId: 'm-your-merchant-username',
+  accessToken: 'your-jwt-token',
+  username: 'your-merchant-username',
 });
 
 async function demonstrateQuerySystem() {

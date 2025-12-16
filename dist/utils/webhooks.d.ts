@@ -10,8 +10,22 @@ export interface WebhookVerificationOptions {
 export declare class WebhookUtils {
     /**
      * Verify webhook signature using HMAC SHA256
+     * Inkress webhooks use the format: crypto.mac(:hmac, :sha256, secret, body) |> Base.encode64()
+     * The signature is sent in the X-Inkress-Webhook-Signature header
      */
-    static verifySignature(payload: string | any, signature: string, secret: string, options?: WebhookVerificationOptions): boolean;
+    static verifySignature(body: string, signature: string, secret: string): boolean;
+    /**
+     * Verify webhook from an HTTP request object
+     * Automatically extracts signature from headers and body from request
+     * Returns both verification status and body (since body can only be read once)
+     */
+    static verifyRequest(request: {
+        headers: Record<string, string | string[] | undefined>;
+        body: string | any;
+    }, secret: string): {
+        isValid: boolean;
+        body: string;
+    };
     /**
      * Parse and validate webhook payload
      */
@@ -19,11 +33,12 @@ export declare class WebhookUtils {
     /**
      * Verify and parse webhook payload in one step
      */
-    static verifyAndParse(payload: string, signature: string, secret: string, options?: WebhookVerificationOptions): WebhookPayload;
+    static verifyAndParse(body: string, signature: string, secret: string): WebhookPayload;
     /**
      * Generate webhook signature for testing
+     * Matches Inkress signature generation: crypto.mac(:hmac, :sha256, secret, body) |> Base.encode64()
      */
-    static generateSignature(payload: string, secret: string, timestamp?: number): string;
+    static generateSignature(body: string, secret: string): string;
     /**
      * Create a test webhook payload
      */
@@ -37,6 +52,6 @@ export declare class WebhookUtils {
      */
     static extractEventData<T = any>(payload: WebhookPayload): T;
 }
-export declare function createWebhookMiddleware(secret: string, options?: WebhookVerificationOptions): (req: any, res: any, next: any) => any;
+export declare function createWebhookMiddleware(secret: string): (req: any, res: any, next: any) => any;
 export declare function isWebhookEvent(data: any): data is WebhookPayload;
 //# sourceMappingURL=webhooks.d.ts.map

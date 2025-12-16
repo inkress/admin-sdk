@@ -88,14 +88,14 @@ export type {
 
 // Configuration and base types
 export interface InkressConfig {
-  /** Bearer token for authentication */
-  bearerToken: string;
-  /** API endpoint URL */
-  endpoint?: string;
+  /** Access token for authentication */
+  accessToken: string;
+  /** API mode - 'live' (https://api.inkress.com) or 'sandbox' (https://api-dev.inkress.com) */
+  mode?: 'live' | 'sandbox';
   /** API version */
   apiVersion?: string;
-  /** Client ID for request identification (format: m-{merchant.username}) */
-  clientId?: string;
+  /** Merchant username (will be prepended with 'm-' for client ID) */
+  username?: string;
   /** Request timeout in milliseconds */
   timeout?: number;
   /** Number of retry attempts */
@@ -277,6 +277,11 @@ export interface Merchant {
   data?: Record<string, any>;
   inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  address?: Address;
+  owner?: User;
+  organisation?: Organisation;
+  parent_merchant?: Merchant;
 }
 
 export interface CreateMerchantData {
@@ -377,6 +382,8 @@ export interface Category {
   uid: string;
   inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  parent?: Category;
 }
 
 export interface CreateCategoryData {
@@ -419,6 +426,10 @@ export interface Product {
   user_id?: number;
   inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  category?: Category;
+  currency?: Currency;
+  user?: User;
 }
 
 export interface CreateProductData {
@@ -470,11 +481,21 @@ export interface Order {
   customer_id?: number;
   payment_link_id?: number;
   billing_plan_id?: number;
+  billing_subscription_id?: number;
   meta_data?: Record<string, any>;
   session_id?: string;
   data?: Record<string, any>;
   inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  currency?: Currency;
+  customer?: Customer;
+  payment_link?: PaymentLink;
+  billing_plan?: BillingPlan;
+  billing_subscription?: Subscription;
+  order_lines?: OrderLine[];
+  merchant?: Merchant;
+  organisation?: Organisation;
 }
 
 export interface OrderLine {
@@ -494,6 +515,7 @@ export interface CreateOrderData {
   customer_id?: number;
   payment_link_id?: number;
   billing_plan_id?: number;
+  billing_subscription_id?: number;
   meta_data?: Record<string, any>;
   session_id?: string;
   data?: Record<string, any>;
@@ -510,6 +532,7 @@ export interface UpdateOrderData {
   customer_id?: number;
   payment_link_id?: number;
   billing_plan_id?: number;
+  billing_subscription_id?: number;
   meta_data?: Record<string, any>;
   session_id?: string;
   data?: Record<string, any>;
@@ -531,6 +554,8 @@ export interface PaymentMethod {
   financial_account_id?: number;
   inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  financial_account?: FinancialAccount;
 }
 
 export interface CreatePaymentMethodData {
@@ -566,6 +591,9 @@ export interface Customer {
   organisation_id?: number;
   inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  merchant?: Merchant;
+  organisation?: Organisation;
 }
 
 // Payment Link types
@@ -585,6 +613,10 @@ export interface PaymentLink {
   order_id?: number;
   inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  customer?: Customer;
+  currency?: Currency;
+  order?: Order;
 }
 
 export interface CreatePaymentLinkData {
@@ -687,6 +719,13 @@ export interface FinancialRequest {
   evidence_file_id?: number;
   inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  source?: FinancialAccount;
+  destination?: FinancialAccount;
+  merchant?: Merchant;
+  requester?: User;
+  reviewer?: User;
+  currency?: Currency;
 }
 
 export interface CreateFinancialRequestData {
@@ -729,6 +768,9 @@ export interface WebhookUrl {
   org_id?: number;
   inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  merchant?: Merchant;
+  organisation?: Organisation;
 }
 
 export interface CreateWebhookUrlData {
@@ -758,6 +800,8 @@ export interface Token {
   role_id?: number;
   inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  user?: User;
 }
 
 export interface CreateTokenData {
@@ -788,6 +832,10 @@ export interface ExchangeRate {
   user_id?: number;
   inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  source_currency?: Currency;
+  destination_currency?: Currency;
+  user?: User;
 }
 
 export interface CreateExchangeRateData {
@@ -822,6 +870,9 @@ export interface Fee {
   user_id?: number;
   inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  currency?: Currency;
+  user?: User;
 }
 
 export interface CreateFeeData {
@@ -863,6 +914,8 @@ export interface Post {
   data?: Record<string, any>;
   inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  author?: User;
 }
 
 export interface CreatePostData {
@@ -891,6 +944,8 @@ export interface TransactionEntry {
   financial_account_id: number;
   inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  financial_account?: FinancialAccount;
 }
 
 export interface CreateTransactionEntryData {
@@ -945,6 +1000,8 @@ export interface BillingPlan {
   payment_provider_id?: number;
   inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  currency?: Currency;
 }
 
 export interface CreateBillingPlanData {
@@ -1017,9 +1074,16 @@ export interface Subscription {
   token?: string;
   billing_plan_id: number;
   customer_id?: number;
+  order_id?: number;
   data?: Record<string, any>;
+  meta_data?: Record<string, any>;
   inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  billing_plan?: BillingPlan;
+  customer?: Customer;
+  order?: Order;
+  subscription_periods?: SubscriptionPeriod[];
 }
 
 export interface CreateSubscriptionData {
@@ -1035,7 +1099,9 @@ export interface CreateSubscriptionData {
   trial_end?: string;
   token?: string;
   customer_id?: number;
+  order_id?: number;
   data?: Record<string, any>;
+  meta_data?: Record<string, any>;
 }
 
 export interface SubscriptionPeriod {
@@ -1093,6 +1159,8 @@ export interface User {
   role_id?: number;
   inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  organisation?: Organisation;
 }
 
 export interface CreateUserData {
@@ -1189,6 +1257,8 @@ export interface KycRequest {
   data?: Record<string, any>;
   inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  user?: User;
 }
 
 export interface CreateKycRequestData {
@@ -1224,6 +1294,11 @@ export interface PayoutRequest {
   currency_id: number;
   inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  merchant?: Merchant;
+  requester?: User;
+  reviewer?: User;
+  currency?: Currency;
 }
 
 export interface CreatePayoutRequestData {
@@ -1350,6 +1425,7 @@ export interface InternalOrder {
   customer?: Customer;
   currency: Currency;
   billing_plan?: any | null;
+  billing_subscription_id?: number;
   order_detail?: Record<string, any>;
   transactions?: any[];
   payment_methods?: PaymentMethod[];
@@ -1420,12 +1496,15 @@ export interface InternalSubscription {
   record: string;
   record_id: number;
   customer_id?: number;
+  order_id?: number;
   uid: string;
   token?: string;
   billing_plan_id: number;
   has_token: boolean;
   billing_plan: InternalBillingPlan;
   subscription_periods?: SubscriptionPeriod[];
+  data?: Record<string, any>;
+  meta_data?: Record<string, any>;
   inserted_at: string;
   updated_at: string;
 }

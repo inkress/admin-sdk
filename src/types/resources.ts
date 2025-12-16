@@ -443,6 +443,7 @@ export interface OrderQueryParams {
   customer_id?: number | number[];
   payment_link_id?: number | number[];
   billing_plan_id?: number | number[];
+  billing_subscription_id?: number | number[];
   
   // String fields - support direct values, arrays, and string operations
   reference_id?: string | string[] | StringQuery;
@@ -717,6 +718,7 @@ export interface SubscriptionQueryParams {
   record_id?: number | number[] | RangeQuery<number>;
   billing_plan_id?: number | number[];
   customer_id?: number | number[];
+  order_id?: number | number[];
   
   // String fields
   record?: string | string[] | StringQuery;

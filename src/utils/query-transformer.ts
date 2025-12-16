@@ -1,40 +1,53 @@
 /**
  * Type-Based Query System
+ * 
+ * This module provides a clean, type-safe query API where users write intuitive queries
+ * and the SDK automatically transforms them into the Elixir-compatible format.
+ * 
+ * Features:
+ * - Array values → _in suffix (id: [1,2,3] → id_in: [1,2,3])
+ * - Range objects → _min/_max suffixes (age: {min: 18, max: 65} → age_min: 18, age_max: 65)
+ * - String operations → contains. prefix (name: {contains: "john"} → "contains.name": "john")
+ * - Date operations → before./after./on. prefixes
+ * - JSON field operations → in_, not_, null_, not_null_ prefixes
+ * - Direct values → equality check (no transformation)
  */
 
 // Range queries for numeric/date fields
 export type RangeQuery<T> = {
-  min?: T;
-  max?: T;
+  min?: T;  // SDK adds _min suffix
+  max?: T;  // SDK adds _max suffix
 };
 
 // String-specific queries
 export type StringQuery = {
-  contains?: string;
+  contains?: string;  // SDK adds contains. prefix
 };
 
 // Date-specific queries
 export type DateQuery = {
-  before?: string;
-  after?: string;
-  on?: string;
+  before?: string;  // SDK adds before. prefix
+  after?: string;   // SDK adds after. prefix
+  on?: string;      // SDK adds on. prefix
+  min?: string;     // SDK adds _min suffix
+  max?: string;     // SDK adds _max suffix
 };
 
 // JSON field queries
 export type JsonQueryParams = {
   [key: string]: any | {
-    in?: any;
-    not?: any;
-    null?: boolean;
-    not_null?: boolean;
-    min?: any;
-    max?: any;
+    in?: any;        // SDK adds in_ prefix
+    not?: any;       // SDK adds not_ prefix
+    null?: boolean;  // SDK adds null_ prefix
+    not_null?: boolean;  // SDK adds not_null_ prefix
+    min?: any;       // SDK adds _min suffix
+    max?: any;       // SDK adds _max suffix
   };
 };
 
 // Simplified query parameters for better compatibility
 export type QueryParams<T> = {
-  [K in keyof T]?: any;
+  [K in keyof T]?: any; // Simplified to avoid TypeScript complexity issues
 } & {
   exclude?: string | number;
   distinct?: string;
@@ -52,6 +65,141 @@ export type QueryParams<T> = {
 };
 
 /**
+ * Runtime validation for query parameters
+ */
+export function validateQueryParams<T>(
+  query: any, 
+  fieldTypes?: Partial<Record<keyof T, 'string' | 'number' | 'boolean' | 'date' | 'array'>>
+): string[] {
+  const errors: string[] = [];
+  
+  if (!query || typeof query !== 'object') {
+    return errors;
+  }
+
+  for (const [key, value] of Object.entries(query)) {
+    // Skip special fields and undefined/null values
+    if (isSpecialField(key) || value === undefined || value === null) {
+      continue;
+    }
+
+    // Skip data field (JSON queries have their own validation)
+    if (key === 'data') {
+      continue;
+    }
+
+    const fieldType = fieldTypes?.[key as keyof T];
+    
+    // Validate based on field type
+    if (fieldType) {
+      const validationError = validateFieldValue(key, value, fieldType);
+      if (validationError) {
+        errors.push(validationError);
+      }
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * Validate a single field value against its expected type
+ */
+function validateFieldValue(fieldName: string, value: any, expectedType: string): string | null {
+  // Handle array values (for _in operations)
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (!isValueOfType(item, expectedType)) {
+        return `Field "${fieldName}" array contains invalid type. Expected all items to be ${expectedType}, but found ${typeof item}`;
+      }
+    }
+    return null;
+  }
+
+  // Handle range objects
+  if (typeof value === 'object' && value !== null && ('min' in value || 'max' in value)) {
+    if (expectedType !== 'number' && expectedType !== 'date' && expectedType !== 'string') {
+      return `Field "${fieldName}" cannot use range queries. Range queries are only supported for number, date, and string fields.`;
+    }
+    
+    if ('min' in value && value.min !== undefined && !isValueOfType(value.min, expectedType)) {
+      return `Field "${fieldName}" range min value has wrong type. Expected ${expectedType}, got ${typeof value.min}`;
+    }
+    
+    if ('max' in value && value.max !== undefined && !isValueOfType(value.max, expectedType)) {
+      return `Field "${fieldName}" range max value has wrong type. Expected ${expectedType}, got ${typeof value.max}`;
+    }
+    
+    return null;
+  }
+
+  // Handle string contains queries
+  if (typeof value === 'object' && value !== null && 'contains' in value) {
+    if (expectedType !== 'string') {
+      return `Field "${fieldName}" cannot use contains queries. Contains queries are only supported for string fields.`;
+    }
+    
+    if (typeof value.contains !== 'string') {
+      return `Field "${fieldName}" contains value must be a string. Got ${typeof value.contains}`;
+    }
+    
+    return null;
+  }
+
+  // Handle date queries
+  if (typeof value === 'object' && value !== null && ('before' in value || 'after' in value || 'on' in value || 'min' in value || 'max' in value)) {
+    if ('before' in value && value.before !== undefined && typeof value.before !== 'string') {
+      return `Field "${fieldName}" before value must be a string. Got ${typeof value.before}`;
+    }
+    
+    if ('after' in value && value.after !== undefined && typeof value.after !== 'string') {
+      return `Field "${fieldName}" after value must be a string. Got ${typeof value.after}`;
+    }
+    
+    if ('on' in value && value.on !== undefined && typeof value.on !== 'string') {
+      return `Field "${fieldName}" on value must be a string. Got ${typeof value.on}`;
+    }
+    
+    if ('min' in value && value.min !== undefined && typeof value.min !== 'string') {
+      return `Field "${fieldName}" min value must be a string. Got ${typeof value.min}`;
+    }
+    
+    if ('max' in value && value.max !== undefined && typeof value.max !== 'string') {
+      return `Field "${fieldName}" max value must be a string. Got ${typeof value.max}`;
+    }
+    
+    return null;
+  }
+
+  // Handle direct values
+  if (!isValueOfType(value, expectedType)) {
+    return `Field "${fieldName}" has wrong type. Expected ${expectedType}, got ${typeof value}`;
+  }
+
+  return null;
+}
+
+/**
+ * Check if a value matches the expected type
+ */
+function isValueOfType(value: any, expectedType: string): boolean {
+  switch (expectedType) {
+    case 'string':
+      return typeof value === 'string';
+    case 'number':
+      return typeof value === 'number' && !isNaN(value);
+    case 'boolean':
+      return typeof value === 'boolean';
+    case 'date':
+      return value instanceof Date || (typeof value === 'string' && !isNaN(Date.parse(value)));
+    case 'array':
+      return Array.isArray(value);
+    default:
+      return true;
+  }
+}
+
+/**
  * Transform a clean user query into Elixir-compatible format
  */
 export function transformQuery<T>(query: any): Record<string, any> {
@@ -62,20 +210,24 @@ export function transformQuery<T>(query: any): Record<string, any> {
   const result: Record<string, any> = {};
   
   for (const [key, value] of Object.entries(query)) {
+    // Skip undefined/null values
     if (value === undefined || value === null) {
       continue;
     }
 
+    // Pass through special fields unchanged
     if (isSpecialField(key)) {
       result[key] = value;
       continue;
     }
     
+    // Handle data field specially for JSON queries
     if (key === 'data' && typeof value === 'object') {
       result.data = transformJsonQuery(value as JsonQueryParams);
       continue;
     }
     
+    // Transform based on value type
     result[key] = transformFieldValue(key, value);
   }
   
@@ -98,12 +250,14 @@ function isSpecialField(key: string): boolean {
  */
 function transformFieldValue(key: string, value: any): any {
   if (Array.isArray(value)) {
+    // Array → add _in suffix
     return { [`${key}_in`]: value };
   } 
   
   if (typeof value === 'object' && value !== null) {
     const transformedObject: Record<string, any> = {};
     
+    // Handle range queries
     if ('min' in value && value.min !== undefined) {
       transformedObject[`${key}_min`] = value.min;
     }
@@ -111,10 +265,12 @@ function transformFieldValue(key: string, value: any): any {
       transformedObject[`${key}_max`] = value.max;
     }
     
+    // Handle string queries
     if ('contains' in value && value.contains !== undefined) {
       transformedObject[`contains.${key}`] = value.contains;
     }
     
+    // Handle date queries
     if ('before' in value && value.before !== undefined) {
       transformedObject[`before.${key}`] = value.before;
     }
@@ -125,11 +281,13 @@ function transformFieldValue(key: string, value: any): any {
       transformedObject[`on.${key}`] = value.on;
     }
     
+    // If we found any transformations, return them
     if (Object.keys(transformedObject).length > 0) {
       return transformedObject;
     }
   }
   
+  // Direct value → equality (no transformation needed at this level)
   return { [key]: value };
 }
 
@@ -140,16 +298,19 @@ function transformJsonQuery(data: JsonQueryParams): Record<string, any> {
   const result: Record<string, any> = {};
   
   for (const [key, value] of Object.entries(data)) {
+    // Skip undefined/null values
     if (value === undefined || value === null) {
       continue;
     }
 
+    // Nested paths (e.g., "settings->theme") stay as-is
     if (key.includes('->')) {
       result[key] = value;
       continue;
     }
     
     if (typeof value === 'object' && value !== null) {
+      // Transform JSON-specific operations
       if ('in' in value && value.in !== undefined) {
         result[`in_${key}`] = value.in;
       }
@@ -169,6 +330,7 @@ function transformJsonQuery(data: JsonQueryParams): Record<string, any> {
         result[`${key}_max`] = value.max;
       }
     } else {
+      // Direct value in JSON field
       result[key] = value;
     }
   }
@@ -184,12 +346,15 @@ export function flattenTransformedQuery(transformed: Record<string, any>): Recor
   
   for (const [key, value] of Object.entries(transformed)) {
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      // If it's a transformation object, merge its properties
       if (hasTransformationKeys(value)) {
         Object.assign(result, value);
       } else {
+        // Regular object (like data field)
         result[key] = value;
       }
     } else {
+      // Direct value or array
       result[key] = value;
     }
   }
@@ -221,6 +386,14 @@ export function processQuery<T>(
   fieldTypes?: Partial<Record<keyof T, 'string' | 'number' | 'boolean' | 'date' | 'array'>>,
   options: { validate?: boolean } = { validate: false }
 ): Record<string, any> {
+  // Runtime validation if enabled and field types provided
+  if (options.validate && fieldTypes) {
+    const validationErrors = validateQueryParams(query, fieldTypes);
+    if (validationErrors.length > 0) {
+      console.warn(`Query validation warnings: ${validationErrors.join(', ')}`);
+    }
+  }
+
   const transformed = transformQuery(query);
   return flattenTransformedQuery(transformed);
 }
@@ -237,16 +410,25 @@ export class QueryBuilder<T> {
     }
   }
 
+  /**
+   * Add a field equality condition
+   */
   where<K extends keyof T>(field: K, value: any): this {
     this.query[field] = value;
     return this;
   }
 
+  /**
+   * Add a field IN condition (array of values)
+   */
   whereIn<K extends keyof T>(field: K, values: any[]): this {
     this.query[field] = values;
     return this;
   }
 
+  /**
+   * Add a range condition (min/max)
+   */
   whereRange<K extends keyof T>(field: K, min?: any, max?: any): this {
     const range: any = {};
     if (min !== undefined) range.min = min;
@@ -255,11 +437,17 @@ export class QueryBuilder<T> {
     return this;
   }
 
+  /**
+   * Add a string contains condition
+   */
   whereContains<K extends keyof T>(field: K, value: string): this {
     this.query[field] = { contains: value };
     return this;
   }
 
+  /**
+   * Add a date range condition
+   */
   whereDateRange<K extends keyof T>(field: K, after?: string, before?: string, on?: string): this {
     const dateQuery: any = {};
     if (after !== undefined) dateQuery.after = after;
@@ -269,26 +457,41 @@ export class QueryBuilder<T> {
     return this;
   }
 
+  /**
+   * Add pagination
+   */
   paginate(page: number, pageSize: number): this {
     this.query.page = page;
     this.query.page_size = pageSize;
     return this;
   }
 
+  /**
+   * Add ordering
+   */
   orderBy(field: string, direction: 'asc' | 'desc' = 'asc'): this {
     this.query.order_by = `${field} ${direction}`;
     return this;
   }
 
+  /**
+   * Add general search
+   */
   search(term: string): this {
     this.query.q = term;
     return this;
   }
 
+  /**
+   * Build and return the transformed query
+   */
   build(): Record<string, any> {
     return processQuery(this.query);
   }
 
+  /**
+   * Get the raw query (before transformation)
+   */
   getRawQuery(): any {
     return { ...this.query };
   }

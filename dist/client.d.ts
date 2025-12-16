@@ -20,7 +20,7 @@ export declare class HttpClient {
     delete<T>(path: string): Promise<ApiResponse<T>>;
     patch<T>(path: string, body?: any): Promise<ApiResponse<T>>;
     updateConfig(newConfig: Partial<InkressConfig>): void;
-    getConfig(): Omit<InkressConfig, 'bearerToken'>;
+    getConfig(): Omit<InkressConfig, 'accessToken'>;
 }
 export declare class InkressApiError extends Error {
     readonly status: number;

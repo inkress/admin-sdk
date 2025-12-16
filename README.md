@@ -41,9 +41,28 @@ pnpm add @inkress/admin-sdk
 import { InkressSDK } from '@inkress/admin-sdk';
 
 const inkress = new InkressSDK({
-  bearerToken: 'your-jwt-token',
-  clientId: 'm-merchant-username',
-  endpoint: 'https://api.inkress.com', // Optional, defaults to production
+  accessToken: 'your-jwt-token',
+  username: 'merchant-username', // Optional - automatically prepended with 'm-'
+  mode: 'live', // Optional - 'live' (default) or 'sandbox'
+});
+```
+
+### Configuration Options
+
+```typescript
+const inkress = new InkressSDK({
+  // Required
+  accessToken: 'your-jwt-token',
+  
+  // Optional
+  username: 'merchant-username',    // Prepended with 'm-' for Client-Id header
+  mode: 'live',                     // 'live' = api.inkress.com, 'sandbox' = api-dev.inkress.com
+  apiVersion: 'v1',                 // API version (default: 'v1')
+  timeout: 30000,                   // Request timeout in ms (default: 30000)
+  retries: 3,                       // Number of retry attempts (default: 0)
+  headers: {                        // Custom headers for all requests
+    'X-Custom-Header': 'value'
+  }
 });
 ```
 
@@ -1450,6 +1469,73 @@ async function getCachedMerchant(username: string) {
   return merchant;
 }
 ```
+
+### 4. Webhook Verification
+
+Verify incoming webhook requests from Inkress using HMAC SHA256:
+
+```typescript
+import { WebhookUtils } from '@inkress/admin-sdk';
+
+// Method 1: Verify with signature, body, and secret
+app.post('/webhooks/inkress', (req, res) => {
+  const signature = req.headers['x-inkress-webhook-signature'];
+  const body = JSON.stringify(req.body);
+  const secret = process.env.INKRESS_WEBHOOK_SECRET;
+  
+  const isValid = WebhookUtils.verifySignature(body, signature, secret);
+  
+  if (!isValid) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+  
+  // Process webhook...
+  res.status(200).json({ received: true });
+});
+
+// Method 2: Let the SDK extract everything from the request
+app.post('/webhooks/inkress', (req, res) => {
+  const secret = process.env.INKRESS_WEBHOOK_SECRET;
+  
+  try {
+    const { isValid, body } = WebhookUtils.verifyRequest(req, secret);
+    
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
+    
+    // Parse the verified body
+    const webhookPayload = WebhookUtils.parsePayload(body);
+    
+    // Process webhook...
+    res.status(200).json({ received: true });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Method 3: Use Express middleware for automatic verification
+import { createWebhookMiddleware } from '@inkress/admin-sdk';
+
+app.use('/webhooks/inkress', createWebhookMiddleware(process.env.INKRESS_WEBHOOK_SECRET));
+
+app.post('/webhooks/inkress', (req, res) => {
+  // Request is already verified, payload attached to req.webhookPayload
+  const { webhookPayload } = req;
+  
+  console.log(`Received event: ${webhookPayload.event.action}`);
+  
+  res.status(200).json({ received: true });
+});
+```
+
+**Webhook Signature Format:**
+- Header: `X-Inkress-Webhook-Signature`
+- Algorithm: HMAC SHA256
+- Encoding: Base64
+- Equivalent to: `crypto.mac(:hmac, :sha256, secret, body) |> Base.encode64()`
+
+See [examples/webhook-server.ts](examples/webhook-server.ts) for a complete implementation.
 
 ## Contributing
 

@@ -9,17 +9,23 @@ export interface RequestOptions {
 }
 
 export class HttpClient {
-  private config: Required<InkressConfig>;
+  private config: Required<InkressConfig> & { endpoint: string };
 
   constructor(config: InkressConfig) {
+    // Compute endpoint from mode
+    const endpoint = config.mode === 'sandbox' 
+      ? 'https://api-dev.inkress.com' 
+      : 'https://api.inkress.com';
+
     this.config = {
-      endpoint: 'https://api.inkress.com',
-      apiVersion: 'v1',
-      clientId: '',
-      timeout: 30000,
-      retries: 0,
-      headers: {},
-      ...config,
+      accessToken: config.accessToken,
+      mode: config.mode || 'live',
+      apiVersion: config.apiVersion || 'v1',
+      username: config.username || '',
+      timeout: config.timeout || 30000,
+      retries: config.retries || 0,
+      headers: config.headers || {},
+      endpoint, // computed from mode
     };
   }
 
@@ -31,14 +37,14 @@ export class HttpClient {
   private getHeaders(additionalHeaders: Record<string, string> = {}): Record<string, string> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this.config.bearerToken}`,
+      'Authorization': `Bearer ${this.config.accessToken}`,
       ...this.config.headers,
       ...additionalHeaders,
     };
 
-    // Add Client-Id header if provided
-    if (this.config.clientId) {
-      headers['Client-Id'] = this.config.clientId;
+    // Add Client-Id header if username is provided (prepend with 'm-')
+    if (this.config.username) {
+      headers['Client-Id'] = `m-${this.config.username}`;
     }
 
     return headers;
@@ -174,13 +180,23 @@ export class HttpClient {
 
   // Update configuration
   updateConfig(newConfig: Partial<InkressConfig>): void {
-    this.config = { ...this.config, ...newConfig };
+    // Recompute endpoint if mode changes
+    if (newConfig.mode) {
+      const endpoint = newConfig.mode === 'sandbox' 
+        ? 'https://api-dev.inkress.com' 
+        : 'https://api.inkress.com';
+      this.config = { ...this.config, ...newConfig, endpoint } as any;
+    } else {
+      this.config = { ...this.config, ...newConfig } as any;
+    }
   }
 
   // Get current configuration (without sensitive data)
-  getConfig(): Omit<InkressConfig, 'bearerToken'> {
-    const { bearerToken, ...config } = this.config;
-    return config;
+  getConfig(): Omit<InkressConfig, 'accessToken'> {
+    const { accessToken, ...config } = this.config;
+    // Remove computed endpoint from config
+    const { endpoint, ...publicConfig } = config as any;
+    return publicConfig;
   }
 }
 

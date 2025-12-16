@@ -1,7 +1,7 @@
 {
   "name": "@inkress/admin-sdk",
   "version": "1.1.0",
-  "description": "Official Inkress Commerce API SDK for JavaScript/TypeScript - Fully typed with 23+ resources",
+  "description": "Official Inkress Commerce API SDK for JavaScript/TypeScript",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",

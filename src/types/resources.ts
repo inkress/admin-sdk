@@ -39,7 +39,6 @@ import type {
   ExchangeRate,
   Fee,
   PaymentMethod,
-  Post,
   TransactionEntry,
 } from '../types';
 import type { StatusKey, KindKey, FeeStructureKey } from '../utils/translators';
@@ -393,20 +392,6 @@ export const PAYMENT_METHOD_FIELD_TYPES = {
   active: 'boolean',
   payment_provider_id: 'number',
   financial_account_id: 'number',
-  inserted_at: 'date',
-  updated_at: 'date',
-} as const;
-
-/**
- * Post field types
- */
-export const POST_FIELD_TYPES = {
-  id: 'number',
-  title: 'string',
-  content: 'string',
-  status: 'number',
-  kind: 'number',
-  author_id: 'number',
   inserted_at: 'date',
   updated_at: 'date',
 } as const;
@@ -1136,39 +1121,6 @@ export interface PaymentMethodQueryParams {
 }
 
 /**
- * Post query parameters with full type safety
- */
-export interface PostQueryParams {
-  // Numeric fields
-  id?: number | number[] | RangeQuery<number>;
-  status?: number | number[];
-  kind?: number | number[];
-  author_id?: number | number[];
-  
-  // String fields
-  title?: string | string[] | StringQuery;
-  content?: string | string[] | StringQuery;
-  
-  // Date fields
-  inserted_at?: string | DateQuery;
-  updated_at?: string | DateQuery;
-  
-  // Special query fields
-  exclude?: string | number;
-  distinct?: string;
-  order_by?: string;
-  page?: number;
-  page_size?: number;
-  per_page?: number;
-  limit?: number;
-  override_page?: string | boolean;
-  q?: string;
-  search?: string;
-  sort?: string;
-  order?: 'asc' | 'desc';
-}
-
-/**
  * Transaction Entry query parameters with full type safety
  */
 export interface TransactionEntryQueryParams {
@@ -1511,18 +1463,6 @@ export interface PaymentMethodFilterParams extends BaseFilterParams {
 }
 
 /**
- * Post filter parameters (legacy)
- * @deprecated Use PostQueryParams with the query() method instead
- */
-export interface PostFilterParams extends BaseFilterParams {
-  status?: number;
-  kind?: number;
-  author_id?: number;
-  title?: string;
-  limit?: number;
-}
-
-/**
  * Transaction Entry filter parameters (legacy)
  * @deprecated Use TransactionEntryQueryParams with the query() method instead
  */
@@ -1627,11 +1567,6 @@ export interface FeeListResponse {
 
 export interface PaymentMethodListResponse {
   entries: PaymentMethod[];
-  page_info: PageInfo;
-}
-
-export interface PostListResponse {
-  entries: Post[];
   page_info: PageInfo;
 }
 

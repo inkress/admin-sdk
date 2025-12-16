@@ -22,7 +22,6 @@ import { CurrenciesResource } from './resources/currencies';
 import { ExchangeRatesResource } from './resources/exchange-rates';
 import { FeesResource } from './resources/fees';
 import { PaymentMethodsResource } from './resources/payment-methods';
-import { PostsResource } from './resources/posts';
 import { TransactionEntriesResource } from './resources/transaction-entries';
 import { GenericsResource } from './resources/generics';
 
@@ -93,7 +92,6 @@ export class InkressSDK {
   public readonly exchangeRates: ExchangeRatesResource;
   public readonly fees: FeesResource;
   public readonly paymentMethods: PaymentMethodsResource;
-  public readonly posts: PostsResource;
   public readonly transactionEntries: TransactionEntriesResource;
   public readonly generics: GenericsResource;
 
@@ -121,7 +119,6 @@ export class InkressSDK {
     this.exchangeRates = new ExchangeRatesResource(this.client);
     this.fees = new FeesResource(this.client);
     this.paymentMethods = new PaymentMethodsResource(this.client);
-    this.posts = new PostsResource(this.client);
     this.transactionEntries = new TransactionEntriesResource(this.client);
     this.generics = new GenericsResource(this.client);
   }
@@ -166,7 +163,6 @@ export type {
   ExchangeRateQueryParams,
   FeeQueryParams,
   PaymentMethodQueryParams,
-  PostQueryParams,
   TransactionEntryQueryParams,
   
   // Filter parameter types (legacy, but still supported)
@@ -187,7 +183,6 @@ export type {
   ExchangeRateFilterParams,
   FeeFilterParams,
   PaymentMethodFilterParams,
-  PostFilterParams,
   TransactionEntryFilterParams,
   
   // List response types
@@ -208,7 +203,6 @@ export type {
   ExchangeRateListResponse,
   FeeListResponse,
   PaymentMethodListResponse,
-  PostListResponse,
   TransactionEntryListResponse,
   
   // Field type constants for advanced usage
@@ -234,7 +228,6 @@ export {
   EXCHANGE_RATE_FIELD_TYPES,
   FEE_FIELD_TYPES,
   PAYMENT_METHOD_FIELD_TYPES,
-  POST_FIELD_TYPES,
   TRANSACTION_ENTRY_FIELD_TYPES,
 } from './types/resources';
 
@@ -268,7 +261,6 @@ export {
   ExchangeRateQueryBuilder,
   FeeQueryBuilder,
   PaymentMethodQueryBuilder,
-  PostQueryBuilder,
   TransactionEntryQueryBuilder,
   type Queryable,
 } from './utils/query-builders';

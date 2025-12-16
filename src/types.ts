@@ -902,38 +902,6 @@ export interface UpdateFeeData {
   user_id?: number;
 }
 
-// Post types
-export interface Post {
-  id: number;
-  title: string;
-  content: string;
-  status: number;
-  kind: number;
-  author_id: number;
-  data?: Record<string, any>;
-  inserted_at: string;
-  updated_at: string;
-  // Associations (preloaded)
-  author?: User;
-}
-
-export interface CreatePostData {
-  title: string;
-  content: string;
-  status?: number;
-  kind?: number;
-  author_id: number;
-  data?: Record<string, any>;
-}
-
-export interface UpdatePostData {
-  title?: string;
-  content?: string;
-  status?: number;
-  kind?: number;
-  data?: Record<string, any>;
-}
-
 // Transaction Entry types
 export interface TransactionEntry {
   id: number;

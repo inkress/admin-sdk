@@ -102,12 +102,12 @@ await inkress.orders.createQueryBuilder()
   .execute();
 ```
 
-**📦 Complete Coverage** - 23 resources with 128+ fully-typed methods:
+**📦 Complete Coverage** - 22 resources with 125+ fully-typed methods:
 - Core: Merchants, Products, Categories, Orders, Users
 - Billing: Plans, Subscriptions, Payment Links, Payment Methods
 - Financial: Accounts, Requests, Fees, Currencies, Exchange Rates
 - Identity: Addresses, Tokens, Webhooks
-- Content: Posts, Public Data
+- Content: Public Data
 - And more...
 
 ---
@@ -240,7 +240,6 @@ The SDK provides access to 23+ fully-typed resources:
 - **Webhook URLs** - Webhook configuration
 
 ### Content & Other
-- **Posts** - Content management
 - **Generics** - Dynamic endpoint access
 - **KYC** - Know Your Customer operations
 - **Payout** - Payout processing
@@ -789,26 +788,6 @@ await inkress.exchangeRates.create({
 
 // Update exchange rate
 await inkress.exchangeRates.update(rateId, { rate: 0.86 });
-```
-
-### Posts
-
-```typescript
-// List posts
-await inkress.posts.list({ published: true });
-
-// Create post
-await inkress.posts.create({
-  title: 'New Feature Release',
-  content: 'We are excited to announce...',
-  published: true
-});
-
-// Update post
-await inkress.posts.update(postId, { title: 'Updated Title' });
-
-// Delete post
-await inkress.posts.delete(postId);
 ```
 
 ### Public Resource

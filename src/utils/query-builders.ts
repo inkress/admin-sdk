@@ -25,7 +25,6 @@ import type {
   ExchangeRateListResponse,
   FeeListResponse,
   PaymentMethodListResponse,
-  PostListResponse,
   TransactionEntryListResponse,
   OrderQueryParams,
   ProductQueryParams,
@@ -44,7 +43,6 @@ import type {
   ExchangeRateQueryParams,
   FeeQueryParams,
   PaymentMethodQueryParams,
-  PostQueryParams,
   TransactionEntryQueryParams,
 } from '../types/resources';
 import type {
@@ -65,7 +63,6 @@ import type {
   ExchangeRate,
   Fee,
   PaymentMethod,
-  Post,
   TransactionEntry,
   OrderStatus,
   OrderKind,
@@ -975,38 +972,6 @@ export class PaymentMethodQueryBuilder extends QueryBuilder<any> {
 
   whereCodeEquals(code: string): this {
     return this.where('code', code);
-  }
-}
-
-/**
- * Post Query Builder
- */
-export class PostQueryBuilder extends QueryBuilder<any> {
-  constructor(
-    private resource: Queryable<any>,
-    initialQuery?: any
-  ) {
-    super(initialQuery);
-  }
-
-  async execute(): Promise<ApiResponse<any>> {
-    return this.resource.query(this.getRawQuery());
-  }
-
-  whereStatusIn(statuses: number[]): this {
-    return this.whereIn('status', statuses);
-  }
-
-  whereKindIn(kinds: number[]): this {
-    return this.whereIn('kind', kinds);
-  }
-
-  whereAuthorIdEquals(authorId: number): this {
-    return this.where('author_id', authorId);
-  }
-
-  whereTitleContains(title: string): this {
-    return this.whereContains('title', title);
   }
 }
 

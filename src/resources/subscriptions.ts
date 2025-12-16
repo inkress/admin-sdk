@@ -1,6 +1,10 @@
 import { HttpClient } from '../client';
 import {
   Subscription,
+  InternalSubscription,
+  InternalBillingPlan,
+  BillingPlan,
+  BillingPlanKind,
   SubscriptionPeriod,
   CreateSubscriptionData,
   SubscriptionLinkData,
@@ -110,6 +114,35 @@ export class SubscriptionsResource {
   constructor(private client: HttpClient) {}
 
   /**
+   * Convert internal subscription data (integers) to user-facing data (strings)
+   */
+  private translateToUserFacing(internal: InternalSubscription): Subscription {
+    const result: any = {
+      ...internal,
+      status: StatusTranslator.toStringWithoutContext(internal.status, 'billing_subscription') as StatusKey,
+      kind: KindTranslator.toStringWithoutContext(internal.kind, 'billing_subscription') as KindKey,
+    };
+    
+    // Translate nested billing plan if present
+    if (internal.billing_plan) {
+      result.billing_plan = this.translateBillingPlanToUserFacing(internal.billing_plan);
+    }
+    
+    return result;
+  }
+
+  /**
+   * Convert internal billing plan data to user-facing billing plan
+   */
+  private translateBillingPlanToUserFacing(internal: InternalBillingPlan): BillingPlan {
+    return {
+      ...internal,
+      status: StatusTranslator.toStringWithoutContext(internal.status, 'billing_plan') as StatusKey,
+      kind: KindTranslator.toStringWithoutContext(internal.kind, 'billing_plan') as BillingPlanKind,
+    };
+  }
+
+  /**
    * Convert filter parameters (strings to integers where needed)
    */
   private translateFilters(params?: SubscriptionListParams): any {
@@ -149,7 +182,23 @@ export class SubscriptionsResource {
    */
   async list(params?: SubscriptionListParams): Promise<ApiResponse<SubscriptionListResponse>> {
     const translatedParams = this.translateFilters(params);
-    return this.client.get<SubscriptionListResponse>('/billing_subscriptions', translatedParams);
+    const response = await this.client.get<{ entries: InternalSubscription[]; page_info: any }>('/billing_subscriptions', translatedParams);
+    
+    if (response.result?.entries) {
+      const translatedEntries = response.result.entries.map(sub => this.translateToUserFacing(sub));
+      return {
+        state: response.state,
+        result: {
+          entries: translatedEntries,
+          page_info: response.result.page_info
+        }
+      };
+    }
+    
+    return {
+      state: response.state,
+      result: response.result as any
+    };
   }
 
   /**
@@ -157,7 +206,20 @@ export class SubscriptionsResource {
    * Requires Client-Id header to be set in the configuration
    */
   async get(id?: number): Promise<ApiResponse<Subscription>> {
-    return this.client.get<Subscription>(`/billing_subscriptions/${id}`);
+    const response = await this.client.get<InternalSubscription>(`/billing_subscriptions/${id}`);
+    
+    if (response.result) {
+      const translatedSub = this.translateToUserFacing(response.result);
+      return {
+        state: response.state,
+        result: translatedSub
+      };
+    }
+    
+    return {
+      state: response.state,
+      result: response.result as any
+    };
   }
 
   /**
@@ -166,7 +228,20 @@ export class SubscriptionsResource {
    */
   async create(data: CreateSubscriptionData): Promise<ApiResponse<Subscription>> {
     const internalData = this.translateToInternal(data);
-    return this.client.post<Subscription>('/billing_subscriptions', internalData);
+    const response = await this.client.post<InternalSubscription>('/billing_subscriptions', internalData);
+    
+    if (response.result) {
+      const translatedSub = this.translateToUserFacing(response.result);
+      return {
+        state: response.state,
+        result: translatedSub
+      };
+    }
+    
+    return {
+      state: response.state,
+      result: response.result as any
+    };
   }
 
   /**

@@ -78,17 +78,6 @@ export class ProductsResource {
     const translatedParams = this.translateFilters(params);
     const response = await this.client.get<{ entries: InternalProduct[]; page_info: any }>('/products', translatedParams);
     
-    if (response.data?.entries) {
-      const translatedEntries = response.data.entries.map(product => this.translateProductToUserFacing(product));
-      return {
-        state: response.state,
-        data: {
-          entries: translatedEntries,
-          page_info: response.data.page_info
-        }
-      };
-    }
-    
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(product => this.translateProductToUserFacing(product));
       return {
@@ -102,7 +91,6 @@ export class ProductsResource {
     
     return {
       state: response.state,
-      data: response.data as any,
       result: response.result as any
     };
   }
@@ -114,14 +102,6 @@ export class ProductsResource {
   async get(id: number): Promise<ApiResponse<Product>> {
     const response = await this.client.get<InternalProduct>(`/products/${id}`);
     
-    if (response.data) {
-      const translatedProduct = this.translateProductToUserFacing(response.data);
-      return {
-        state: response.state,
-        data: translatedProduct
-      };
-    }
-    
     if (response.result) {
       const translatedProduct = this.translateProductToUserFacing(response.result);
       return {
@@ -132,7 +112,6 @@ export class ProductsResource {
     
     return {
       state: response.state,
-      data: response.data as any,
       result: response.result as any
     };
   }
@@ -145,14 +124,6 @@ export class ProductsResource {
     const internalData = this.translateProductToInternal(data);
     const response = await this.client.post<InternalProduct>('/products', internalData);
     
-    if (response.data) {
-      const translatedProduct = this.translateProductToUserFacing(response.data);
-      return {
-        state: response.state,
-        data: translatedProduct
-      };
-    }
-    
     if (response.result) {
       const translatedProduct = this.translateProductToUserFacing(response.result);
       return {
@@ -163,7 +134,6 @@ export class ProductsResource {
     
     return {
       state: response.state,
-      data: response.data as any,
       result: response.result as any
     };
   }
@@ -176,14 +146,6 @@ export class ProductsResource {
     const internalData = this.translateProductToInternal(data);
     const response = await this.client.put<InternalProduct>(`/products/${id}`, internalData);
     
-    if (response.data) {
-      const translatedProduct = this.translateProductToUserFacing(response.data);
-      return {
-        state: response.state,
-        data: translatedProduct
-      };
-    }
-    
     if (response.result) {
       const translatedProduct = this.translateProductToUserFacing(response.result);
       return {
@@ -194,7 +156,6 @@ export class ProductsResource {
     
     return {
       state: response.state,
-      data: response.data as any,
       result: response.result as any
     };
   }
@@ -243,17 +204,6 @@ export class ProductsResource {
     
     const response = await this.client.get<{ entries: InternalProduct[]; page_info: any }>('/products', translatedQuery);
     
-    if (response.data?.entries) {
-      const translatedEntries = response.data.entries.map(product => this.translateProductToUserFacing(product));
-      return {
-        state: response.state,
-        data: {
-          entries: translatedEntries,
-          page_info: response.data.page_info
-        }
-      };
-    }
-    
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(product => this.translateProductToUserFacing(product));
       return {
@@ -267,7 +217,6 @@ export class ProductsResource {
     
     return {
       state: response.state,
-      data: response.data as any,
       result: response.result as any
     };
   }

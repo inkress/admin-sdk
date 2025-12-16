@@ -99,7 +99,7 @@ export class HttpClient {
 
       const responseText = await response.text();
       if (!responseText) {
-        return { state: 'ok', data: undefined as T };
+        return { state: 'ok', result: undefined as T };
       }
 
       const data = JSON.parse(responseText);
@@ -202,12 +202,12 @@ export class HttpClient {
 
 export class InkressApiError extends Error {
   public readonly status: number;
-  public readonly data: any;
+  public readonly result: any;
 
-  constructor(message: string, status: number, data?: any) {
+  constructor(message: string, status: number, result?: any) {
     super(message);
     this.name = 'InkressApiError';
     this.status = status;
-    this.data = data;
+    this.result = result;
   }
 }

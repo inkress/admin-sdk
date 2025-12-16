@@ -77,11 +77,11 @@ const balances: ApiResponse<MerchantBalance> = await inkress.merchants.balances(
 
 **🌍 Human-Readable API** - Use contextual strings instead of cryptic integers:
 ```typescript
-// Before: Hard to remember integer codes
-await inkress.orders.update(123, { status: 4, kind: 1 });
-
-// Now: Clear, self-documenting code
-await inkress.orders.update(123, { status: 'confirmed', kind: 'online' });
+// Clear, self-documenting code with contextual strings
+await inkress.orders.update(123, {
+  status: 'confirmed',
+  kind: 'online'
+});
 // SDK automatically converts to integers for the API
 ```
 
@@ -1055,33 +1055,33 @@ await inkress.orders.list({ q: 'ORDER-12345' });
 
 ### String-Based Status and Kind Values
 
-The SDK now supports human-readable string values instead of hard-to-remember integers:
+The SDK supports human-readable string values for better code clarity:
 
 ```typescript
-// ✅ NEW: Use descriptive strings
+// Use descriptive strings for merchants
 await inkress.merchants.list({
-  status: 'account_approved',           // Instead of remembering "2"
-  platform_fee_structure: 'customer_pay',  // Instead of remembering "1"
+  status: 'account_approved',
+  platform_fee_structure: 'customer_pay',
   q: 'electronics'
 });
 
-// ✅ NEW: Filter orders with readable values
+// Filter orders with readable values
 await inkress.orders.list({
-  status: 'order_confirmed',   // Instead of "4"
-  kind: 'order_online',        // Instead of "1"
+  status: 'order_confirmed',
+  kind: 'order_online',
   q: 'laptop'
 });
 
-// ✅ NEW: Filter products by status
+// Filter products by status
 await inkress.products.list({
-  status: 'product_published',  // Instead of "2"
+  status: 'product_published',
   q: 'smartphone'
 });
 
-// ✅ Backward compatible: integers still work
+// Integers also work for backward compatibility
 await inkress.merchants.list({
-  status: 2,                    // Still works for backward compatibility
-  platform_fee_structure: 1    // Still works
+  status: 2,
+  platform_fee_structure: 1
 });
 ```
 
@@ -1164,7 +1164,7 @@ try {
   if (error.response?.status === 404) {
     console.log('Product not found');
   } else if (error.response?.status === 422) {
-    console.log('Validation errors:', error.response.data);
+    console.log('Validation errors:', error.response.result);
   } else {
     console.log('Unexpected error:', error.message);
   }
@@ -1229,7 +1229,7 @@ import {
 
 // All responses are properly typed
 const response: ApiResponse<ProductListResponse> = await inkress.products.list();
-const products: Product[] = response.result?.entries || response.data?.entries || [];
+const products: Product[] = response.result?.entries || [];
 
 // Create operations with full typing
 const createData: CreateProductData = {
@@ -1311,9 +1311,7 @@ async function getProduct(id: number): Promise<Product | null> {
     const response: ApiResponse<Product> = await inkress.products.get(id);
     
     // TypeScript knows the exact structure
-    if (response.data) {
-      return response.data;  // Product type
-    } else if (response.result) {
+    if (response.result) {
       return response.result;  // Product type
     }
     return null;
@@ -1327,7 +1325,7 @@ async function listProducts(): Promise<Product[]> {
   const response: ApiResponse<ProductListResponse> = await inkress.products.list();
   
   // TypeScript knows ProductListResponse structure
-  const entries = response.data?.entries || response.result?.entries || [];
+  const entries = response.result?.entries || [];
   
   // entries is Product[]
   return entries.map(product => ({
@@ -1440,7 +1438,7 @@ Always implement proper error handling:
 async function fetchProducts() {
   try {
     const response = await inkress.products.list();
-    return response.result || response.data || [];
+    return response.result || [];
   } catch (error) {
     console.error('Failed to fetch products:', error);
     return [];
@@ -1540,6 +1538,10 @@ See [examples/webhook-server.ts](examples/webhook-server.ts) for a complete impl
 ## Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+## Migrating from Older Versions
+
+See [MIGRATION.md](MIGRATION.md) for upgrade instructions and breaking changes between versions.
 
 ## Support
 

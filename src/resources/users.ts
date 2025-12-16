@@ -158,14 +158,6 @@ export class UsersResource {
     const translatedQuery = this.translateFilters(processedQuery);
     const response = await this.client.get<{ entries: InternalUser[]; page_info: any }>('/users', translatedQuery);
     
-    if (response.data?.entries) {
-      const translatedEntries = response.data.entries.map(user => this.translateUserToUserFacing(user));
-      return {
-        state: response.state,
-        data: { entries: translatedEntries, page_info: response.data.page_info }
-      };
-    }
-    
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(user => this.translateUserToUserFacing(user));
       return {
@@ -174,7 +166,7 @@ export class UsersResource {
       };
     }
     
-    return { state: response.state, data: response.data as any, result: response.result as any };
+    return { state: response.state, result: response.result as any };
   }
 
   /**

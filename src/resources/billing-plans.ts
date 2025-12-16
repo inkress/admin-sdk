@@ -33,6 +33,17 @@ export class BillingPlansResource {
   constructor(private client: HttpClient) {}
 
   /**
+   * Convert internal billing plan data (integers) to user-facing data (strings)
+   */
+  private translateToUserFacing(internal: InternalBillingPlan): BillingPlan {
+    return {
+      ...internal,
+      status: StatusTranslator.toStringWithoutContext(internal.status, 'billing_plan') as StatusKey,
+      kind: KindTranslator.toStringWithoutContext(internal.kind, 'billing_plan') as BillingPlanKind,
+    };
+  }
+
+  /**
    * Convert filter parameters (strings to integers where needed)
    */
   private translateFilters(params?: BillingPlanFilterParams): any {
@@ -76,7 +87,23 @@ export class BillingPlansResource {
    */
   async list(params?: BillingPlanFilterParams): Promise<ApiResponse<BillingPlanListResponse>> {
     const translatedParams = this.translateFilters(params);
-    return this.client.get<BillingPlanListResponse>('/billing_plans', translatedParams);
+    const response = await this.client.get<{ entries: InternalBillingPlan[]; page_info: any }>('/billing_plans', translatedParams);
+    
+    if (response.result?.entries) {
+      const translatedEntries = response.result.entries.map(plan => this.translateToUserFacing(plan));
+      return {
+        state: response.state,
+        result: {
+          entries: translatedEntries,
+          page_info: response.result.page_info
+        }
+      };
+    }
+    
+    return {
+      state: response.state,
+      result: response.result as any
+    };
   }
 
   /**
@@ -84,7 +111,20 @@ export class BillingPlansResource {
    * Requires Client-Id header to be set in the configuration
    */
   async get(id: number): Promise<ApiResponse<BillingPlan>> {
-    return this.client.get<BillingPlan>(`/billing_plans/${id}`);
+    const response = await this.client.get<InternalBillingPlan>(`/billing_plans/${id}`);
+    
+    if (response.result) {
+      const translatedPlan = this.translateToUserFacing(response.result);
+      return {
+        state: response.state,
+        result: translatedPlan
+      };
+    }
+    
+    return {
+      state: response.state,
+      result: response.result as any
+    };
   }
 
   /**
@@ -93,7 +133,20 @@ export class BillingPlansResource {
    */
   async create(data: CreateBillingPlanData): Promise<ApiResponse<BillingPlan>> {
     const internalData = this.translateToInternal(data);
-    return this.client.post<BillingPlan>('/billing_plans', internalData);
+    const response = await this.client.post<InternalBillingPlan>('/billing_plans', internalData);
+    
+    if (response.result) {
+      const translatedPlan = this.translateToUserFacing(response.result);
+      return {
+        state: response.state,
+        result: translatedPlan
+      };
+    }
+    
+    return {
+      state: response.state,
+      result: response.result as any
+    };
   }
 
   /**
@@ -102,7 +155,20 @@ export class BillingPlansResource {
    */
   async update(id: number, data: UpdateBillingPlanData): Promise<ApiResponse<BillingPlan>> {
     const internalData = this.translateToInternal(data);
-    return this.client.put<BillingPlan>(`/billing_plans/${id}`, internalData);
+    const response = await this.client.put<InternalBillingPlan>(`/billing_plans/${id}`, internalData);
+    
+    if (response.result) {
+      const translatedPlan = this.translateToUserFacing(response.result);
+      return {
+        state: response.state,
+        result: translatedPlan
+      };
+    }
+    
+    return {
+      state: response.state,
+      result: response.result as any
+    };
   }
 
   /**
@@ -121,7 +187,23 @@ export class BillingPlansResource {
   async query(params?: BillingPlanQueryParams): Promise<ApiResponse<BillingPlanListResponse>> {
     const processedQuery = processQuery(params || {}, BILLING_PLAN_FIELD_TYPES, { validate: true });
     const translatedQuery = this.translateFilters(processedQuery);
-    return this.client.get<BillingPlanListResponse>('/billing_plans', translatedQuery);
+    const response = await this.client.get<{ entries: InternalBillingPlan[]; page_info: any }>('/billing_plans', translatedQuery);
+    
+    if (response.result?.entries) {
+      const translatedEntries = response.result.entries.map(plan => this.translateToUserFacing(plan));
+      return {
+        state: response.state,
+        result: {
+          entries: translatedEntries,
+          page_info: response.result.page_info
+        }
+      };
+    }
+    
+    return {
+      state: response.state,
+      result: response.result as any
+    };
   }
 
   /**

@@ -80,17 +80,6 @@ export class CategoriesResource {
     const translatedParams = this.translateFilters(params);
     const response = await this.client.get<{ entries: InternalCategory[]; page_info: any }>('/categories', translatedParams);
     
-    if (response.data?.entries) {
-      const translatedEntries = response.data.entries.map(category => this.translateCategoryToUserFacing(category));
-      return {
-        state: response.state,
-        data: {
-          entries: translatedEntries,
-          page_info: response.data.page_info
-        }
-      };
-    }
-    
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(category => this.translateCategoryToUserFacing(category));
       return {
@@ -104,7 +93,6 @@ export class CategoriesResource {
     
     return {
       state: response.state,
-      data: response.data as any,
       result: response.result as any
     };
   }
@@ -116,14 +104,6 @@ export class CategoriesResource {
   async get(id: number): Promise<ApiResponse<Category>> {
     const response = await this.client.get<InternalCategory>(`/categories/${id}`);
     
-    if (response.data) {
-      const translatedCategory = this.translateCategoryToUserFacing(response.data);
-      return {
-        state: response.state,
-        data: translatedCategory
-      };
-    }
-    
     if (response.result) {
       const translatedCategory = this.translateCategoryToUserFacing(response.result);
       return {
@@ -134,7 +114,6 @@ export class CategoriesResource {
     
     return {
       state: response.state,
-      data: response.data as any,
       result: response.result as any
     };
   }
@@ -147,14 +126,6 @@ export class CategoriesResource {
     const internalData = this.translateCategoryToInternal(data);
     const response = await this.client.post<InternalCategory>('/categories', internalData);
     
-    if (response.data) {
-      const translatedCategory = this.translateCategoryToUserFacing(response.data);
-      return {
-        state: response.state,
-        data: translatedCategory
-      };
-    }
-    
     if (response.result) {
       const translatedCategory = this.translateCategoryToUserFacing(response.result);
       return {
@@ -165,7 +136,6 @@ export class CategoriesResource {
     
     return {
       state: response.state,
-      data: response.data as any,
       result: response.result as any
     };
   }
@@ -179,14 +149,6 @@ export class CategoriesResource {
     const internalData = this.translateCategoryToInternal(data);
     const response = await this.client.put<InternalCategory>(`/categories/${id}`, internalData);
     
-    if (response.data) {
-      const translatedCategory = this.translateCategoryToUserFacing(response.data);
-      return {
-        state: response.state,
-        data: translatedCategory
-      };
-    }
-    
     if (response.result) {
       const translatedCategory = this.translateCategoryToUserFacing(response.result);
       return {
@@ -197,7 +159,6 @@ export class CategoriesResource {
     
     return {
       state: response.state,
-      data: response.data as any,
       result: response.result as any
     };
   }
@@ -212,14 +173,6 @@ export class CategoriesResource {
     const translatedQuery = this.translateFilters(processedQuery);
     const response = await this.client.get<{ entries: InternalCategory[]; page_info: any }>('/categories', translatedQuery);
     
-    if (response.data?.entries) {
-      const translatedEntries = response.data.entries.map(c => this.translateCategoryToUserFacing(c));
-      return {
-        state: response.state,
-        data: { entries: translatedEntries, page_info: response.data.page_info }
-      };
-    }
-    
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(c => this.translateCategoryToUserFacing(c));
       return {
@@ -228,7 +181,7 @@ export class CategoriesResource {
       };
     }
     
-    return { state: response.state, data: response.data as any, result: response.result as any };
+    return { state: response.state, result: response.result as any };
   }
 
   /**

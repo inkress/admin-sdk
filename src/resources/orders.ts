@@ -5,12 +5,16 @@ import {
   UpdateOrderData,
   ApiResponse,
   InternalOrder,
+  InternalMerchant,
+  Merchant,
   OrderStatus,
   OrderKind,
+  AccountStatus,
 } from '../types';
 import {
   StatusTranslator,
   KindTranslator,
+  FeeStructureTranslator,
   StatusKey,
   KindKey,
 } from '../utils/translators';
@@ -56,10 +60,29 @@ export class OrdersResource {
    * Convert internal order data (integers) to user-facing data (strings)
    */
   private translateOrderToUserFacing(internal: InternalOrder): Order {
-    return {
+    const result: any = {
       ...internal,
       status: StatusTranslator.toStringWithoutContext(internal.status, 'order') as OrderStatus,
       kind: KindTranslator.toStringWithoutContext(internal.kind, 'order') as OrderKind,
+    };
+    
+    // Translate nested merchant if present
+    if (internal.merchant) {
+      result.merchant = this.translateMerchantToUserFacing(internal.merchant);
+    }
+    
+    return result;
+  }
+
+  /**
+   * Convert internal merchant data to user-facing merchant
+   */
+  private translateMerchantToUserFacing(internal: InternalMerchant): Merchant {
+    return {
+      ...internal,
+      status: StatusTranslator.toStringWithoutContext(internal.status, 'account') as AccountStatus,
+      platform_fee_structure: FeeStructureTranslator.toString(internal.platform_fee_structure),
+      provider_fee_structure: FeeStructureTranslator.toString(internal.provider_fee_structure),
     };
   }
 
@@ -131,14 +154,6 @@ export class OrdersResource {
   async get(id: number): Promise<ApiResponse<Order>> {
     const response = await this.client.get<InternalOrder>(`/orders/${id}`);
     
-    if (response.data) {
-      const translatedOrder = this.translateOrderToUserFacing(response.data);
-      return {
-        state: response.state,
-        data: translatedOrder
-      };
-    }
-    
     if (response.result) {
       const translatedOrder = this.translateOrderToUserFacing(response.result);
       return {
@@ -149,7 +164,6 @@ export class OrdersResource {
     
     return {
       state: response.state,
-      data: response.data as any,
       result: response.result as any
     };
   }
@@ -162,14 +176,6 @@ export class OrdersResource {
     const internalData = this.translateStatusUpdate(data);
     const response = await this.client.put<InternalOrder>(`/orders/${id}`, internalData);
     
-    if (response.data) {
-      const translatedOrder = this.translateOrderToUserFacing(response.data);
-      return {
-        state: response.state,
-        data: translatedOrder
-      };
-    }
-    
     if (response.result) {
       const translatedOrder = this.translateOrderToUserFacing(response.result);
       return {
@@ -180,7 +186,6 @@ export class OrdersResource {
     
     return {
       state: response.state,
-      data: response.data as any,
       result: response.result as any
     };
   }
@@ -199,14 +204,6 @@ export class OrdersResource {
   async getStatus(id: number): Promise<ApiResponse<Order>> {
     const response = await this.client.get<InternalOrder>(`/orders/status/${id}`);
     
-    if (response.data) {
-      const translatedOrder = this.translateOrderToUserFacing(response.data);
-      return {
-        state: response.state,
-        data: translatedOrder
-      };
-    }
-    
     if (response.result) {
       const translatedOrder = this.translateOrderToUserFacing(response.result);
       return {
@@ -217,7 +214,6 @@ export class OrdersResource {
     
     return {
       state: response.state,
-      data: response.data as any,
       result: response.result as any
     };
   }
@@ -230,17 +226,6 @@ export class OrdersResource {
   async list(params?: OrderFilterParams): Promise<ApiResponse<OrderListResponse>> {
     const translatedParams = this.translateFilters(params);
     const response = await this.client.get<{ entries: InternalOrder[]; page_info: any }>('/orders', translatedParams);
-    
-    if (response.data?.entries) {
-      const translatedEntries = response.data.entries.map(order => this.translateOrderToUserFacing(order));
-      return {
-        state: response.state,
-        data: {
-          entries: translatedEntries,
-          page_info: response.data.page_info
-        }
-      };
-    }
     
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(order => this.translateOrderToUserFacing(order));
@@ -255,7 +240,6 @@ export class OrdersResource {
     
     return {
       state: response.state,
-      data: response.data as any,
       result: response.result as any
     };
   }
@@ -299,17 +283,6 @@ export class OrdersResource {
     
     const response = await this.client.get<{ entries: InternalOrder[]; page_info: any }>('/orders', translatedQuery);
     
-    if (response.data?.entries) {
-      const translatedEntries = response.data.entries.map(order => this.translateOrderToUserFacing(order));
-      return {
-        state: response.state,
-        data: {
-          entries: translatedEntries,
-          page_info: response.data.page_info
-        }
-      };
-    }
-    
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(order => this.translateOrderToUserFacing(order));
       return {
@@ -323,7 +296,6 @@ export class OrdersResource {
     
     return {
       state: response.state,
-      data: response.data as any,
       result: response.result as any
     };
   }

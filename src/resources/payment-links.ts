@@ -1,6 +1,7 @@
 import { HttpClient } from '../client';
 import {
   PaymentLink,
+  InternalPaymentLink,
   CreatePaymentLinkData,
   UpdatePaymentLinkData,
   ApiResponse,
@@ -8,6 +9,8 @@ import {
 import {
   StatusTranslator,
   KindTranslator,
+  StatusKey,
+  KindKey,
 } from '../utils/translators';
 import { processQuery } from '../utils/query-transformer';
 import { PaymentLinkQueryBuilder } from '../utils/query-builders';
@@ -20,6 +23,17 @@ import {
 
 export class PaymentLinksResource {
   constructor(private client: HttpClient) {}
+
+  /**
+   * Convert internal payment link data (integers) to user-facing data (strings)
+   */
+  private translateToUserFacing(internal: InternalPaymentLink): PaymentLink {
+    return {
+      ...internal,
+      status: StatusTranslator.toStringWithoutContext(internal.status, 'payment_link') as StatusKey,
+      kind: KindTranslator.toStringWithoutContext(internal.kind, 'order') as KindKey,
+    };
+  }
 
   /**
    * Convert filter parameters (strings to integers where needed)
@@ -62,14 +76,43 @@ export class PaymentLinksResource {
    */
   async list(params?: PaymentLinkFilterParams): Promise<ApiResponse<PaymentLinkListResponse>> {
     const translatedParams = this.translateFilters(params);
-    return this.client.get<PaymentLinkListResponse>('/payment_links', translatedParams);
+    const response = await this.client.get<{ entries: InternalPaymentLink[]; page_info: any }>('/payment_links', translatedParams);
+    
+    if (response.result?.entries) {
+      const translatedEntries = response.result.entries.map(link => this.translateToUserFacing(link));
+      return {
+        state: response.state,
+        result: {
+          entries: translatedEntries,
+          page_info: response.result.page_info
+        }
+      };
+    }
+    
+    return {
+      state: response.state,
+      result: response.result as any
+    };
   }
 
   /**
    * Get payment link by ID
    */
   async get(id: number): Promise<ApiResponse<PaymentLink>> {
-    return this.client.get<PaymentLink>(`/payment_links/${id}`);
+    const response = await this.client.get<InternalPaymentLink>(`/payment_links/${id}`);
+    
+    if (response.result) {
+      const translatedLink = this.translateToUserFacing(response.result);
+      return {
+        state: response.state,
+        result: translatedLink
+      };
+    }
+    
+    return {
+      state: response.state,
+      result: response.result as any
+    };
   }
 
   /**
@@ -77,7 +120,20 @@ export class PaymentLinksResource {
    */
   async create(data: CreatePaymentLinkData): Promise<ApiResponse<PaymentLink>> {
     const internalData = this.translateToInternal(data);
-    return this.client.post<PaymentLink>('/payment_links', internalData);
+    const response = await this.client.post<InternalPaymentLink>('/payment_links', internalData);
+    
+    if (response.result) {
+      const translatedLink = this.translateToUserFacing(response.result);
+      return {
+        state: response.state,
+        result: translatedLink
+      };
+    }
+    
+    return {
+      state: response.state,
+      result: response.result as any
+    };
   }
 
   /**
@@ -85,7 +141,20 @@ export class PaymentLinksResource {
    */
   async update(id: number, data: UpdatePaymentLinkData): Promise<ApiResponse<PaymentLink>> {
     const internalData = this.translateToInternal(data);
-    return this.client.put<PaymentLink>(`/payment_links/${id}`, internalData);
+    const response = await this.client.put<InternalPaymentLink>(`/payment_links/${id}`, internalData);
+    
+    if (response.result) {
+      const translatedLink = this.translateToUserFacing(response.result);
+      return {
+        state: response.state,
+        result: translatedLink
+      };
+    }
+    
+    return {
+      state: response.state,
+      result: response.result as any
+    };
   }
 
   /**

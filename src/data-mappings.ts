@@ -94,7 +94,9 @@ export const mappings = {
     "fee_merchant_withdrawal_limit": 15,
     "legal_request_document_submission": 1,
     "legal_request_bank_info_update": 2,
-    "legal_request_limit_increase": 3
+    "legal_request_limit_increase": 3,
+    "payment_link_order": 1,
+    "payment_link_invoice": 2
   },
   "Status": {
     "order_pending": 1,
@@ -160,6 +162,14 @@ export const mappings = {
     "post_archived": 3,
     "product_draft": 1,
     "product_published": 2,
-    "product_archived": 3
+    "product_archived": 3,
+    "legal_request_pending": 1,
+    "legal_request_in_review": 2,
+    "legal_request_approved": 3,
+    "legal_request_rejected": 4,
+    "financial_request_pending": 1,
+    "financial_request_in_review": 2,
+    "financial_request_approved": 3,
+    "financial_request_rejected": 4
   }
 }

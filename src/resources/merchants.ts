@@ -107,17 +107,6 @@ export class MerchantsResource {
     const translatedParams = this.translateFilters(params);
     const response = await this.client.get<{ entries: InternalMerchant[]; page_info: any }>('/merchants', translatedParams);
     
-    if (response.data?.entries) {
-      const translatedEntries = response.data.entries.map(merchant => this.translateMerchantToUserFacing(merchant));
-      return {
-        state: response.state,
-        data: {
-          entries: translatedEntries,
-          page_info: response.data.page_info
-        }
-      };
-    }
-    
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(merchant => this.translateMerchantToUserFacing(merchant));
       return {
@@ -131,7 +120,6 @@ export class MerchantsResource {
     
     return {
       state: response.state,
-      data: response.data as any,
       result: response.result as any
     };
   }
@@ -141,14 +129,6 @@ export class MerchantsResource {
    */
   async get(id: number): Promise<ApiResponse<Merchant>> {
     const response = await this.client.get<InternalMerchant>(`/merchants/${id}`);
-    
-    if (response.data) {
-      const translatedMerchant = this.translateMerchantToUserFacing(response.data);
-      return {
-        state: response.state,
-        data: translatedMerchant
-      };
-    }
     
     if (response.result) {
       const translatedMerchant = this.translateMerchantToUserFacing(response.result);
@@ -160,7 +140,6 @@ export class MerchantsResource {
     
     return {
       state: response.state,
-      data: response.data as any,
       result: response.result as any
     };
   }
@@ -172,14 +151,6 @@ export class MerchantsResource {
     const internalData = this.translateMerchantToInternal(data) as InternalCreateMerchantData;
     const response = await this.client.post<InternalMerchant>('/merchants', internalData);
     
-    if (response.data) {
-      const translatedMerchant = this.translateMerchantToUserFacing(response.data);
-      return {
-        state: response.state,
-        data: translatedMerchant
-      };
-    }
-    
     if (response.result) {
       const translatedMerchant = this.translateMerchantToUserFacing(response.result);
       return {
@@ -190,7 +161,6 @@ export class MerchantsResource {
     
     return {
       state: response.state,
-      data: response.data as any,
       result: response.result as any
     };
   }
@@ -202,14 +172,6 @@ export class MerchantsResource {
     const internalData = this.translateMerchantToInternal(data) as InternalUpdateMerchantData;
     const response = await this.client.put<InternalMerchant>(`/merchants/${id}`, internalData);
     
-    if (response.data) {
-      const translatedMerchant = this.translateMerchantToUserFacing(response.data);
-      return {
-        state: response.state,
-        data: translatedMerchant
-      };
-    }
-    
     if (response.result) {
       const translatedMerchant = this.translateMerchantToUserFacing(response.result);
       return {
@@ -220,7 +182,6 @@ export class MerchantsResource {
     
     return {
       state: response.state,
-      data: response.data as any,
       result: response.result as any
     };
   }
@@ -270,14 +231,6 @@ export class MerchantsResource {
     const translatedQuery = this.translateFilters(processedQuery);
     const response = await this.client.get<{ entries: InternalMerchant[]; page_info: any }>('/merchants', translatedQuery);
     
-    if (response.data?.entries) {
-      const translatedEntries = response.data.entries.map(m => this.translateMerchantToUserFacing(m));
-      return {
-        state: response.state,
-        data: { entries: translatedEntries, page_info: response.data.page_info }
-      };
-    }
-    
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(m => this.translateMerchantToUserFacing(m));
       return {
@@ -286,7 +239,7 @@ export class MerchantsResource {
       };
     }
     
-    return { state: response.state, data: response.data as any, result: response.result as any };
+    return { state: response.state, result: response.result as any };
   }
 
   /**

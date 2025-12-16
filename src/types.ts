@@ -142,13 +142,12 @@ export interface PaginatedResponse<T> {
 // Standard API response types
 export interface ApiResponse<T = any> {
   state: 'ok' | 'error';
-  data?: T;
   result?: T;
 }
 
 export interface ErrorResponse {
   state: 'error';
-  data: 
+  result: 
     | { result: string }
     | { reason: string }
     | string
@@ -157,7 +156,7 @@ export interface ErrorResponse {
 
 export interface ValidationError {
   state: 'error';
-  data: Record<string, string[]>;
+  result: Record<string, string[]>;
 }
 
 // Currency type
@@ -605,8 +604,8 @@ export interface PaymentLink {
   total: number;
   usage_limit: number;
   expires_at?: string;
-  status: number;
-  kind: number;
+  status: StatusKey; // Translated from integer to string
+  kind: KindKey; // Translated from integer to string
   data?: Record<string, any>;
   customer_id?: number;
   currency_id: number;
@@ -1460,6 +1459,24 @@ export interface InternalUser {
   updated_at: string;
 }
 
+export interface InternalPaymentLink {
+  id: number;
+  uid: string;
+  title: string;
+  description?: string;
+  total: number;
+  usage_limit: number;
+  expires_at?: string;
+  status: number; // Integer for API
+  kind: number; // Integer for API
+  data?: Record<string, any>;
+  customer_id?: number;
+  currency_id: number;
+  order_id?: number;
+  inserted_at: string;
+  updated_at: string;
+}
+
 export interface InternalBillingPlan {
   id: number;
   name: string;
@@ -1473,14 +1490,24 @@ export interface InternalBillingPlan {
   duration: number;
   status: number; // Integer for API
   kind: number; // Integer for API
-  billing_cycle: number;
+  billing_cycle?: number;
   trial_period: number;
   charge_strategy: number;
   auto_charge: boolean;
-  currency: Currency;
-  features?: string[];
+  public: boolean;
+  payout_period: number;
+  payout_value_limit: number;
+  payout_percentage_limit: number;
+  features?: Record<string, any>;
+  data?: Record<string, any>;
+  meta_data?: Record<string, any>;
+  uid: string;
+  currency_id: number;
+  payment_provider_id?: number;
   inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  currency?: Currency;
 }
 
 export interface InternalSubscription {

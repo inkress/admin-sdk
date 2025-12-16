@@ -1,8 +1,6 @@
 import { HttpClient } from '../client';
 import {
   Order,
-  CreateOrderData,
-  UpdateOrderData,
   ApiResponse,
   InternalOrder,
   InternalMerchant,
@@ -10,6 +8,9 @@ import {
   OrderStatus,
   OrderKind,
   AccountStatus,
+  CreateOrderData,
+  CreateOrderResponseData,
+  UpdateOrderData,
 } from '../types';
 import {
   StatusTranslator,
@@ -26,32 +27,6 @@ import {
   OrderListResponse,
   ORDER_FIELD_TYPES,
 } from '../types/resources';
-
-export interface CreateOrderRequestData {
-  currency_code: string;
-  customer: {
-    email: string;
-    first_name?: string;
-    last_name?: string;
-  };
-  total: number;
-  reference_id?: string;
-  kind?: 'online' | 'offline' | 'subscription';
-}
-
-export interface CreateOrderResponseData {
-  id: number;
-  payment_urls?: {
-    short_link: string;
-  };
-  transaction?: {
-    id: number;
-  };
-}
-
-export interface UpdateOrderStatusData {
-  status: number;
-}
 
 export class OrdersResource {
   constructor(private client: HttpClient) {}
@@ -87,28 +62,8 @@ export class OrdersResource {
   }
 
   /**
-   * Convert user-facing order data (strings) to internal data (integers)
-   */
-  private translateOrderToInternal(userFacing: CreateOrderData | UpdateOrderData): any {
-    const internal: any = { ...userFacing };
-    
-    if ('status' in userFacing && userFacing.status) {
-      internal.status = typeof userFacing.status === 'string' 
-        ? StatusTranslator.toIntegerWithContext(userFacing.status, 'order')
-        : userFacing.status;
-    }
-    
-    if ('kind' in userFacing && userFacing.kind) {
-      internal.kind = typeof userFacing.kind === 'string' 
-        ? KindTranslator.toIntegerWithContext(userFacing.kind, 'order')
-        : userFacing.kind;
-    }
-    
-    return internal;
-  }
-
-  /**
    * Convert filter parameters (strings to integers where needed)
+   * @deprecated This method is no longer needed as processQuery handles translation
    */
   private translateFilters(params?: OrderFilterParams): any {
     if (!params) return params;
@@ -129,7 +84,7 @@ export class OrdersResource {
   /**
    * Convert status update data (strings to integers where needed)
    */
-  private translateStatusUpdate(data: UpdateOrderStatusData): any {
+  private translateStatusUpdate(data: UpdateOrderData): any {
     const internal: any = { ...data };
     
     if (data.status && typeof data.status === 'string') {
@@ -143,7 +98,7 @@ export class OrdersResource {
    * Create a new order
    * Requires Client-Id header to be set in the configuration
    */
-  async create(data: CreateOrderRequestData): Promise<ApiResponse<CreateOrderResponseData>> {
+  async create(data: CreateOrderData): Promise<ApiResponse<CreateOrderResponseData>> {
     return this.client.post<CreateOrderResponseData>('/orders', data);
   }
 
@@ -172,7 +127,7 @@ export class OrdersResource {
    * Update order status
    * Requires Client-Id header to be set in the configuration
    */
-  async update(id: number, data: UpdateOrderStatusData): Promise<ApiResponse<Order>> {
+  async update(id: number, data: UpdateOrderData): Promise<ApiResponse<Order>> {
     const internalData = this.translateStatusUpdate(data);
     const response = await this.client.put<InternalOrder>(`/orders/${id}`, internalData);
     

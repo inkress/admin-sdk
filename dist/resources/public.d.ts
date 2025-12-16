@@ -38,8 +38,14 @@ export interface PublicMerchantParams {
     'domain.cname'?: string;
 }
 export interface MerchantFeesParams {
-    currency: string;
+    /** Order total amount (required) */
     total: number;
+    /** Currency code (required) */
+    currency_code: string;
+    /** Optional fulfillment/shipping cost */
+    fulfillment_total?: number;
+    /** Optional payment method ID */
+    method_id?: number;
 }
 export declare class PublicResource {
     private client;

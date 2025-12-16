@@ -51,8 +51,17 @@ export interface PublicMerchantParams {
 }
 
 export interface MerchantFeesParams {
-  currency: string;
+  /** Order total amount (required) */
   total: number;
+  
+  /** Currency code (required) */
+  currency_code: string;
+  
+  /** Optional fulfillment/shipping cost */
+  fulfillment_total?: number;
+  
+  /** Optional payment method ID */
+  method_id?: number;
 }
 
 export class PublicResource {

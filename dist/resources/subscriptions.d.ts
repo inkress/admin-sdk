@@ -1,35 +1,12 @@
 import { HttpClient } from '../client';
-import { Subscription, SubscriptionPeriod, CreateSubscriptionData, SubscriptionChargeData, SubscriptionUsageResponse, SubscriptionCancelResponse, ApiResponse, PaginationParams, SubscriptionStatus } from '../types';
-import { StatusKey } from '../utils/translators';
+import { Subscription, SubscriptionPeriod, CreateSubscriptionData, SubscriptionChargeData, SubscriptionUsageResponse, SubscriptionCancelResponse, ApiResponse, PaginationParams } from '../types';
 import { SubscriptionQueryBuilder } from '../utils/query-builders';
-import { SubscriptionQueryParams, SubscriptionListResponse } from '../types/resources';
-/**
- * @deprecated Use SubscriptionFilterParams from types/resources instead
- */
-export interface SubscriptionListParams {
-    status?: SubscriptionStatus | StatusKey | number;
-    billing_plan_id?: number;
-    customer_id?: number;
-    limit?: number;
-    id?: number;
-    record_id?: number;
-    record?: string;
-    start_date?: string;
-    end_date?: string;
-    current_period_start?: string;
-    current_period_end?: string;
-    trial_end?: string;
-    canceled_at?: string;
-    uid?: string;
-    kind?: number;
-    token?: string;
-    inserted_at?: string;
-    updated_at?: string;
-}
+import { SubscriptionFilterParams, SubscriptionQueryParams, SubscriptionListResponse } from '../types/resources';
 export interface CreateSubscriptionLinkData {
     reference_id: string;
     title: string;
     plan_uid: string;
+    meta_data?: Record<string, any>;
     customer: {
         first_name: string;
         last_name: string;
@@ -88,6 +65,7 @@ export declare class SubscriptionsResource {
     private translateBillingPlanToUserFacing;
     /**
      * Convert filter parameters (strings to integers where needed)
+     * @deprecated This method is no longer needed as processQuery handles translation
      */
     private translateFilters;
     /**
@@ -98,7 +76,7 @@ export declare class SubscriptionsResource {
      * List billing subscriptions with pagination and filtering
      * Requires Client-Id header to be set in the configuration
      */
-    list(params?: SubscriptionListParams): Promise<ApiResponse<SubscriptionListResponse>>;
+    list(params?: SubscriptionFilterParams): Promise<ApiResponse<SubscriptionListResponse>>;
     /**
      * Gets a billing subscription by ID
      * Requires Client-Id header to be set in the configuration

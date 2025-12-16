@@ -1,30 +1,7 @@
 import { HttpClient } from '../client';
-import { Order, ApiResponse } from '../types';
+import { Order, ApiResponse, CreateOrderData, CreateOrderResponseData, UpdateOrderData } from '../types';
 import { OrderQueryBuilder } from '../utils/query-builders';
 import { OrderFilterParams, OrderQueryParams, OrderListResponse } from '../types/resources';
-export interface CreateOrderRequestData {
-    currency_code: string;
-    customer: {
-        email: string;
-        first_name?: string;
-        last_name?: string;
-    };
-    total: number;
-    reference_id?: string;
-    kind?: 'online' | 'offline' | 'subscription';
-}
-export interface CreateOrderResponseData {
-    id: number;
-    payment_urls?: {
-        short_link: string;
-    };
-    transaction?: {
-        id: number;
-    };
-}
-export interface UpdateOrderStatusData {
-    status: number;
-}
 export declare class OrdersResource {
     private client;
     constructor(client: HttpClient);
@@ -37,11 +14,8 @@ export declare class OrdersResource {
      */
     private translateMerchantToUserFacing;
     /**
-     * Convert user-facing order data (strings) to internal data (integers)
-     */
-    private translateOrderToInternal;
-    /**
      * Convert filter parameters (strings to integers where needed)
+     * @deprecated This method is no longer needed as processQuery handles translation
      */
     private translateFilters;
     /**
@@ -52,7 +26,7 @@ export declare class OrdersResource {
      * Create a new order
      * Requires Client-Id header to be set in the configuration
      */
-    create(data: CreateOrderRequestData): Promise<ApiResponse<CreateOrderResponseData>>;
+    create(data: CreateOrderData): Promise<ApiResponse<CreateOrderResponseData>>;
     /**
      * Get order details by ID
      * Requires Client-Id header to be set in the configuration
@@ -62,7 +36,7 @@ export declare class OrdersResource {
      * Update order status
      * Requires Client-Id header to be set in the configuration
      */
-    update(id: number, data: UpdateOrderStatusData): Promise<ApiResponse<Order>>;
+    update(id: number, data: UpdateOrderData): Promise<ApiResponse<Order>>;
     /**
      * Delete an order
      * Requires Client-Id header to be set in the configuration

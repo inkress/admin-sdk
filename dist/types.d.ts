@@ -237,17 +237,26 @@ export interface UpdateMerchantData {
     parent_merchant_id?: number;
     data?: Record<string, any>;
 }
+/**
+ * @deprecated These interfaces may not align with current API - endpoints not found in OpenAPI spec
+ */
 export interface MerchantBalance {
     available: number;
     pending: number;
     currency: string;
 }
+/**
+ * @deprecated These interfaces may not align with current API - endpoints not found in OpenAPI spec
+ */
 export interface MerchantLimits {
     transaction_limit: number;
     daily_limit: number;
     monthly_limit: number;
     currency: string;
 }
+/**
+ * @deprecated These interfaces may not align with current API - endpoints not found in OpenAPI spec
+ */
 export interface MerchantSubscription {
     plan_name: string;
     status: string;
@@ -257,6 +266,9 @@ export interface MerchantSubscription {
     features: string[];
     next_billing_date?: string;
 }
+/**
+ * @deprecated These interfaces may not align with current API - endpoints not found in OpenAPI spec
+ */
 export interface MerchantInvoice {
     id: string;
     invoice_number: string;
@@ -387,46 +399,218 @@ export interface Order {
     payment_link?: PaymentLink;
     billing_plan?: BillingPlan;
     billing_subscription?: Subscription;
-    order_lines?: OrderLine[];
     merchant?: Merchant;
     organisation?: Organisation;
 }
+/**
+ * @deprecated OrderLine interface - not found in current OpenAPI spec
+ * Only used in internal order representations
+ */
 export interface OrderLine {
     product_id: number;
     quantity: number;
     price: number;
 }
+/**
+ * Fulfillment type for order delivery
+ */
+export type FulfillmentType = 'shipping' | 'pickup' | 'digital';
+/**
+ * OrderAddress information for shipping/billing
+ */
+export interface OrderAddress {
+    street?: string;
+    street_optional?: string;
+    town?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    postal_code?: string;
+    latitude?: number;
+    longitude?: number;
+}
+/**
+ * Pickup location information
+ */
+export interface PickupLocation {
+    name?: string;
+    OrderAddress?: string;
+    contact?: string;
+    instructions?: string;
+}
+export interface OrderDetailData {
+    /** Lynk payment system ID */
+    lynk_id?: string;
+    /** Customer information override */
+    customer?: {
+        first_name?: string;
+        last_name?: string;
+        email?: string;
+        phone?: string;
+    };
+    /** Subscription plan ID */
+    plan_id?: number;
+    /** Shipping OrderAddress details */
+    shipping_OrderAddress?: OrderAddress;
+    /** Type of fulfillment */
+    fulfillment_type?: FulfillmentType;
+    /** Cost of fulfillment/shipping */
+    fulfillment_total?: number;
+    /** Pickup location details */
+    pickup_location?: PickupLocation;
+}
+/**
+ * Product item for order creation
+ */
+export interface ProductItem {
+    /** Product variant ID */
+    id: number;
+    /** Quantity to order */
+    quantity: number;
+}
+/**
+ * Payment URLs returned after order creation
+ */
+export interface PaymentUrls {
+    cancel_url?: string;
+    return_url?: string;
+    approval_url?: string;
+    payment_url: string;
+    short_link: string;
+    qr_url: string;
+    embed_url?: string;
+}
+/**
+ * Customer information for order creation
+ */
+export interface CustomerInfo {
+    /** Required */
+    email: string;
+    /** Optional */
+    first_name: string;
+    last_name: string;
+    phone?: string;
+    dob?: string;
+    /** Customer type/classification */
+    kind?: 'merchants' | 'users' | string;
+    kind_id?: number;
+}
+export interface CreateOrderMetaData {
+    return_url?: string;
+    [key: string]: any;
+}
+export interface RecordOrderMetaData {
+    [key: string]: any;
+}
+/**
+ * Parameters for Service.Order.Processor.record/1
+ *
+ * Creates a complete order with customer, products, transactions, and payment URLs
+ */
 export interface CreateOrderData {
-    reference_id?: string;
+    /** Required fields */
+    currency_code: string;
     total: number;
-    kind?: OrderKind | KindKey | number;
-    status?: OrderStatus | StatusKey | number;
+    /** Customer information */
+    customer: CustomerInfo;
+    /** Products to order */
+    products: ProductItem[];
+    /** Optional order identification */
+    reference_id?: string;
+    /** Optional fields */
+    fulfillment_total?: number;
+    /** Payment method */
+    method_id?: number;
+    /** Order classification */
+    kind?: string;
+    /** Source payment link ID (if creating from existing payment link) */
+    payment_link_id?: string;
+    /** Subscription fields (if kind = 'subscription' or OrderKind.SUBSCRIPTION) */
+    plan_id?: string;
+    subscription_token?: string;
+    /** Additional data */
+    data?: OrderDetailData;
+    meta_data?: CreateOrderMetaData;
+    title?: string;
+}
+/**
+ * Response from record function
+ * Returns formatted order with all associations
+ */
+export interface CreateOrderResponseData {
+    /** Order identification */
+    id: number;
+    reference_id: string;
+    /** Status */
+    status: number;
     status_on?: number;
-    cart_id?: number;
-    currency_id?: number;
-    customer_id?: number;
-    payment_link_id?: number;
-    billing_plan_id?: number;
-    billing_subscription_id?: number;
-    meta_data?: Record<string, any>;
-    session_id?: string;
-    data?: Record<string, any>;
+    /** Financial */
+    total: number;
+    /** Timestamps */
+    created_at: string;
+    inserted_at: string;
+    updated_at: string;
+    /** Customer information */
+    customer: {
+        first_name: string;
+        last_name: string;
+        email: string;
+    };
+    /** Currency code */
+    currency: string;
+    /** Merchant information */
+    merchant: {
+        name: string;
+        email: string;
+        phone?: string;
+        logo?: string;
+        username: string;
+        theme_colour?: string;
+    };
+    /** Order details */
+    details: {
+        title?: string;
+        data?: OrderDetailData;
+        updated_at: string;
+    };
+    /** Order line items */
+    lines: Array<{
+        product_variant_name_frozen: string;
+        product_variant_total_frozen: number;
+        quantity: number;
+    }>;
+    /** Transactions */
+    transactions: Array<{
+        total?: number;
+        provider_fee?: number;
+        platform_fee?: number;
+        payment_method_order_id?: string;
+        updated_at: string;
+    }>;
+    /** Transaction logs */
+    transaction_logs: Array<{
+        id: number;
+        message: string;
+    }>;
+    /** Payment provider info */
+    provider: {
+        id: number;
+        name: string;
+        logo: string;
+    };
+    /** Payment URLs */
+    payment_urls?: PaymentUrls;
+    return_url?: string;
+    invoice_url: string;
+    /** Additional metadata */
+    meta_data?: RecordOrderMetaData;
 }
 export interface UpdateOrderData {
-    reference_id?: string;
+    status?: string;
     total?: number;
-    kind?: OrderKind | KindKey | number;
-    status?: OrderStatus | StatusKey | number;
-    status_on?: number;
-    cart_id?: number;
-    currency_id?: number;
-    customer_id?: number;
-    payment_link_id?: number;
-    billing_plan_id?: number;
-    billing_subscription_id?: number;
-    meta_data?: Record<string, any>;
-    session_id?: string;
+    fulfillment_total?: number;
     data?: Record<string, any>;
+    meta_data?: Record<string, any>;
 }
 export interface OrderStats {
     [key: string]: any;
@@ -457,20 +641,16 @@ export interface UpdatePaymentMethodData {
 }
 export interface Customer {
     id: number;
+    uid?: string;
     email: string;
+    username?: string;
     first_name?: string;
     last_name?: string;
-    name?: string;
     phone?: string;
-    uid?: string;
+    image?: string;
     dob?: number;
     sex?: number;
-    image?: string;
     status?: number;
-    level?: number;
-    data?: Record<string, any>;
-    merchant_id?: number;
-    organisation_id?: number;
     inserted_at: string;
     updated_at: string;
     merchant?: Merchant;
@@ -1019,7 +1199,33 @@ export interface APIToken {
     updated_at: string;
 }
 export interface PublicMerchantFees {
-    [key: string]: any;
+    /** New detailed fee breakdown (Oct 2, 2025) */
+    sub_total: number;
+    discount_total: number;
+    shipping_total: number;
+    pre_tax_fee_total: number;
+    tax_total: number;
+    post_tax_fee_total: number;
+    /** Party totals */
+    customer_total: number;
+    platform_total: number;
+    provider_total: number;
+    merchant_total: number;
+    /** Legacy fields for compatibility */
+    total: number;
+    provider_fee: number;
+    platform_fee: number;
+    /** Merchant information */
+    merchant: {
+        username: string;
+        name: string;
+        email: string;
+        phone?: string;
+        logo?: string;
+        theme_colour?: string;
+    };
+    /** Currency code */
+    currency: string;
 }
 export interface PublicMerchantProducts {
     products: Product[];

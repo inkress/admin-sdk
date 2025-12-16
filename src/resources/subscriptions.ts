@@ -30,35 +30,11 @@ import {
   SUBSCRIPTION_FIELD_TYPES,
 } from '../types/resources';
 
-/**
- * @deprecated Use SubscriptionFilterParams from types/resources instead
- */
-export interface SubscriptionListParams {
-  // Legacy interface - kept for backward compatibility
-  status?: SubscriptionStatus | StatusKey | number;
-  billing_plan_id?: number;
-  customer_id?: number;
-  limit?: number;
-  id?: number;
-  record_id?: number;
-  record?: string;
-  start_date?: string;
-  end_date?: string;
-  current_period_start?: string;
-  current_period_end?: string;
-  trial_end?: string;
-  canceled_at?: string;
-  uid?: string;
-  kind?: number;
-  token?: string;
-  inserted_at?: string;
-  updated_at?: string;
-}
-
 export interface CreateSubscriptionLinkData {
   reference_id: string;
   title: string;
   plan_uid: string;
+  meta_data?: Record<string, any>;
   customer: {
     first_name: string;
     last_name: string;
@@ -67,12 +43,12 @@ export interface CreateSubscriptionLinkData {
 }
 
 export interface CreateSubscriptionLinkResponse {
-    status: 'paid';
-    total: number;
-    reference: string;
-    currency: string;
-    subscription_status: string;
-    subscription_uid: string;
+  status: 'paid';
+  total: number;
+  reference: string;
+  currency: string;
+  subscription_status: string;
+  subscription_uid: string;
 }
 
 export interface ChargeSubscriptionData {
@@ -144,8 +120,9 @@ export class SubscriptionsResource {
 
   /**
    * Convert filter parameters (strings to integers where needed)
+   * @deprecated This method is no longer needed as processQuery handles translation
    */
-  private translateFilters(params?: SubscriptionListParams): any {
+  private translateFilters(params?: SubscriptionFilterParams): any {
     if (!params) return params;
     
     const translated: any = { ...params };
@@ -180,7 +157,7 @@ export class SubscriptionsResource {
    * List billing subscriptions with pagination and filtering
    * Requires Client-Id header to be set in the configuration
    */
-  async list(params?: SubscriptionListParams): Promise<ApiResponse<SubscriptionListResponse>> {
+  async list(params?: SubscriptionFilterParams): Promise<ApiResponse<SubscriptionListResponse>> {
     const translatedParams = this.translateFilters(params);
     const response = await this.client.get<{ entries: InternalSubscription[]; page_info: any }>('/billing_subscriptions', translatedParams);
     
@@ -257,7 +234,7 @@ export class SubscriptionsResource {
    * Requires Client-Id header to be set in the configuration
    */
   async createLink(data: CreateSubscriptionLinkData): Promise<ApiResponse<CreateSubscriptionLinkResponse>> {
-    return this.client.post<CreateSubscriptionLinkResponse>('/billing_subscriptions/link', data);
+    return this.client.post<CreateSubscriptionLinkResponse>('/billing_subscriptions/link', {...data, plan_id: data.plan_uid });
   }
 
   /**

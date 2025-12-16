@@ -2587,24 +2587,8 @@ class OrdersResource {
         };
     }
     /**
-     * Convert user-facing order data (strings) to internal data (integers)
-     */
-    translateOrderToInternal(userFacing) {
-        const internal = { ...userFacing };
-        if ('status' in userFacing && userFacing.status) {
-            internal.status = typeof userFacing.status === 'string'
-                ? StatusTranslator.toIntegerWithContext(userFacing.status, 'order')
-                : userFacing.status;
-        }
-        if ('kind' in userFacing && userFacing.kind) {
-            internal.kind = typeof userFacing.kind === 'string'
-                ? KindTranslator.toIntegerWithContext(userFacing.kind, 'order')
-                : userFacing.kind;
-        }
-        return internal;
-    }
-    /**
      * Convert filter parameters (strings to integers where needed)
+     * @deprecated This method is no longer needed as processQuery handles translation
      */
     translateFilters(params) {
         if (!params)
@@ -3171,6 +3155,7 @@ class SubscriptionsResource {
     }
     /**
      * Convert filter parameters (strings to integers where needed)
+     * @deprecated This method is no longer needed as processQuery handles translation
      */
     translateFilters(params) {
         if (!params)
@@ -3268,7 +3253,7 @@ class SubscriptionsResource {
      * Requires Client-Id header to be set in the configuration
      */
     async createLink(data) {
-        return this.client.post('/billing_subscriptions/link', data);
+        return this.client.post('/billing_subscriptions/link', { ...data, plan_id: data.plan_uid });
     }
     /**
      * Charge an existing subscription

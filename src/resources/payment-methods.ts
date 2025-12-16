@@ -62,7 +62,7 @@ export class PaymentMethodsResource {
    * });
    */
   async query(params: PaymentMethodQueryParams): Promise<ApiResponse<PaymentMethodListResponse>> {
-    const processedQuery = processQuery(params, PAYMENT_METHOD_FIELD_TYPES);
+    const processedQuery = processQuery(params, PAYMENT_METHOD_FIELD_TYPES, { validate: true });
     return this.list(processedQuery as any);
   }
 

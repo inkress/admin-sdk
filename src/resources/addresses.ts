@@ -97,7 +97,7 @@ export class AddressesResource {
    * });
    */
   async query(params: AddressQueryParams): Promise<ApiResponse<AddressListResponse>> {
-    const processedQuery = processQuery(params, ADDRESS_FIELD_TYPES);
+    const processedQuery = processQuery(params, ADDRESS_FIELD_TYPES, { validate: true });
     return this.list(processedQuery as any);
   }
 

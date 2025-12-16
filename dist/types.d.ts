@@ -20,6 +20,8 @@ export type TransactionStatus = 'pending' | 'authorized' | 'hold' | 'captured' |
 export type BillingPlanKind = 'subscription' | 'payout';
 export type BillingStatus = 'active' | 'inactive';
 export type CategoryKind = ProductKind;
+export type KycKind = 'document_submission' | 'bank_info_update' | 'limit_increase';
+export type KycStatus = 'pending' | 'in_review' | 'approved' | 'rejected';
 export type { QueryParams, RangeQuery, StringQuery, DateQuery, JsonQueryParams } from './utils/query-transformer';
 export type { OrderQueryParams, ProductQueryParams, CategoryQueryParams, UserQueryParams, MerchantQueryParams, BillingPlanQueryParams, SubscriptionQueryParams, } from './types/resources';
 export interface InkressConfig {
@@ -1025,7 +1027,8 @@ export interface PublicMerchantProducts {
 }
 export interface KycRequest {
     id: number;
-    kind: KindKey;
+    kind: KycKind | KindKey;
+    status: KycStatus | StatusKey;
     user_id?: number;
     subject_id?: number;
     data?: Record<string, any>;
@@ -1034,13 +1037,15 @@ export interface KycRequest {
     user?: User;
 }
 export interface CreateKycRequestData {
-    kind: KindKey;
+    kind: KycKind | KindKey;
+    status?: KycStatus | StatusKey;
     user_id?: number;
     subject_id?: number;
     data?: Record<string, any>;
 }
 export interface UpdateKycRequestData {
-    kind?: KindKey;
+    kind?: KycKind | KindKey;
+    status?: KycStatus | StatusKey;
     user_id?: number;
     subject_id?: number;
     data?: Record<string, any>;

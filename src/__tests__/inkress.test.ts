@@ -45,7 +45,6 @@ describe('InkressSDK', () => {
     // Other resources
     expect(inkress.public).toBeDefined();
     expect(inkress.kyc).toBeDefined();
-    expect(inkress.payout).toBeDefined();
     expect(inkress.generics).toBeDefined();
   });
 });

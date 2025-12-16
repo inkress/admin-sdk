@@ -48,7 +48,7 @@ export class CurrenciesResource {
    * });
    */
   async query(params: CurrencyQueryParams): Promise<ApiResponse<CurrencyListResponse>> {
-    const processedQuery = processQuery(params, CURRENCY_FIELD_TYPES);
+    const processedQuery = processQuery(params, CURRENCY_FIELD_TYPES, { validate: true });
     return this.list(processedQuery as any);
   }
 

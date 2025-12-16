@@ -261,12 +261,26 @@ function transformFieldValue(key: string, value: any): any {
   if (typeof value === 'object' && value !== null) {
     const transformedObject: Record<string, any> = {};
     
-    // Handle range queries
+    // Handle range queries (min/max)
     if ('min' in value && value.min !== undefined) {
       transformedObject[`${key}_min`] = value.min;
     }
     if ('max' in value && value.max !== undefined) {
       transformedObject[`${key}_max`] = value.max;
+    }
+    
+    // Handle range queries (gte/lte/gt/lt)
+    if ('gte' in value && value.gte !== undefined) {
+      transformedObject[`${key}_gte`] = value.gte;
+    }
+    if ('lte' in value && value.lte !== undefined) {
+      transformedObject[`${key}_lte`] = value.lte;
+    }
+    if ('gt' in value && value.gt !== undefined) {
+      transformedObject[`${key}_gt`] = value.gt;
+    }
+    if ('lt' in value && value.lt !== undefined) {
+      transformedObject[`${key}_lt`] = value.lt;
     }
     
     // Handle string queries
@@ -400,6 +414,10 @@ function hasTransformationKeys(obj: Record<string, any>): boolean {
   return keys.some(key => 
     key.includes('_min') || 
     key.includes('_max') || 
+    key.includes('_gte') ||
+    key.includes('_lte') ||
+    key.includes('_gt') ||
+    key.includes('_lt') ||
     key.includes('_in') ||
     key.includes('contains.') ||
     key.includes('before.') ||
@@ -410,22 +428,115 @@ function hasTransformationKeys(obj: Record<string, any>): boolean {
 
 /**
  * Main function to transform and flatten a query in one step
+ * Handles translation of contextual strings to integers before transformation
  */
 export function processQuery<T>(
   query: any, 
   fieldTypes?: Partial<Record<keyof T, 'string' | 'number' | 'boolean' | 'date' | 'array'>>,
-  options: { validate?: boolean } = { validate: false }
+  options: { validate?: boolean; context?: string } = { validate: false }
 ): Record<string, any> {
-  // Runtime validation if enabled and field types provided
+  // Import translators dynamically to avoid circular dependencies
+  let StatusTranslator: any, KindTranslator: any;
+  try {
+    const translators = require('./translators');
+    StatusTranslator = translators.StatusTranslator;
+    KindTranslator = translators.KindTranslator;
+  } catch {
+    // Translators not available
+  }
+
+  // Translate contextual strings to integers BEFORE validation and transformation
+  const translatedQuery = { ...query };
+  
+  if (StatusTranslator && KindTranslator && fieldTypes) {
+    for (const [key, value] of Object.entries(translatedQuery)) {
+      const fieldType = fieldTypes[key as keyof T];
+      
+      // Skip special fields
+      if (isSpecialField(key)) continue;
+      
+      // Translate status fields (contextual strings to integers)
+      if (key === 'status' && fieldType === 'number') {
+        translatedQuery[key] = translateValue(value, StatusTranslator, options.context || '');
+      }
+      
+      // Translate kind fields (contextual strings to integers)
+      if (key === 'kind' && fieldType === 'number') {
+        translatedQuery[key] = translateValue(value, KindTranslator, options.context || '');
+      }
+    }
+  }
+
+  // Transform AFTER translation so that range objects are properly handled
+  const transformed = transformQuery(translatedQuery);
+  const flattened = flattenTransformedQuery(transformed);
+
+  // Runtime validation AFTER transformation if enabled and field types provided
   if (options.validate && fieldTypes) {
-    const validationErrors = validateQueryParams(query, fieldTypes);
+    const validationErrors = validateQueryParams(flattened, fieldTypes);
     if (validationErrors.length > 0) {
       console.warn(`Query validation warnings: ${validationErrors.join(', ')}`);
     }
   }
 
-  const transformed = transformQuery(query);
-  return flattenTransformedQuery(transformed);
+  return flattened;
+}
+
+/**
+ * Helper to translate a value (string, array of strings, or object with strings)
+ */
+function translateValue(value: any, translator: any, context: string): any {
+  if (value === undefined || value === null) {
+    return value;
+  }
+  
+  // Handle arrays (for _in operations)
+  if (Array.isArray(value)) {
+    return value.map(item => {
+      if (typeof item === 'string') {
+        try {
+          return context 
+            ? translator.toIntegerWithContext(item, context)
+            : translator.toInteger(item);
+        } catch {
+          return item; // Keep original if translation fails
+        }
+      }
+      return item;
+    });
+  }
+  
+  // Handle range objects
+  if (typeof value === 'object' && value !== null) {
+    const translated: any = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (typeof v === 'string') {
+        try {
+          translated[k] = context
+            ? translator.toIntegerWithContext(v, context)
+            : translator.toInteger(v);
+        } catch {
+          translated[k] = v; // Keep original if translation fails
+        }
+      } else {
+        translated[k] = v;
+      }
+    }
+    return translated;
+  }
+  
+  // Handle direct string values
+  if (typeof value === 'string') {
+    try {
+      return context
+        ? translator.toIntegerWithContext(value, context)
+        : translator.toInteger(value);
+    } catch {
+      return value; // Keep original if translation fails
+    }
+  }
+  
+  return value;
 }
 
 /**

@@ -82,7 +82,7 @@ export class FinancialRequestsResource {
    * });
    */
   async query(params: FinancialRequestQueryParams): Promise<ApiResponse<FinancialRequestListResponse>> {
-    const processedQuery = processQuery(params, FINANCIAL_REQUEST_FIELD_TYPES);
+    const processedQuery = processQuery(params, FINANCIAL_REQUEST_FIELD_TYPES, { validate: true, context: 'financial_request' });
     return this.list(processedQuery as any);
   }
 

@@ -571,5 +571,141 @@ describe('Query Transformer', () => {
         }
       });
     });
+
+    it('should translate contextual string values for status field', () => {
+      // Define field types for an order-like entity
+      const fieldTypes = {
+        id: 'number' as const,
+        status: 'number' as const,
+        kind: 'number' as const,
+        name: 'string' as const
+      };
+
+      const query = {
+        status: 'paid'
+      };
+
+      const result = processQuery(query, fieldTypes, { validate: true, context: 'order' });
+
+      // 'paid' should be translated to 3 (order_paid = 3)
+      expect(result).toEqual({
+        status: 3
+      });
+    });
+
+    it('should translate array of contextual string values', () => {
+      const fieldTypes = {
+        id: 'number' as const,
+        status: 'number' as const,
+        name: 'string' as const
+      };
+
+      const query = {
+        status: ['paid', 'confirmed']
+      };
+
+      const result = processQuery(query, fieldTypes, { validate: true, context: 'order' });
+
+      // Should translate to status_in: [3, 4]
+      expect(result).toEqual({
+        status_in: [3, 4]
+      });
+    });
+
+    it('should translate range queries with contextual strings', () => {
+      const fieldTypes = {
+        id: 'number' as const,
+        status: 'number' as const
+      };
+
+      const query = {
+        status: { gte: 'paid', lte: 'confirmed' }
+      };
+
+      const result = processQuery(query, fieldTypes, { validate: true, context: 'order' });
+
+      // Should translate to status_gte: 3, status_lte: 4
+      expect(result).toEqual({
+        status_gte: 3,
+        status_lte: 4
+      });
+    });
+
+    it('should handle kind field translation', () => {
+      const fieldTypes = {
+        id: 'number' as const,
+        kind: 'number' as const
+      };
+
+      const query = {
+        kind: 'online'
+      };
+
+      const result = processQuery(query, fieldTypes, { validate: true, context: 'order' });
+
+      // 'online' should be translated to 1 (order_online = 1)
+      expect(result).toEqual({
+        kind: 1
+      });
+    });
+
+    it('should work with product context', () => {
+      const fieldTypes = {
+        id: 'number' as const,
+        status: 'number' as const
+      };
+
+      const query = {
+        status: 'published'
+      };
+
+      const result = processQuery(query, fieldTypes, { validate: true, context: 'product' });
+
+      // 'published' should be translated to 2 (product_published = 2)
+      expect(result).toEqual({
+        status: 2
+      });
+    });
+
+    it('should preserve numeric values without translation', () => {
+      const fieldTypes = {
+        id: 'number' as const,
+        status: 'number' as const
+      };
+
+      const query = {
+        status: 3
+      };
+
+      const result = processQuery(query, fieldTypes, { validate: true, context: 'order' });
+
+      // Numeric values should pass through unchanged
+      expect(result).toEqual({
+        status: 3
+      });
+    });
+
+    it('should handle mixed contextual and non-contextual fields', () => {
+      const fieldTypes = {
+        id: 'number' as const,
+        status: 'number' as const,
+        kind: 'number' as const,
+        total: 'number' as const
+      };
+
+      const query = {
+        status: 'paid',
+        kind: 'online',
+        total: { gte: 100 }
+      };
+
+      const result = processQuery(query, fieldTypes, { validate: true, context: 'order' });
+
+      expect(result).toEqual({
+        status: 3,
+        kind: 1,
+        total_gte: 100
+      });
+    });
   });
 });

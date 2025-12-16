@@ -63,7 +63,7 @@ export class ExchangeRatesResource {
    * });
    */
   async query(params: ExchangeRateQueryParams): Promise<ApiResponse<ExchangeRateListResponse>> {
-    const processedQuery = processQuery(params, EXCHANGE_RATE_FIELD_TYPES);
+    const processedQuery = processQuery(params, EXCHANGE_RATE_FIELD_TYPES, { validate: true });
     return this.list(processedQuery as any);
   }
 

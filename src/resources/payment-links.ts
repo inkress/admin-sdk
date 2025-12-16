@@ -176,7 +176,7 @@ export class PaymentLinksResource {
    * });
    */
   async query(params: PaymentLinkQueryParams): Promise<ApiResponse<PaymentLinkListResponse>> {
-    const processedQuery = processQuery(params, PAYMENT_LINK_FIELD_TYPES);
+    const processedQuery = processQuery(params, PAYMENT_LINK_FIELD_TYPES, { validate: true, context: 'payment_link' });
     return this.list(processedQuery as any);
   }
 

@@ -97,7 +97,7 @@ export class TokensResource {
    * });
    */
   async query(params: TokenQueryParams): Promise<ApiResponse<TokenListResponse>> {
-    const processedQuery = processQuery(params, TOKEN_FIELD_TYPES);
+    const processedQuery = processQuery(params, TOKEN_FIELD_TYPES, { validate: true, context: 'token' });
     return this.list(processedQuery as any);
   }
 

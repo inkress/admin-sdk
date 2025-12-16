@@ -1,5 +1,6 @@
 import { HttpClient } from '../client';
 import { ApiResponse, GenericResource } from '../types';
+import { processQuery } from '../utils/query-transformer';
 
 /**
  * Generic resource handler for any endpoint
@@ -16,6 +17,21 @@ export class GenericsResource {
    */
   async list(endpoint: string, params?: Record<string, any>): Promise<ApiResponse<GenericResource[]>> {
     return this.client.get<GenericResource[]>(endpoint, params);
+  }
+
+  /**
+   * Query resources from a generic endpoint with advanced filtering
+   * Supports all query system features (ranges, arrays, date ranges, etc.)
+   * 
+   * @example
+   * await sdk.generics.query('/subscription_periods', { 
+   *   status: [1, 2], 
+   *   inserted_at: { after: '2024-01-01' } 
+   * })
+   */
+  async query(endpoint: string, params?: Record<string, any>): Promise<ApiResponse<GenericResource[]>> {
+    const processedQuery = processQuery(params || {});
+    return this.list(endpoint, processedQuery);
   }
 
   /**

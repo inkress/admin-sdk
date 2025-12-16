@@ -97,7 +97,7 @@ export class FeesResource {
    * });
    */
   async query(params: FeeQueryParams): Promise<ApiResponse<FeeListResponse>> {
-    const processedQuery = processQuery(params, FEE_FIELD_TYPES);
+    const processedQuery = processQuery(params, FEE_FIELD_TYPES, { validate: true, context: 'fee' });
     return this.list(processedQuery as any);
   }
 

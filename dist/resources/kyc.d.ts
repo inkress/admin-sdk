@@ -1,13 +1,31 @@
 import { HttpClient } from '../client';
-import { ApiResponse, BaseFilterParams } from '../types';
-export interface KycRequestListParams extends BaseFilterParams {
-    status?: number;
-    subject_id?: number;
-    user_id?: number;
-    id?: number;
-    kind?: number;
-    inserted_at?: string;
-    updated_at?: string;
+import { KycRequest, ApiResponse, KycKind, KycStatus } from '../types';
+import { KycQueryBuilder } from '../utils/query-builders';
+export interface KycRequestListParams {
+    id?: number | number[];
+    status?: KycStatus | KycStatus[] | number | number[];
+    kind?: KycKind | KycKind[] | number | number[];
+    subject_id?: number | number[];
+    user_id?: number | number[];
+    inserted_at?: string | {
+        after?: string;
+        before?: string;
+        on?: string;
+    };
+    updated_at?: string | {
+        after?: string;
+        before?: string;
+        on?: string;
+    };
+    page?: number;
+    page_size?: number;
+    per_page?: number;
+    limit?: number;
+    order_by?: string;
+    sort?: string;
+    order?: 'asc' | 'desc';
+    q?: string;
+    search?: string;
 }
 export interface KycRequestListResponse {
     entries: KycRequest[];
@@ -40,24 +58,39 @@ export interface BankInfoUpdateRequestData {
     country_code: string;
     currency_code: string;
 }
-export interface CreateKycRequestData<T> {
-    kind: 'limit_increase' | 'document_submission';
+export interface CreateKycRequestPayload<T> {
+    kind: 'limit_increase' | 'document_submission' | 'bank_info_update';
     data: T;
-}
-export interface KycRequest {
-    kind: number;
-    subject_id: number;
-    user_id: number;
-    data: Record<string, any>;
-    status: number;
-    created_at: string;
-    updated_at: string;
 }
 export declare class KycResource {
     private client;
     constructor(client: HttpClient);
     /**
      * List KYC records with pagination and filtering
+     * Requires Client-Id header to be set in the configuration
+     *
+     * @example
+     * await kyc.list({ status: 'pending' })
+     */
+    list(params?: KycRequestListParams): Promise<ApiResponse<KycRequestListResponse>>;
+    /**
+     * Query KYC records with advanced filtering
+     * Supports all query system features (ranges, arrays, date ranges, etc.)
+     *
+     * @example
+     * await kyc.query({ status: ['pending', 'in_review'], inserted_at: { after: '2024-01-01' } })
+     */
+    query(params?: KycRequestListParams): Promise<ApiResponse<KycRequestListResponse>>;
+    /**
+     * Create a fluent query builder for KYC requests
+     *
+     * @example
+     * await sdk.kyc.createQueryBuilder().whereStatus('pending').execute()
+     */
+    createQueryBuilder(initialQuery?: KycRequestListParams): KycQueryBuilder;
+    /**
+     * List KYC records with pagination and filtering (alias for list)
+     * @deprecated Use list() or query() instead
      * Requires Client-Id header to be set in the configuration
      */
     listRequests(params?: KycRequestListParams): Promise<ApiResponse<KycRequestListResponse>>;
@@ -70,11 +103,16 @@ export declare class KycResource {
      * Request a limit increase
      * Requires Client-Id header to be set in the configuration
      */
-    requestLimitIncrease(data: CreateKycRequestData<LimitIncreaseRequestData>): Promise<ApiResponse<KycRequest>>;
+    requestLimitIncrease(data: CreateKycRequestPayload<LimitIncreaseRequestData>): Promise<ApiResponse<KycRequest>>;
     /**
      * Upload a document for KYC verification
      * Requires Client-Id header to be set in the configuration
      */
-    uploadDocument(data: CreateKycRequestData<DocumentSubmissionRequestData>): Promise<ApiResponse<KycRequest>>;
+    uploadDocument(data: CreateKycRequestPayload<DocumentSubmissionRequestData>): Promise<ApiResponse<KycRequest>>;
+    /**
+     * Update bank information
+     * Requires Client-Id header to be set in the configuration
+     */
+    updateBankInfo(data: CreateKycRequestPayload<BankInfoUpdateRequestData>): Promise<ApiResponse<KycRequest>>;
 }
 //# sourceMappingURL=kyc.d.ts.map

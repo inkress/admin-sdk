@@ -62,6 +62,10 @@ export type BillingStatus = 'active' | 'inactive';
 // Category-specific contextual types (using product kinds for now)
 export type CategoryKind = ProductKind;
 
+// KYC/Legal Request contextual types
+export type KycKind = 'document_submission' | 'bank_info_update' | 'limit_increase';
+export type KycStatus = 'pending' | 'in_review' | 'approved' | 'rejected';
+
 // ============================================================================
 // ENHANCED QUERY SYSTEM TYPES
 // ============================================================================
@@ -1218,7 +1222,8 @@ export interface PublicMerchantProducts {
 // KYC/Legal Request types
 export interface KycRequest {
   id: number;
-  kind: KindKey; // Translated from integer to string
+  kind: KycKind | KindKey; // Contextual or full key
+  status: KycStatus | StatusKey; // Contextual or full key
   user_id?: number;
   subject_id?: number;
   data?: Record<string, any>;
@@ -1229,14 +1234,16 @@ export interface KycRequest {
 }
 
 export interface CreateKycRequestData {
-  kind: KindKey;
+  kind: KycKind | KindKey;
+  status?: KycStatus | StatusKey;
   user_id?: number;
   subject_id?: number;
   data?: Record<string, any>;
 }
 
 export interface UpdateKycRequestData {
-  kind?: KindKey;
+  kind?: KycKind | KindKey;
+  status?: KycStatus | StatusKey;
   user_id?: number;
   subject_id?: number;
   data?: Record<string, any>;

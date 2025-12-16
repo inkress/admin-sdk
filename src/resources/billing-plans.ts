@@ -185,9 +185,8 @@ export class BillingPlansResource {
    * await billingPlans.query({ kind: 'subscription', public: true })
    */
   async query(params?: BillingPlanQueryParams): Promise<ApiResponse<BillingPlanListResponse>> {
-    const processedQuery = processQuery(params || {}, BILLING_PLAN_FIELD_TYPES, { validate: true });
-    const translatedQuery = this.translateFilters(processedQuery);
-    const response = await this.client.get<{ entries: InternalBillingPlan[]; page_info: any }>('/billing_plans', translatedQuery);
+    const processedQuery = processQuery(params || {}, BILLING_PLAN_FIELD_TYPES, { validate: true, context: 'billing_plan' });
+    const response = await this.client.get<{ entries: InternalBillingPlan[]; page_info: any }>('/billing_plans', processedQuery);
     
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(plan => this.translateToUserFacing(plan));

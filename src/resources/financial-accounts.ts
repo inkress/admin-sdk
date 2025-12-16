@@ -56,7 +56,7 @@ export class FinancialAccountsResource {
    * });
    */
   async query(params: FinancialAccountQueryParams): Promise<ApiResponse<FinancialAccountListResponse>> {
-    const processedQuery = processQuery(params, FINANCIAL_ACCOUNT_FIELD_TYPES);
+    const processedQuery = processQuery(params, FINANCIAL_ACCOUNT_FIELD_TYPES, { validate: true });
     return this.list(processedQuery as any);
   }
 

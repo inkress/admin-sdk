@@ -62,7 +62,7 @@ export class WebhookUrlsResource {
    * });
    */
   async query(params: WebhookUrlQueryParams): Promise<ApiResponse<WebhookUrlListResponse>> {
-    const processedQuery = processQuery(params, WEBHOOK_URL_FIELD_TYPES);
+    const processedQuery = processQuery(params, WEBHOOK_URL_FIELD_TYPES, { validate: true });
     return this.list(processedQuery as any);
   }
 

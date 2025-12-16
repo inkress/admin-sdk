@@ -196,13 +196,10 @@ export class ProductsResource {
    * })
    */
   async query(params?: ProductQueryParams): Promise<ApiResponse<ProductListResponse>> {
-    // Process the query through the transformation system with validation
-    const processedQuery = processQuery(params || {}, PRODUCT_FIELD_TYPES, { validate: true });
+    // Process the query through the transformation system with validation and translation
+    const processedQuery = processQuery(params || {}, PRODUCT_FIELD_TYPES, { validate: true, context: 'product' });
     
-    // Apply contextual translations for status
-    const translatedQuery = this.translateFilters(processedQuery);
-    
-    const response = await this.client.get<{ entries: InternalProduct[]; page_info: any }>('/products', translatedQuery);
+    const response = await this.client.get<{ entries: InternalProduct[]; page_info: any }>('/products', processedQuery);
     
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(product => this.translateProductToUserFacing(product));

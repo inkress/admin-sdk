@@ -8,7 +8,6 @@ import { SubscriptionsResource } from './resources/subscriptions';
 import { UsersResource } from './resources/users';
 import { PublicResource } from './resources/public';
 import { KycResource } from './resources/kyc';
-import { PayoutResource } from './resources/payout';
 import { PaymentLinksResource } from './resources/payment-links';
 import { FinancialAccountsResource } from './resources/financial-accounts';
 import { FinancialRequestsResource } from './resources/financial-requests';
@@ -75,7 +74,6 @@ export declare class InkressSDK {
     readonly users: UsersResource;
     readonly public: PublicResource;
     readonly kyc: KycResource;
-    readonly payout: PayoutResource;
     readonly paymentLinks: PaymentLinksResource;
     readonly financialAccounts: FinancialAccountsResource;
     readonly financialRequests: FinancialRequestsResource;

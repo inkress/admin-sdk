@@ -227,9 +227,8 @@ export class MerchantsResource {
    * await merchants.query({ status: 'approved', sector: 'retail' })
    */
   async query(params?: MerchantQueryParams): Promise<ApiResponse<MerchantListResponse>> {
-    const processedQuery = processQuery(params || {}, MERCHANT_FIELD_TYPES, { validate: true });
-    const translatedQuery = this.translateFilters(processedQuery);
-    const response = await this.client.get<{ entries: InternalMerchant[]; page_info: any }>('/merchants', translatedQuery);
+    const processedQuery = processQuery(params || {}, MERCHANT_FIELD_TYPES, { validate: true, context: 'account' });
+    const response = await this.client.get<{ entries: InternalMerchant[]; page_info: any }>('/merchants', processedQuery);
     
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(m => this.translateMerchantToUserFacing(m));

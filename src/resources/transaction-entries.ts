@@ -52,7 +52,7 @@ export class TransactionEntriesResource {
    * });
    */
   async query(params: TransactionEntryQueryParams): Promise<ApiResponse<TransactionEntryListResponse>> {
-    const processedQuery = processQuery(params, TRANSACTION_ENTRY_FIELD_TYPES);
+    const processedQuery = processQuery(params, TRANSACTION_ENTRY_FIELD_TYPES, { validate: true, context: 'ledger_entry' });
     return this.list(processedQuery as any);
   }
 

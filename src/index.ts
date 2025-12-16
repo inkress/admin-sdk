@@ -11,7 +11,6 @@ import { SubscriptionsResource } from './resources/subscriptions';
 import { UsersResource } from './resources/users';
 import { PublicResource } from './resources/public';
 import { KycResource } from './resources/kyc';
-import { PayoutResource } from './resources/payout';
 import { PaymentLinksResource } from './resources/payment-links';
 import { FinancialAccountsResource } from './resources/financial-accounts';
 import { FinancialRequestsResource } from './resources/financial-requests';
@@ -81,7 +80,6 @@ export class InkressSDK {
   public readonly users: UsersResource;
   public readonly public: PublicResource;
   public readonly kyc: KycResource;
-  public readonly payout: PayoutResource;
   public readonly paymentLinks: PaymentLinksResource;
   public readonly financialAccounts: FinancialAccountsResource;
   public readonly financialRequests: FinancialRequestsResource;
@@ -108,7 +106,6 @@ export class InkressSDK {
     this.users = new UsersResource(this.client);
     this.public = new PublicResource(this.client);
     this.kyc = new KycResource(this.client);
-    this.payout = new PayoutResource(this.client);
     this.paymentLinks = new PaymentLinksResource(this.client);
     this.financialAccounts = new FinancialAccountsResource(this.client);
     this.financialRequests = new FinancialRequestsResource(this.client);

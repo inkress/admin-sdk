@@ -64,6 +64,7 @@ import type {
   Fee,
   PaymentMethod,
   TransactionEntry,
+  KycRequest,
   OrderStatus,
   OrderKind,
   ProductStatus,
@@ -72,8 +73,11 @@ import type {
   CategoryKind,
   BillingPlanKind,
   SubscriptionStatus,
+  KycKind,
+  KycStatus,
 } from '../types';
 import type { FeeStructureKey } from './translators';
+import type { KycRequestListParams, KycRequestListResponse } from '../resources/kyc';
 
 /**
  * Interface for resources that support querying
@@ -1008,5 +1012,86 @@ export class TransactionEntryQueryBuilder extends QueryBuilder<TransactionEntry>
 
   whereFinancialAccountIdEquals(accountId: number): this {
     return this.where('financial_account_id', accountId);
+  }
+}
+
+/**
+ * KYC Query Builder
+ * Provides a fluent interface for building complex KYC/legal request queries
+ * 
+ * @example
+ * const requests = await sdk.kyc.createQueryBuilder()
+ *   .whereStatus('pending')
+ *   .whereKind('document_submission')
+ *   .paginate(1, 20)
+ *   .execute();
+ */
+export class KycQueryBuilder extends QueryBuilder<KycRequest> {
+  constructor(
+    private resource: Queryable<KycRequestListResponse>,
+    initialQuery?: KycRequestListParams
+  ) {
+    super(initialQuery);
+  }
+
+  /**
+   * Execute the query and return the results
+   */
+  async execute(): Promise<ApiResponse<KycRequestListResponse>> {
+    return this.resource.query(this.getRawQuery());
+  }
+
+  /**
+   * Filter by KYC request status
+   */
+  whereStatus(status: KycStatus | KycStatus[]): this {
+    if (Array.isArray(status)) {
+      return this.whereIn('status', status as any);
+    }
+    return this.where('status', status as any);
+  }
+
+  /**
+   * Filter by KYC request kind/type
+   */
+  whereKind(kind: KycKind | KycKind[]): this {
+    if (Array.isArray(kind)) {
+      return this.whereIn('kind', kind as any);
+    }
+    return this.where('kind', kind as any);
+  }
+
+  /**
+   * Filter by subject ID
+   */
+  whereSubject(subjectId: number | number[]): this {
+    if (Array.isArray(subjectId)) {
+      return this.whereIn('subject_id', subjectId);
+    }
+    return this.where('subject_id', subjectId);
+  }
+
+  /**
+   * Filter by user ID
+   */
+  whereUser(userId: number | number[]): this {
+    if (Array.isArray(userId)) {
+      return this.whereIn('user_id', userId);
+    }
+    return this.where('user_id', userId);
+  }
+
+  /**
+   * Filter by creation date range
+   */
+  whereCreatedBetween(after?: string, before?: string): this {
+    return this.whereDateRange('inserted_at', after, before);
+  }
+
+  /**
+   * Filter by update date range
+   */
+  whereUpdatedBetween(after?: string, before?: string): this {
+    return this.whereDateRange('updated_at', after, before);
   }
 }

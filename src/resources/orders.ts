@@ -275,13 +275,10 @@ export class OrdersResource {
    * })
    */
   async query(params?: OrderQueryParams): Promise<ApiResponse<OrderListResponse>> {
-    // Process the query through the transformation system with validation
-    const processedQuery = processQuery(params || {}, ORDER_FIELD_TYPES, { validate: true });
+    // Process the query through the transformation system with validation and translation
+    const processedQuery = processQuery(params || {}, ORDER_FIELD_TYPES, { validate: true, context: 'order' });
     
-    // Apply contextual translations for status and kind
-    const translatedQuery = this.translateFilters(processedQuery);
-    
-    const response = await this.client.get<{ entries: InternalOrder[]; page_info: any }>('/orders', translatedQuery);
+    const response = await this.client.get<{ entries: InternalOrder[]; page_info: any }>('/orders', processedQuery);
     
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(order => this.translateOrderToUserFacing(order));

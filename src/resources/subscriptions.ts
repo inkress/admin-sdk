@@ -298,9 +298,8 @@ export class SubscriptionsResource {
    * await subscriptions.query({ status: 'active', billing_plan_id: 123 })
    */
   async query(params?: SubscriptionQueryParams): Promise<ApiResponse<SubscriptionListResponse>> {
-    const processedQuery = processQuery(params || {}, SUBSCRIPTION_FIELD_TYPES, { validate: true });
-    const translatedQuery = this.translateFilters(processedQuery);
-    return this.client.get<SubscriptionListResponse>('/billing_subscriptions', translatedQuery);
+    const processedQuery = processQuery(params || {}, SUBSCRIPTION_FIELD_TYPES, { validate: true, context: 'billing_subscription' });
+    return this.client.get<SubscriptionListResponse>('/billing_subscriptions', processedQuery);
   }
 
   /**

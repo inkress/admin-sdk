@@ -687,12 +687,25 @@ function transformFieldValue(key, value) {
     }
     if (typeof value === 'object' && value !== null) {
         const transformedObject = {};
-        // Handle range queries
+        // Handle range queries (min/max)
         if ('min' in value && value.min !== undefined) {
             transformedObject[`${key}_min`] = value.min;
         }
         if ('max' in value && value.max !== undefined) {
             transformedObject[`${key}_max`] = value.max;
+        }
+        // Handle range queries (gte/lte/gt/lt)
+        if ('gte' in value && value.gte !== undefined) {
+            transformedObject[`${key}_gte`] = value.gte;
+        }
+        if ('lte' in value && value.lte !== undefined) {
+            transformedObject[`${key}_lte`] = value.lte;
+        }
+        if ('gt' in value && value.gt !== undefined) {
+            transformedObject[`${key}_gt`] = value.gt;
+        }
+        if ('lt' in value && value.lt !== undefined) {
+            transformedObject[`${key}_lt`] = value.lt;
         }
         // Handle string queries
         if ('contains' in value && value.contains !== undefined) {
@@ -814,6 +827,10 @@ function hasTransformationKeys(obj) {
     const keys = Object.keys(obj);
     return keys.some(key => key.includes('_min') ||
         key.includes('_max') ||
+        key.includes('_gte') ||
+        key.includes('_lte') ||
+        key.includes('_gt') ||
+        key.includes('_lt') ||
         key.includes('_in') ||
         key.includes('contains.') ||
         key.includes('before.') ||
@@ -822,17 +839,104 @@ function hasTransformationKeys(obj) {
 }
 /**
  * Main function to transform and flatten a query in one step
+ * Handles translation of contextual strings to integers before transformation
  */
 function processQuery(query, fieldTypes, options = { validate: false }) {
-    // Runtime validation if enabled and field types provided
+    // Import translators dynamically to avoid circular dependencies
+    let StatusTranslator, KindTranslator;
+    try {
+        const translators = require('./translators');
+        StatusTranslator = translators.StatusTranslator;
+        KindTranslator = translators.KindTranslator;
+    }
+    catch (_a) {
+        // Translators not available
+    }
+    // Translate contextual strings to integers BEFORE validation and transformation
+    const translatedQuery = { ...query };
+    if (StatusTranslator && KindTranslator && fieldTypes) {
+        for (const [key, value] of Object.entries(translatedQuery)) {
+            const fieldType = fieldTypes[key];
+            // Skip special fields
+            if (isSpecialField(key))
+                continue;
+            // Translate status fields (contextual strings to integers)
+            if (key === 'status' && fieldType === 'number') {
+                translatedQuery[key] = translateValue(value, StatusTranslator, options.context || '');
+            }
+            // Translate kind fields (contextual strings to integers)
+            if (key === 'kind' && fieldType === 'number') {
+                translatedQuery[key] = translateValue(value, KindTranslator, options.context || '');
+            }
+        }
+    }
+    // Transform AFTER translation so that range objects are properly handled
+    const transformed = transformQuery(translatedQuery);
+    const flattened = flattenTransformedQuery(transformed);
+    // Runtime validation AFTER transformation if enabled and field types provided
     if (options.validate && fieldTypes) {
-        const validationErrors = validateQueryParams(query, fieldTypes);
+        const validationErrors = validateQueryParams(flattened, fieldTypes);
         if (validationErrors.length > 0) {
             console.warn(`Query validation warnings: ${validationErrors.join(', ')}`);
         }
     }
-    const transformed = transformQuery(query);
-    return flattenTransformedQuery(transformed);
+    return flattened;
+}
+/**
+ * Helper to translate a value (string, array of strings, or object with strings)
+ */
+function translateValue(value, translator, context) {
+    if (value === undefined || value === null) {
+        return value;
+    }
+    // Handle arrays (for _in operations)
+    if (Array.isArray(value)) {
+        return value.map(item => {
+            if (typeof item === 'string') {
+                try {
+                    return context
+                        ? translator.toIntegerWithContext(item, context)
+                        : translator.toInteger(item);
+                }
+                catch (_a) {
+                    return item; // Keep original if translation fails
+                }
+            }
+            return item;
+        });
+    }
+    // Handle range objects
+    if (typeof value === 'object' && value !== null) {
+        const translated = {};
+        for (const [k, v] of Object.entries(value)) {
+            if (typeof v === 'string') {
+                try {
+                    translated[k] = context
+                        ? translator.toIntegerWithContext(v, context)
+                        : translator.toInteger(v);
+                }
+                catch (_a) {
+                    translated[k] = v; // Keep original if translation fails
+                }
+            }
+            else {
+                translated[k] = v;
+            }
+        }
+        return translated;
+    }
+    // Handle direct string values
+    if (typeof value === 'string') {
+        try {
+            return context
+                ? translator.toIntegerWithContext(value, context)
+                : translator.toInteger(value);
+        }
+        catch (_b) {
+            return value; // Keep original if translation fails
+        }
+    }
+    return value;
 }
 /**
  * Type-safe query builder for specific entity types
@@ -1703,6 +1807,77 @@ class TransactionEntryQueryBuilder extends QueryBuilder {
         return this.where('financial_account_id', accountId);
     }
 }
+/**
+ * KYC Query Builder
+ * Provides a fluent interface for building complex KYC/legal request queries
+ *
+ * @example
+ * const requests = await sdk.kyc.createQueryBuilder()
+ *   .whereStatus('pending')
+ *   .whereKind('document_submission')
+ *   .paginate(1, 20)
+ *   .execute();
+ */
+class KycQueryBuilder extends QueryBuilder {
+    constructor(resource, initialQuery) {
+        super(initialQuery);
+        this.resource = resource;
+    }
+    /**
+     * Execute the query and return the results
+     */
+    async execute() {
+        return this.resource.query(this.getRawQuery());
+    }
+    /**
+     * Filter by KYC request status
+     */
+    whereStatus(status) {
+        if (Array.isArray(status)) {
+            return this.whereIn('status', status);
+        }
+        return this.where('status', status);
+    }
+    /**
+     * Filter by KYC request kind/type
+     */
+    whereKind(kind) {
+        if (Array.isArray(kind)) {
+            return this.whereIn('kind', kind);
+        }
+        return this.where('kind', kind);
+    }
+    /**
+     * Filter by subject ID
+     */
+    whereSubject(subjectId) {
+        if (Array.isArray(subjectId)) {
+            return this.whereIn('subject_id', subjectId);
+        }
+        return this.where('subject_id', subjectId);
+    }
+    /**
+     * Filter by user ID
+     */
+    whereUser(userId) {
+        if (Array.isArray(userId)) {
+            return this.whereIn('user_id', userId);
+        }
+        return this.where('user_id', userId);
+    }
+    /**
+     * Filter by creation date range
+     */
+    whereCreatedBetween(after, before) {
+        return this.whereDateRange('inserted_at', after, before);
+    }
+    /**
+     * Filter by update date range
+     */
+    whereUpdatedBetween(after, before) {
+        return this.whereDateRange('updated_at', after, before);
+    }
+}
 
 /**
  * Resource-specific types and interfaces
@@ -2224,9 +2399,8 @@ class MerchantsResource {
      */
     async query(params) {
         var _a;
-        const processedQuery = processQuery(params || {}, MERCHANT_FIELD_TYPES, { validate: true });
-        const translatedQuery = this.translateFilters(processedQuery);
-        const response = await this.client.get('/merchants', translatedQuery);
+        const processedQuery = processQuery(params || {}, MERCHANT_FIELD_TYPES, { validate: true, context: 'account' });
+        const response = await this.client.get('/merchants', processedQuery);
         if ((_a = response.result) === null || _a === void 0 ? void 0 : _a.entries) {
             const translatedEntries = response.result.entries.map(m => this.translateMerchantToUserFacing(m));
             return {
@@ -2591,11 +2765,9 @@ class OrdersResource {
      */
     async query(params) {
         var _a;
-        // Process the query through the transformation system with validation
-        const processedQuery = processQuery(params || {}, ORDER_FIELD_TYPES, { validate: true });
-        // Apply contextual translations for status and kind
-        const translatedQuery = this.translateFilters(processedQuery);
-        const response = await this.client.get('/orders', translatedQuery);
+        // Process the query through the transformation system with validation and translation
+        const processedQuery = processQuery(params || {}, ORDER_FIELD_TYPES, { validate: true, context: 'order' });
+        const response = await this.client.get('/orders', processedQuery);
         if ((_a = response.result) === null || _a === void 0 ? void 0 : _a.entries) {
             const translatedEntries = response.result.entries.map(order => this.translateOrderToUserFacing(order));
             return {
@@ -2781,11 +2953,9 @@ class ProductsResource {
      */
     async query(params) {
         var _a;
-        // Process the query through the transformation system with validation
-        const processedQuery = processQuery(params || {}, PRODUCT_FIELD_TYPES, { validate: true });
-        // Apply contextual translations for status
-        const translatedQuery = this.translateFilters(processedQuery);
-        const response = await this.client.get('/products', translatedQuery);
+        // Process the query through the transformation system with validation and translation
+        const processedQuery = processQuery(params || {}, PRODUCT_FIELD_TYPES, { validate: true, context: 'product' });
+        const response = await this.client.get('/products', processedQuery);
         if ((_a = response.result) === null || _a === void 0 ? void 0 : _a.entries) {
             const translatedEntries = response.result.entries.map(product => this.translateProductToUserFacing(product));
             return {
@@ -2956,9 +3126,8 @@ class BillingPlansResource {
      */
     async query(params) {
         var _a;
-        const processedQuery = processQuery(params || {}, BILLING_PLAN_FIELD_TYPES, { validate: true });
-        const translatedQuery = this.translateFilters(processedQuery);
-        const response = await this.client.get('/billing_plans', translatedQuery);
+        const processedQuery = processQuery(params || {}, BILLING_PLAN_FIELD_TYPES, { validate: true, context: 'billing_plan' });
+        const response = await this.client.get('/billing_plans', processedQuery);
         if ((_a = response.result) === null || _a === void 0 ? void 0 : _a.entries) {
             const translatedEntries = response.result.entries.map(plan => this.translateToUserFacing(plan));
             return {
@@ -3148,9 +3317,8 @@ class SubscriptionsResource {
      * await subscriptions.query({ status: 'active', billing_plan_id: 123 })
      */
     async query(params) {
-        const processedQuery = processQuery(params || {}, SUBSCRIPTION_FIELD_TYPES, { validate: true });
-        const translatedQuery = this.translateFilters(processedQuery);
-        return this.client.get('/billing_subscriptions', translatedQuery);
+        const processedQuery = processQuery(params || {}, SUBSCRIPTION_FIELD_TYPES, { validate: true, context: 'billing_subscription' });
+        return this.client.get('/billing_subscriptions', processedQuery);
     }
     /**
      * Create a query builder for subscriptions
@@ -3305,6 +3473,16 @@ class PublicResource {
     }
 }
 
+// Field type definitions for query validation
+const KYC_FIELD_TYPES = {
+    id: 'number',
+    status: 'number',
+    kind: 'number',
+    subject_id: 'number',
+    user_id: 'number',
+    inserted_at: 'date',
+    updated_at: 'date',
+};
 class KycResource {
     constructor(client) {
         this.client = client;
@@ -3312,9 +3490,40 @@ class KycResource {
     /**
      * List KYC records with pagination and filtering
      * Requires Client-Id header to be set in the configuration
+     *
+     * @example
+     * await kyc.list({ status: 'pending' })
+     */
+    async list(params) {
+        return this.client.get('/legal_requests', params);
+    }
+    /**
+     * Query KYC records with advanced filtering
+     * Supports all query system features (ranges, arrays, date ranges, etc.)
+     *
+     * @example
+     * await kyc.query({ status: ['pending', 'in_review'], inserted_at: { after: '2024-01-01' } })
+     */
+    async query(params) {
+        const processedQuery = processQuery(params || {}, KYC_FIELD_TYPES, { validate: true, context: 'legal_request' });
+        return this.list(processedQuery);
+    }
+    /**
+     * Create a fluent query builder for KYC requests
+     *
+     * @example
+     * await sdk.kyc.createQueryBuilder().whereStatus('pending').execute()
+     */
+    createQueryBuilder(initialQuery) {
+        return new KycQueryBuilder(this, initialQuery);
+    }
+    /**
+     * List KYC records with pagination and filtering (alias for list)
+     * @deprecated Use list() or query() instead
+     * Requires Client-Id header to be set in the configuration
      */
     async listRequests(params) {
-        return this.client.get('/legal_requests', params);
+        return this.list(params);
     }
     /**
      * Get a specific KYC request by ID
@@ -3337,32 +3546,12 @@ class KycResource {
     async uploadDocument(data) {
         return this.client.post('/legal_requests', data);
     }
-}
-
-class PayoutResource {
-    constructor(client) {
-        this.client = client;
-    }
     /**
-     * List payout requests with pagination and filtering
+     * Update bank information
      * Requires Client-Id header to be set in the configuration
      */
-    async list(params) {
-        return this.client.get('/financial_requests', params);
-    }
-    /**
-     * Get a specific payout request by ID
-     * Requires Client-Id header to be set in the configuration
-     */
-    async get(id) {
-        return this.client.get(`/financial_requests/${id}`);
-    }
-    /**
-     * Create a new payout request
-     * Requires Client-Id header to be set in the configuration
-     */
-    async request(data) {
-        return this.client.post('/financial_requests', data);
+    async updateBankInfo(data) {
+        return this.client.post('/legal_requests', data);
     }
 }
 
@@ -3501,7 +3690,7 @@ class PaymentLinksResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params, PAYMENT_LINK_FIELD_TYPES);
+        const processedQuery = processQuery(params, PAYMENT_LINK_FIELD_TYPES, { validate: true, context: 'payment_link' });
         return this.list(processedQuery);
     }
     /**
@@ -3559,7 +3748,7 @@ class FinancialAccountsResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params, FINANCIAL_ACCOUNT_FIELD_TYPES);
+        const processedQuery = processQuery(params, FINANCIAL_ACCOUNT_FIELD_TYPES, { validate: true });
         return this.list(processedQuery);
     }
     /**
@@ -3634,7 +3823,7 @@ class FinancialRequestsResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params, FINANCIAL_REQUEST_FIELD_TYPES);
+        const processedQuery = processQuery(params, FINANCIAL_REQUEST_FIELD_TYPES, { validate: true, context: 'financial_request' });
         return this.list(processedQuery);
     }
     /**
@@ -3696,7 +3885,7 @@ class WebhookUrlsResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params, WEBHOOK_URL_FIELD_TYPES);
+        const processedQuery = processQuery(params, WEBHOOK_URL_FIELD_TYPES, { validate: true });
         return this.list(processedQuery);
     }
     /**
@@ -3784,7 +3973,7 @@ class TokensResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params, TOKEN_FIELD_TYPES);
+        const processedQuery = processQuery(params, TOKEN_FIELD_TYPES, { validate: true, context: 'token' });
         return this.list(processedQuery);
     }
     /**
@@ -3871,7 +4060,7 @@ class AddressesResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params, ADDRESS_FIELD_TYPES);
+        const processedQuery = processQuery(params, ADDRESS_FIELD_TYPES, { validate: true });
         return this.list(processedQuery);
     }
     /**
@@ -3920,7 +4109,7 @@ class CurrenciesResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params, CURRENCY_FIELD_TYPES);
+        const processedQuery = processQuery(params, CURRENCY_FIELD_TYPES, { validate: true });
         return this.list(processedQuery);
     }
     /**
@@ -3982,7 +4171,7 @@ class ExchangeRatesResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params, EXCHANGE_RATE_FIELD_TYPES);
+        const processedQuery = processQuery(params, EXCHANGE_RATE_FIELD_TYPES, { validate: true });
         return this.list(processedQuery);
     }
     /**
@@ -4069,7 +4258,7 @@ class FeesResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params, FEE_FIELD_TYPES);
+        const processedQuery = processQuery(params, FEE_FIELD_TYPES, { validate: true, context: 'fee' });
         return this.list(processedQuery);
     }
     /**
@@ -4130,7 +4319,7 @@ class PaymentMethodsResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params, PAYMENT_METHOD_FIELD_TYPES);
+        const processedQuery = processQuery(params, PAYMENT_METHOD_FIELD_TYPES, { validate: true });
         return this.list(processedQuery);
     }
     /**
@@ -4183,7 +4372,7 @@ class TransactionEntriesResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params, TRANSACTION_ENTRY_FIELD_TYPES);
+        const processedQuery = processQuery(params, TRANSACTION_ENTRY_FIELD_TYPES, { validate: true, context: 'ledger_entry' });
         return this.list(processedQuery);
     }
     /**
@@ -4216,6 +4405,20 @@ class GenericsResource {
      */
     async list(endpoint, params) {
         return this.client.get(endpoint, params);
+    }
+    /**
+     * Query resources from a generic endpoint with advanced filtering
+     * Supports all query system features (ranges, arrays, date ranges, etc.)
+     *
+     * @example
+     * await sdk.generics.query('/subscription_periods', {
+     *   status: [1, 2],
+     *   inserted_at: { after: '2024-01-01' }
+     * })
+     */
+    async query(endpoint, params) {
+        const processedQuery = processQuery(params || {});
+        return this.list(endpoint, processedQuery);
     }
     /**
      * Get a single resource by ID from a generic endpoint
@@ -4311,7 +4514,6 @@ class InkressSDK {
         this.users = new UsersResource(this.client);
         this.public = new PublicResource(this.client);
         this.kyc = new KycResource(this.client);
-        this.payout = new PayoutResource(this.client);
         this.paymentLinks = new PaymentLinksResource(this.client);
         this.financialAccounts = new FinancialAccountsResource(this.client);
         this.financialRequests = new FinancialRequestsResource(this.client);

@@ -683,13 +683,15 @@ export interface CreateOrderResponseData {
   id: number;
   reference_id: string;
   title: string;
-
   /** Status */
   status: number;
   status_on?: number;
   
   /** Financial */
   total: number;
+  /** Currency code */
+  currency_code?: string;
+
   
   /** Timestamps */
   created_at: string;
@@ -702,9 +704,6 @@ export interface CreateOrderResponseData {
     last_name: string;
     email: string;
   };
-  
-  /** Currency code */
-  currency: string;
   
   /** Merchant information */
   merchant: {

@@ -2195,31 +2195,31 @@ class MerchantsResource {
      * Get merchant account balances
      */
     async balances() {
-        return this.client.get('/merchants/account/balances');
+        return this.client.post('/merchants/account/balances');
     }
     /**
      * Get merchant account limits
      */
     async limits() {
-        return this.client.get('/merchants/account/limits');
+        return this.client.post('/merchants/account/limits');
     }
     /**
      * Get merchant subscription plan details
      */
     async subscription() {
-        return this.client.get('/merchants/account/plan');
+        return this.client.post('/merchants/account/plan');
     }
     /**
      * Get list of merchant account invoices
      */
     async invoices() {
-        return this.client.get('/merchants/account/invoices');
+        return this.client.post('/merchants/account/invoices');
     }
     /**
      * Get a specific merchant invoice by ID
      */
     async invoice(invoiceId) {
-        return this.client.get(`/merchants/account/invoice/${invoiceId}`);
+        return this.client.post(`/merchants/account/invoice/${invoiceId}`);
     }
     /**
      * Query merchants with enhanced query support
@@ -2526,7 +2526,7 @@ class OrdersResource {
      * Get order status (public endpoint - no auth required)
      */
     async getStatus(id) {
-        const response = await this.client.get(`/orders/status/${id}`);
+        const response = await this.client.post(`/orders/status/${id}`);
         if (response.result) {
             const translatedOrder = this.translateOrderToUserFacing(response.result);
             return {

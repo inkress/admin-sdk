@@ -485,31 +485,33 @@ function translateValue(value: any, translator: any, context: string): any {
   // Handle arrays (for _in operations)
   if (Array.isArray(value)) {
     return value.map(item => {
+      // If it's already a number, pass it through
+      if (typeof item === 'number') {
+        return item;
+      }
+      // If it's a string, it MUST be translatable
       if (typeof item === 'string') {
-        try {
-          return context 
-            ? translator.toIntegerWithContext(item, context)
-            : translator.toInteger(item);
-        } catch {
-          return item; // Keep original if translation fails
-        }
+        return context 
+          ? translator.toIntegerWithContext(item, context)
+          : translator.toInteger(item);
       }
       return item;
     });
   }
   
-  // Handle range objects
+  // Handle range objects (e.g., { gte: 'paid', lte: 'confirmed' })
   if (typeof value === 'object' && value !== null) {
     const translated: any = {};
     for (const [k, v] of Object.entries(value)) {
-      if (typeof v === 'string') {
-        try {
-          translated[k] = context
-            ? translator.toIntegerWithContext(v, context)
-            : translator.toInteger(v);
-        } catch {
-          translated[k] = v; // Keep original if translation fails
-        }
+      // If it's already a number, pass it through
+      if (typeof v === 'number') {
+        translated[k] = v;
+      }
+      // If it's a string, it MUST be translatable
+      else if (typeof v === 'string') {
+        translated[k] = context
+          ? translator.toIntegerWithContext(v, context)
+          : translator.toInteger(v);
       } else {
         translated[k] = v;
       }
@@ -519,15 +521,12 @@ function translateValue(value: any, translator: any, context: string): any {
   
   // Handle direct string values
   if (typeof value === 'string') {
-    try {
-      return context
-        ? translator.toIntegerWithContext(value, context)
-        : translator.toInteger(value);
-    } catch {
-      return value; // Keep original if translation fails
-    }
+    return context
+      ? translator.toIntegerWithContext(value, context)
+      : translator.toInteger(value);
   }
   
+  // Already a number, pass through
   return value;
 }
 

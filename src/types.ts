@@ -641,18 +641,19 @@ export interface RecordOrderMetaData {
  * Creates a complete order with customer, products, transactions, and payment URLs
  */
 export interface CreateOrderData {
-  /** Required fields */
-  currency_code: string;
+  reference_id: string;
   total: number;
-  
+  /** Order classification */
+  kind: 'online' | 'cart' | 'subscription' | 'invoice' | 'offline';
   /** Customer information */
   customer: CustomerInfo;
   
   /** Products to order */
-  products: ProductItem[];
-  
-  /** Optional order identification */
-  reference_id?: string;
+  title?: string;
+
+  products?: ProductItem[];
+
+  /** Required order identification */
   
   /** Optional fields */
   fulfillment_total?: number;
@@ -660,8 +661,6 @@ export interface CreateOrderData {
   /** Payment method */
   method_id?: number;
   
-  /** Order classification */
-  kind?: string;
   
   /** Source payment link ID (if creating from existing payment link) */
   payment_link_id?: string;
@@ -673,7 +672,6 @@ export interface CreateOrderData {
   /** Additional data */
   data?: OrderDetailData;
   meta_data?: CreateOrderMetaData;
-  title?: string;
 }
 
 /**
@@ -684,7 +682,8 @@ export interface CreateOrderResponseData {
   /** Order identification */
   id: number;
   reference_id: string;
-  
+  title: string;
+
   /** Status */
   status: number;
   status_on?: number;

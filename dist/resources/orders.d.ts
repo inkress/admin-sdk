@@ -33,6 +33,10 @@ export declare class OrdersResource {
      */
     private translateOrderToUserFacing;
     /**
+     * Convert internal merchant data to user-facing merchant
+     */
+    private translateMerchantToUserFacing;
+    /**
      * Convert user-facing order data (strings) to internal data (integers)
      */
     private translateOrderToInternal;

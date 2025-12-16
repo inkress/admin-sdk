@@ -19,6 +19,7 @@ interface TestEntity {
   age: number;
   total: number;
   created_at: string;
+  updated_at: string;
   status: string;
   data?: Record<string, any>;
 }
@@ -490,7 +491,7 @@ describe('Query Transformer', () => {
         age: 25
       };
 
-      const builderWithInitial = new QueryBuilder(initialQuery);
+      const builderWithInitial = new QueryBuilder<TestEntity>(initialQuery);
       const result = builderWithInitial
         .where('status', 'active')
         .build();

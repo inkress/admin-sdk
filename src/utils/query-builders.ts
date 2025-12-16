@@ -674,15 +674,15 @@ export class SubscriptionQueryBuilder extends QueryBuilder<Subscription> {
 /**
  * Payment Link Query Builder
  */
-export class PaymentLinkQueryBuilder extends QueryBuilder<any> {
+export class PaymentLinkQueryBuilder extends QueryBuilder<PaymentLink> {
   constructor(
-    private resource: Queryable<any>,
-    initialQuery?: any
+    private resource: Queryable<PaymentLinkListResponse>,
+    initialQuery?: PaymentLinkQueryParams
   ) {
     super(initialQuery);
   }
 
-  async execute(): Promise<ApiResponse<any>> {
+  async execute(): Promise<ApiResponse<PaymentLinkListResponse>> {
     return this.resource.query(this.getRawQuery());
   }
 
@@ -706,15 +706,15 @@ export class PaymentLinkQueryBuilder extends QueryBuilder<any> {
 /**
  * Financial Account Query Builder
  */
-export class FinancialAccountQueryBuilder extends QueryBuilder<any> {
+export class FinancialAccountQueryBuilder extends QueryBuilder<FinancialAccount> {
   constructor(
-    private resource: Queryable<any>,
-    initialQuery?: any
+    private resource: Queryable<FinancialAccountListResponse>,
+    initialQuery?: FinancialAccountQueryParams
   ) {
     super(initialQuery);
   }
 
-  async execute(): Promise<ApiResponse<any>> {
+  async execute(): Promise<ApiResponse<FinancialAccountListResponse>> {
     return this.resource.query(this.getRawQuery());
   }
 
@@ -738,15 +738,15 @@ export class FinancialAccountQueryBuilder extends QueryBuilder<any> {
 /**
  * Financial Request Query Builder
  */
-export class FinancialRequestQueryBuilder extends QueryBuilder<any> {
+export class FinancialRequestQueryBuilder extends QueryBuilder<FinancialRequest> {
   constructor(
-    private resource: Queryable<any>,
-    initialQuery?: any
+    private resource: Queryable<FinancialRequestListResponse>,
+    initialQuery?: FinancialRequestQueryParams
   ) {
     super(initialQuery);
   }
 
-  async execute(): Promise<ApiResponse<any>> {
+  async execute(): Promise<ApiResponse<FinancialRequestListResponse>> {
     return this.resource.query(this.getRawQuery());
   }
 
@@ -770,15 +770,15 @@ export class FinancialRequestQueryBuilder extends QueryBuilder<any> {
 /**
  * Webhook URL Query Builder
  */
-export class WebhookUrlQueryBuilder extends QueryBuilder<any> {
+export class WebhookUrlQueryBuilder extends QueryBuilder<WebhookUrl> {
   constructor(
-    private resource: Queryable<any>,
-    initialQuery?: any
+    private resource: Queryable<WebhookUrlListResponse>,
+    initialQuery?: WebhookUrlQueryParams
   ) {
     super(initialQuery);
   }
 
-  async execute(): Promise<ApiResponse<any>> {
+  async execute(): Promise<ApiResponse<WebhookUrlListResponse>> {
     return this.resource.query(this.getRawQuery());
   }
 
@@ -802,15 +802,15 @@ export class WebhookUrlQueryBuilder extends QueryBuilder<any> {
 /**
  * Token Query Builder
  */
-export class TokenQueryBuilder extends QueryBuilder<any> {
+export class TokenQueryBuilder extends QueryBuilder<Token> {
   constructor(
-    private resource: Queryable<any>,
-    initialQuery?: any
+    private resource: Queryable<TokenListResponse>,
+    initialQuery?: TokenQueryParams
   ) {
     super(initialQuery);
   }
 
-  async execute(): Promise<ApiResponse<any>> {
+  async execute(): Promise<ApiResponse<TokenListResponse>> {
     return this.resource.query(this.getRawQuery());
   }
 
@@ -834,15 +834,15 @@ export class TokenQueryBuilder extends QueryBuilder<any> {
 /**
  * Address Query Builder
  */
-export class AddressQueryBuilder extends QueryBuilder<any> {
+export class AddressQueryBuilder extends QueryBuilder<Address> {
   constructor(
-    private resource: Queryable<any>,
-    initialQuery?: any
+    private resource: Queryable<AddressListResponse>,
+    initialQuery?: AddressQueryParams
   ) {
     super(initialQuery);
   }
 
-  async execute(): Promise<ApiResponse<any>> {
+  async execute(): Promise<ApiResponse<AddressListResponse>> {
     return this.resource.query(this.getRawQuery());
   }
 
@@ -866,15 +866,15 @@ export class AddressQueryBuilder extends QueryBuilder<any> {
 /**
  * Currency Query Builder
  */
-export class CurrencyQueryBuilder extends QueryBuilder<any> {
+export class CurrencyQueryBuilder extends QueryBuilder<Currency> {
   constructor(
-    private resource: Queryable<any>,
-    initialQuery?: any
+    private resource: Queryable<CurrencyListResponse>,
+    initialQuery?: CurrencyQueryParams
   ) {
     super(initialQuery);
   }
 
-  async execute(): Promise<ApiResponse<any>> {
+  async execute(): Promise<ApiResponse<CurrencyListResponse>> {
     return this.resource.query(this.getRawQuery());
   }
 
@@ -890,15 +890,15 @@ export class CurrencyQueryBuilder extends QueryBuilder<any> {
 /**
  * Exchange Rate Query Builder
  */
-export class ExchangeRateQueryBuilder extends QueryBuilder<any> {
+export class ExchangeRateQueryBuilder extends QueryBuilder<ExchangeRate> {
   constructor(
-    private resource: Queryable<any>,
-    initialQuery?: any
+    private resource: Queryable<ExchangeRateListResponse>,
+    initialQuery?: ExchangeRateQueryParams
   ) {
     super(initialQuery);
   }
 
-  async execute(): Promise<ApiResponse<any>> {
+  async execute(): Promise<ApiResponse<ExchangeRateListResponse>> {
     return this.resource.query(this.getRawQuery());
   }
 
@@ -918,15 +918,15 @@ export class ExchangeRateQueryBuilder extends QueryBuilder<any> {
 /**
  * Fee Query Builder
  */
-export class FeeQueryBuilder extends QueryBuilder<any> {
+export class FeeQueryBuilder extends QueryBuilder<Fee> {
   constructor(
-    private resource: Queryable<any>,
-    initialQuery?: any
+    private resource: Queryable<FeeListResponse>,
+    initialQuery?: FeeQueryParams
   ) {
     super(initialQuery);
   }
 
-  async execute(): Promise<ApiResponse<any>> {
+  async execute(): Promise<ApiResponse<FeeListResponse>> {
     return this.resource.query(this.getRawQuery());
   }
 
@@ -950,15 +950,15 @@ export class FeeQueryBuilder extends QueryBuilder<any> {
 /**
  * Payment Method Query Builder
  */
-export class PaymentMethodQueryBuilder extends QueryBuilder<any> {
+export class PaymentMethodQueryBuilder extends QueryBuilder<PaymentMethod> {
   constructor(
-    private resource: Queryable<any>,
-    initialQuery?: any
+    private resource: Queryable<PaymentMethodListResponse>,
+    initialQuery?: PaymentMethodQueryParams
   ) {
     super(initialQuery);
   }
 
-  async execute(): Promise<ApiResponse<any>> {
+  async execute(): Promise<ApiResponse<PaymentMethodListResponse>> {
     return this.resource.query(this.getRawQuery());
   }
 
@@ -978,15 +978,15 @@ export class PaymentMethodQueryBuilder extends QueryBuilder<any> {
 /**
  * Transaction Entry Query Builder
  */
-export class TransactionEntryQueryBuilder extends QueryBuilder<any> {
+export class TransactionEntryQueryBuilder extends QueryBuilder<TransactionEntry> {
   constructor(
-    private resource: Queryable<any>,
-    initialQuery?: any
+    private resource: Queryable<TransactionEntryListResponse>,
+    initialQuery?: TransactionEntryQueryParams
   ) {
     super(initialQuery);
   }
 
-  async execute(): Promise<ApiResponse<any>> {
+  async execute(): Promise<ApiResponse<TransactionEntryListResponse>> {
     return this.resource.query(this.getRawQuery());
   }
 

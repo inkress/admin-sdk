@@ -3,9 +3,9 @@ import { InkressSDK } from '../index';
 describe('InkressSDK', () => {
   it('should initialize with config', () => {
     const sdk = new InkressSDK({
-      bearerToken: 'test-token',
-      clientId: 'm-test-merchant',
-      endpoint: 'https://test.api.inkress.com',
+      accessToken: 'test-token',
+      username: 'test-merchant',
+      mode: 'live',
       apiVersion: 'v1',
     });
 

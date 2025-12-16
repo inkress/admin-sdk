@@ -72,7 +72,7 @@ class HttpClient {
             }
             const responseText = await response.text();
             if (!responseText) {
-                return { state: 'ok', data: undefined };
+                return { state: 'ok', result: undefined };
             }
             const data = JSON.parse(responseText);
             return data;
@@ -156,11 +156,11 @@ class HttpClient {
     }
 }
 class InkressApiError extends Error {
-    constructor(message, status, data) {
+    constructor(message, status, result) {
         super(message);
         this.name = 'InkressApiError';
         this.status = status;
-        this.data = data;
+        this.result = result;
     }
 }
 
@@ -260,7 +260,9 @@ const mappings = {
         "fee_merchant_withdrawal_limit": 15,
         "legal_request_document_submission": 1,
         "legal_request_bank_info_update": 2,
-        "legal_request_limit_increase": 3
+        "legal_request_limit_increase": 3,
+        "payment_link_order": 1,
+        "payment_link_invoice": 2
     },
     "Status": {
         "order_pending": 1,
@@ -326,7 +328,15 @@ const mappings = {
         "post_archived": 3,
         "product_draft": 1,
         "product_published": 2,
-        "product_archived": 3
+        "product_archived": 3,
+        "legal_request_pending": 1,
+        "legal_request_in_review": 2,
+        "legal_request_approved": 3,
+        "legal_request_rejected": 4,
+        "financial_request_pending": 1,
+        "financial_request_in_review": 2,
+        "financial_request_approved": 3,
+        "financial_request_rejected": 4
     }
 };
 
@@ -509,7 +519,126 @@ const StatusTranslator = {
 
 /**
  * Type-Based Query System
+ *
+ * This module provides a clean, type-safe query API where users write intuitive queries
+ * and the SDK automatically transforms them into the Elixir-compatible format.
+ *
+ * Features:
+ * - Array values → _in suffix (id: [1,2,3] → id_in: [1,2,3])
+ * - Range objects → _min/_max suffixes (age: {min: 18, max: 65} → age_min: 18, age_max: 65)
+ * - String operations → contains. prefix (name: {contains: "john"} → "contains.name": "john")
+ * - Date operations → before./after./on. prefixes
+ * - JSON field operations → in_, not_, null_, not_null_ prefixes
+ * - Direct values → equality check (no transformation)
  */
+/**
+ * Runtime validation for query parameters
+ */
+function validateQueryParams(query, fieldTypes) {
+    const errors = [];
+    if (!query || typeof query !== 'object') {
+        return errors;
+    }
+    for (const [key, value] of Object.entries(query)) {
+        // Skip special fields and undefined/null values
+        if (isSpecialField(key) || value === undefined || value === null) {
+            continue;
+        }
+        // Skip data field (JSON queries have their own validation)
+        if (key === 'data') {
+            continue;
+        }
+        const fieldType = fieldTypes === null || fieldTypes === void 0 ? void 0 : fieldTypes[key];
+        // Validate based on field type
+        if (fieldType) {
+            const validationError = validateFieldValue(key, value, fieldType);
+            if (validationError) {
+                errors.push(validationError);
+            }
+        }
+    }
+    return errors;
+}
+/**
+ * Validate a single field value against its expected type
+ */
+function validateFieldValue(fieldName, value, expectedType) {
+    // Handle array values (for _in operations)
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            if (!isValueOfType(item, expectedType)) {
+                return `Field "${fieldName}" array contains invalid type. Expected all items to be ${expectedType}, but found ${typeof item}`;
+            }
+        }
+        return null;
+    }
+    // Handle range objects
+    if (typeof value === 'object' && value !== null && ('min' in value || 'max' in value)) {
+        if (expectedType !== 'number' && expectedType !== 'date' && expectedType !== 'string') {
+            return `Field "${fieldName}" cannot use range queries. Range queries are only supported for number, date, and string fields.`;
+        }
+        if ('min' in value && value.min !== undefined && !isValueOfType(value.min, expectedType)) {
+            return `Field "${fieldName}" range min value has wrong type. Expected ${expectedType}, got ${typeof value.min}`;
+        }
+        if ('max' in value && value.max !== undefined && !isValueOfType(value.max, expectedType)) {
+            return `Field "${fieldName}" range max value has wrong type. Expected ${expectedType}, got ${typeof value.max}`;
+        }
+        return null;
+    }
+    // Handle string contains queries
+    if (typeof value === 'object' && value !== null && 'contains' in value) {
+        if (expectedType !== 'string') {
+            return `Field "${fieldName}" cannot use contains queries. Contains queries are only supported for string fields.`;
+        }
+        if (typeof value.contains !== 'string') {
+            return `Field "${fieldName}" contains value must be a string. Got ${typeof value.contains}`;
+        }
+        return null;
+    }
+    // Handle date queries
+    if (typeof value === 'object' && value !== null && ('before' in value || 'after' in value || 'on' in value || 'min' in value || 'max' in value)) {
+        if ('before' in value && value.before !== undefined && typeof value.before !== 'string') {
+            return `Field "${fieldName}" before value must be a string. Got ${typeof value.before}`;
+        }
+        if ('after' in value && value.after !== undefined && typeof value.after !== 'string') {
+            return `Field "${fieldName}" after value must be a string. Got ${typeof value.after}`;
+        }
+        if ('on' in value && value.on !== undefined && typeof value.on !== 'string') {
+            return `Field "${fieldName}" on value must be a string. Got ${typeof value.on}`;
+        }
+        if ('min' in value && value.min !== undefined && typeof value.min !== 'string') {
+            return `Field "${fieldName}" min value must be a string. Got ${typeof value.min}`;
+        }
+        if ('max' in value && value.max !== undefined && typeof value.max !== 'string') {
+            return `Field "${fieldName}" max value must be a string. Got ${typeof value.max}`;
+        }
+        return null;
+    }
+    // Handle direct values
+    if (!isValueOfType(value, expectedType)) {
+        return `Field "${fieldName}" has wrong type. Expected ${expectedType}, got ${typeof value}`;
+    }
+    return null;
+}
+/**
+ * Check if a value matches the expected type
+ */
+function isValueOfType(value, expectedType) {
+    switch (expectedType) {
+        case 'string':
+            return typeof value === 'string';
+        case 'number':
+            return typeof value === 'number' && !isNaN(value);
+        case 'boolean':
+            return typeof value === 'boolean';
+        case 'date':
+            return value instanceof Date || (typeof value === 'string' && !isNaN(Date.parse(value)));
+        case 'array':
+            return Array.isArray(value);
+        default:
+            return true;
+    }
+}
 /**
  * Transform a clean user query into Elixir-compatible format
  */
@@ -519,18 +648,26 @@ function transformQuery(query) {
     }
     const result = {};
     for (const [key, value] of Object.entries(query)) {
+        // Skip undefined/null values
         if (value === undefined || value === null) {
             continue;
         }
+        // Pass through special fields unchanged
         if (isSpecialField(key)) {
             result[key] = value;
             continue;
         }
+        // Handle data field specially for JSON queries
         if (key === 'data' && typeof value === 'object') {
             result.data = transformJsonQuery(value);
             continue;
         }
-        result[key] = transformFieldValue(key, value);
+        // Transform based on value type
+        const transformedValue = transformFieldValue(key, value);
+        // Skip null values (e.g., from empty objects)
+        if (transformedValue !== null) {
+            result[key] = transformedValue;
+        }
     }
     return result;
 }
@@ -549,19 +686,23 @@ function isSpecialField(key) {
  */
 function transformFieldValue(key, value) {
     if (Array.isArray(value)) {
+        // Array → add _in suffix
         return { [`${key}_in`]: value };
     }
     if (typeof value === 'object' && value !== null) {
         const transformedObject = {};
+        // Handle range queries
         if ('min' in value && value.min !== undefined) {
             transformedObject[`${key}_min`] = value.min;
         }
         if ('max' in value && value.max !== undefined) {
             transformedObject[`${key}_max`] = value.max;
         }
+        // Handle string queries
         if ('contains' in value && value.contains !== undefined) {
             transformedObject[`contains.${key}`] = value.contains;
         }
+        // Handle date queries
         if ('before' in value && value.before !== undefined) {
             transformedObject[`before.${key}`] = value.before;
         }
@@ -571,10 +712,16 @@ function transformFieldValue(key, value) {
         if ('on' in value && value.on !== undefined) {
             transformedObject[`on.${key}`] = value.on;
         }
+        // If we found any transformations, return them
         if (Object.keys(transformedObject).length > 0) {
             return transformedObject;
         }
+        // Empty object with no transformation keys - return null to skip it
+        if (Object.keys(value).length === 0) {
+            return null;
+        }
     }
+    // Direct value → wrap for consistent structure that will be flattened later
     return { [key]: value };
 }
 /**
@@ -583,34 +730,47 @@ function transformFieldValue(key, value) {
 function transformJsonQuery(data) {
     const result = {};
     for (const [key, value] of Object.entries(data)) {
+        // Skip undefined/null values
         if (value === undefined || value === null) {
             continue;
         }
+        // Nested paths (e.g., "settings->theme") stay as-is
         if (key.includes('->')) {
             result[key] = value;
             continue;
         }
         if (typeof value === 'object' && value !== null) {
-            if ('in' in value && value.in !== undefined) {
-                result[`in_${key}`] = value.in;
+            // Check if this is a JSON query operation (has special keys)
+            const hasJsonQueryOps = 'in' in value || 'not' in value || 'null' in value ||
+                'not_null' in value || 'min' in value || 'max' in value;
+            if (hasJsonQueryOps) {
+                // Transform JSON-specific operations
+                if ('in' in value && value.in !== undefined) {
+                    result[`in_${key}`] = value.in;
+                }
+                if ('not' in value && value.not !== undefined) {
+                    result[`not_${key}`] = value.not;
+                }
+                if ('null' in value && value.null !== undefined) {
+                    result[`null_${key}`] = value.null;
+                }
+                if ('not_null' in value && value.not_null !== undefined) {
+                    result[`not_null_${key}`] = value.not_null;
+                }
+                if ('min' in value && value.min !== undefined) {
+                    result[`${key}_min`] = value.min;
+                }
+                if ('max' in value && value.max !== undefined) {
+                    result[`${key}_max`] = value.max;
+                }
             }
-            if ('not' in value && value.not !== undefined) {
-                result[`not_${key}`] = value.not;
-            }
-            if ('null' in value && value.null !== undefined) {
-                result[`null_${key}`] = value.null;
-            }
-            if ('not_null' in value && value.not_null !== undefined) {
-                result[`not_null_${key}`] = value.not_null;
-            }
-            if ('min' in value && value.min !== undefined) {
-                result[`${key}_min`] = value.min;
-            }
-            if ('max' in value && value.max !== undefined) {
-                result[`${key}_max`] = value.max;
+            else {
+                // Complex object without query operators - pass through as-is
+                result[key] = value;
             }
         }
         else {
+            // Direct value in JSON field
             result[key] = value;
         }
     }
@@ -623,18 +783,33 @@ function flattenTransformedQuery(transformed) {
     const result = {};
     for (const [key, value] of Object.entries(transformed)) {
         if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+            // If it's a transformation object with special keys, merge its properties
             if (hasTransformationKeys(value)) {
                 Object.assign(result, value);
             }
+            else if (isWrappedDirectValue(key, value)) {
+                // Unwrap direct values like { id: { id: 5 } } → { id: 5 }
+                result[key] = value[key];
+            }
             else {
+                // Regular object (like data field)
                 result[key] = value;
             }
         }
         else {
+            // Direct value or array
             result[key] = value;
         }
     }
     return result;
+}
+/**
+ * Check if a value is a wrapped direct value (e.g., { id: { id: 5 } })
+ * This happens when transformFieldValue wraps a direct value for consistency
+ */
+function isWrappedDirectValue(key, obj) {
+    const keys = Object.keys(obj);
+    return keys.length === 1 && keys[0] === key;
 }
 /**
  * Check if an object contains transformation keys
@@ -653,6 +828,13 @@ function hasTransformationKeys(obj) {
  * Main function to transform and flatten a query in one step
  */
 function processQuery(query, fieldTypes, options = { validate: false }) {
+    // Runtime validation if enabled and field types provided
+    if (options.validate && fieldTypes) {
+        const validationErrors = validateQueryParams(query, fieldTypes);
+        if (validationErrors.length > 0) {
+            console.warn(`Query validation warnings: ${validationErrors.join(', ')}`);
+        }
+    }
     const transformed = transformQuery(query);
     return flattenTransformedQuery(transformed);
 }
@@ -666,14 +848,23 @@ class QueryBuilder {
             this.query = { ...initialQuery };
         }
     }
+    /**
+     * Add a field equality condition
+     */
     where(field, value) {
         this.query[field] = value;
         return this;
     }
+    /**
+     * Add a field IN condition (array of values)
+     */
     whereIn(field, values) {
         this.query[field] = values;
         return this;
     }
+    /**
+     * Add a range condition (min/max)
+     */
     whereRange(field, min, max) {
         const range = {};
         if (min !== undefined)
@@ -683,10 +874,16 @@ class QueryBuilder {
         this.query[field] = range;
         return this;
     }
+    /**
+     * Add a string contains condition
+     */
     whereContains(field, value) {
         this.query[field] = { contains: value };
         return this;
     }
+    /**
+     * Add a date range condition
+     */
     whereDateRange(field, after, before, on) {
         const dateQuery = {};
         if (after !== undefined)
@@ -698,22 +895,37 @@ class QueryBuilder {
         this.query[field] = dateQuery;
         return this;
     }
+    /**
+     * Add pagination
+     */
     paginate(page, pageSize) {
         this.query.page = page;
         this.query.page_size = pageSize;
         return this;
     }
+    /**
+     * Add ordering
+     */
     orderBy(field, direction = 'asc') {
         this.query.order_by = `${field} ${direction}`;
         return this;
     }
+    /**
+     * Add general search
+     */
     search(term) {
         this.query.q = term;
         return this;
     }
+    /**
+     * Build and return the transformed query
+     */
     build() {
         return processQuery(this.query);
     }
+    /**
+     * Get the raw query (before transformation)
+     */
     getRawQuery() {
         return { ...this.query };
     }
@@ -1469,30 +1681,6 @@ class PaymentMethodQueryBuilder extends QueryBuilder {
     }
 }
 /**
- * Post Query Builder
- */
-class PostQueryBuilder extends QueryBuilder {
-    constructor(resource, initialQuery) {
-        super(initialQuery);
-        this.resource = resource;
-    }
-    async execute() {
-        return this.resource.query(this.getRawQuery());
-    }
-    whereStatusIn(statuses) {
-        return this.whereIn('status', statuses);
-    }
-    whereKindIn(kinds) {
-        return this.whereIn('kind', kinds);
-    }
-    whereAuthorIdEquals(authorId) {
-        return this.where('author_id', authorId);
-    }
-    whereTitleContains(title) {
-        return this.whereContains('title', title);
-    }
-}
-/**
  * Transaction Entry Query Builder
  */
 class TransactionEntryQueryBuilder extends QueryBuilder {
@@ -1861,19 +2049,6 @@ const PAYMENT_METHOD_FIELD_TYPES = {
     updated_at: 'date',
 };
 /**
- * Post field types
- */
-const POST_FIELD_TYPES = {
-    id: 'number',
-    title: 'string',
-    content: 'string',
-    status: 'number',
-    kind: 'number',
-    author_id: 'number',
-    inserted_at: 'date',
-    updated_at: 'date',
-};
-/**
  * Transaction Entry field types
  */
 const TRANSACTION_ENTRY_FIELD_TYPES = {
@@ -1945,20 +2120,10 @@ class MerchantsResource {
      * List merchants with pagination and filtering
      */
     async list(params) {
-        var _a, _b;
+        var _a;
         const translatedParams = this.translateFilters(params);
         const response = await this.client.get('/merchants', translatedParams);
-        if ((_a = response.data) === null || _a === void 0 ? void 0 : _a.entries) {
-            const translatedEntries = response.data.entries.map(merchant => this.translateMerchantToUserFacing(merchant));
-            return {
-                state: response.state,
-                data: {
-                    entries: translatedEntries,
-                    page_info: response.data.page_info
-                }
-            };
-        }
-        if ((_b = response.result) === null || _b === void 0 ? void 0 : _b.entries) {
+        if ((_a = response.result) === null || _a === void 0 ? void 0 : _a.entries) {
             const translatedEntries = response.result.entries.map(merchant => this.translateMerchantToUserFacing(merchant));
             return {
                 state: response.state,
@@ -1970,7 +2135,6 @@ class MerchantsResource {
         }
         return {
             state: response.state,
-            data: response.data,
             result: response.result
         };
     }
@@ -1979,13 +2143,6 @@ class MerchantsResource {
      */
     async get(id) {
         const response = await this.client.get(`/merchants/${id}`);
-        if (response.data) {
-            const translatedMerchant = this.translateMerchantToUserFacing(response.data);
-            return {
-                state: response.state,
-                data: translatedMerchant
-            };
-        }
         if (response.result) {
             const translatedMerchant = this.translateMerchantToUserFacing(response.result);
             return {
@@ -1995,7 +2152,6 @@ class MerchantsResource {
         }
         return {
             state: response.state,
-            data: response.data,
             result: response.result
         };
     }
@@ -2005,13 +2161,6 @@ class MerchantsResource {
     async create(data) {
         const internalData = this.translateMerchantToInternal(data);
         const response = await this.client.post('/merchants', internalData);
-        if (response.data) {
-            const translatedMerchant = this.translateMerchantToUserFacing(response.data);
-            return {
-                state: response.state,
-                data: translatedMerchant
-            };
-        }
         if (response.result) {
             const translatedMerchant = this.translateMerchantToUserFacing(response.result);
             return {
@@ -2021,7 +2170,6 @@ class MerchantsResource {
         }
         return {
             state: response.state,
-            data: response.data,
             result: response.result
         };
     }
@@ -2031,13 +2179,6 @@ class MerchantsResource {
     async update(id, data) {
         const internalData = this.translateMerchantToInternal(data);
         const response = await this.client.put(`/merchants/${id}`, internalData);
-        if (response.data) {
-            const translatedMerchant = this.translateMerchantToUserFacing(response.data);
-            return {
-                state: response.state,
-                data: translatedMerchant
-            };
-        }
         if (response.result) {
             const translatedMerchant = this.translateMerchantToUserFacing(response.result);
             return {
@@ -2047,7 +2188,6 @@ class MerchantsResource {
         }
         return {
             state: response.state,
-            data: response.data,
             result: response.result
         };
     }
@@ -2087,25 +2227,18 @@ class MerchantsResource {
      * await merchants.query({ status: 'approved', sector: 'retail' })
      */
     async query(params) {
-        var _a, _b;
-        const processedQuery = processQuery(params || {}, MERCHANT_FIELD_TYPES, { });
+        var _a;
+        const processedQuery = processQuery(params || {}, MERCHANT_FIELD_TYPES, { validate: true });
         const translatedQuery = this.translateFilters(processedQuery);
         const response = await this.client.get('/merchants', translatedQuery);
-        if ((_a = response.data) === null || _a === void 0 ? void 0 : _a.entries) {
-            const translatedEntries = response.data.entries.map(m => this.translateMerchantToUserFacing(m));
-            return {
-                state: response.state,
-                data: { entries: translatedEntries, page_info: response.data.page_info }
-            };
-        }
-        if ((_b = response.result) === null || _b === void 0 ? void 0 : _b.entries) {
+        if ((_a = response.result) === null || _a === void 0 ? void 0 : _a.entries) {
             const translatedEntries = response.result.entries.map(m => this.translateMerchantToUserFacing(m));
             return {
                 state: response.state,
                 result: { entries: translatedEntries, page_info: response.result.page_info }
             };
         }
-        return { state: response.state, data: response.data, result: response.result };
+        return { state: response.state, result: response.result };
     }
     /**
      * Create a query builder for merchants
@@ -2162,20 +2295,10 @@ class CategoriesResource {
      * Requires Client-Id header to be set in the configuration
      */
     async list(params) {
-        var _a, _b;
+        var _a;
         const translatedParams = this.translateFilters(params);
         const response = await this.client.get('/categories', translatedParams);
-        if ((_a = response.data) === null || _a === void 0 ? void 0 : _a.entries) {
-            const translatedEntries = response.data.entries.map(category => this.translateCategoryToUserFacing(category));
-            return {
-                state: response.state,
-                data: {
-                    entries: translatedEntries,
-                    page_info: response.data.page_info
-                }
-            };
-        }
-        if ((_b = response.result) === null || _b === void 0 ? void 0 : _b.entries) {
+        if ((_a = response.result) === null || _a === void 0 ? void 0 : _a.entries) {
             const translatedEntries = response.result.entries.map(category => this.translateCategoryToUserFacing(category));
             return {
                 state: response.state,
@@ -2187,7 +2310,6 @@ class CategoriesResource {
         }
         return {
             state: response.state,
-            data: response.data,
             result: response.result
         };
     }
@@ -2197,13 +2319,6 @@ class CategoriesResource {
      */
     async get(id) {
         const response = await this.client.get(`/categories/${id}`);
-        if (response.data) {
-            const translatedCategory = this.translateCategoryToUserFacing(response.data);
-            return {
-                state: response.state,
-                data: translatedCategory
-            };
-        }
         if (response.result) {
             const translatedCategory = this.translateCategoryToUserFacing(response.result);
             return {
@@ -2213,7 +2328,6 @@ class CategoriesResource {
         }
         return {
             state: response.state,
-            data: response.data,
             result: response.result
         };
     }
@@ -2224,13 +2338,6 @@ class CategoriesResource {
     async create(data) {
         const internalData = this.translateCategoryToInternal(data);
         const response = await this.client.post('/categories', internalData);
-        if (response.data) {
-            const translatedCategory = this.translateCategoryToUserFacing(response.data);
-            return {
-                state: response.state,
-                data: translatedCategory
-            };
-        }
         if (response.result) {
             const translatedCategory = this.translateCategoryToUserFacing(response.result);
             return {
@@ -2240,7 +2347,6 @@ class CategoriesResource {
         }
         return {
             state: response.state,
-            data: response.data,
             result: response.result
         };
     }
@@ -2252,13 +2358,6 @@ class CategoriesResource {
     async update(id, data) {
         const internalData = this.translateCategoryToInternal(data);
         const response = await this.client.put(`/categories/${id}`, internalData);
-        if (response.data) {
-            const translatedCategory = this.translateCategoryToUserFacing(response.data);
-            return {
-                state: response.state,
-                data: translatedCategory
-            };
-        }
         if (response.result) {
             const translatedCategory = this.translateCategoryToUserFacing(response.result);
             return {
@@ -2268,7 +2367,6 @@ class CategoriesResource {
         }
         return {
             state: response.state,
-            data: response.data,
             result: response.result
         };
     }
@@ -2278,25 +2376,18 @@ class CategoriesResource {
      * await categories.query({ kind: 'published', parent_id: null })
      */
     async query(params) {
-        var _a, _b;
-        const processedQuery = processQuery(params || {}, CATEGORY_FIELD_TYPES, { });
+        var _a;
+        const processedQuery = processQuery(params || {}, CATEGORY_FIELD_TYPES, { validate: true });
         const translatedQuery = this.translateFilters(processedQuery);
         const response = await this.client.get('/categories', translatedQuery);
-        if ((_a = response.data) === null || _a === void 0 ? void 0 : _a.entries) {
-            const translatedEntries = response.data.entries.map(c => this.translateCategoryToUserFacing(c));
-            return {
-                state: response.state,
-                data: { entries: translatedEntries, page_info: response.data.page_info }
-            };
-        }
-        if ((_b = response.result) === null || _b === void 0 ? void 0 : _b.entries) {
+        if ((_a = response.result) === null || _a === void 0 ? void 0 : _a.entries) {
             const translatedEntries = response.result.entries.map(c => this.translateCategoryToUserFacing(c));
             return {
                 state: response.state,
                 result: { entries: translatedEntries, page_info: response.result.page_info }
             };
         }
-        return { state: response.state, data: response.data, result: response.result };
+        return { state: response.state, result: response.result };
     }
     /**
      * Create a query builder for categories
@@ -2316,10 +2407,26 @@ class OrdersResource {
      * Convert internal order data (integers) to user-facing data (strings)
      */
     translateOrderToUserFacing(internal) {
-        return {
+        const result = {
             ...internal,
             status: StatusTranslator.toStringWithoutContext(internal.status, 'order'),
             kind: KindTranslator.toStringWithoutContext(internal.kind, 'order'),
+        };
+        // Translate nested merchant if present
+        if (internal.merchant) {
+            result.merchant = this.translateMerchantToUserFacing(internal.merchant);
+        }
+        return result;
+    }
+    /**
+     * Convert internal merchant data to user-facing merchant
+     */
+    translateMerchantToUserFacing(internal) {
+        return {
+            ...internal,
+            status: StatusTranslator.toStringWithoutContext(internal.status, 'account'),
+            platform_fee_structure: FeeStructureTranslator.toString(internal.platform_fee_structure),
+            provider_fee_structure: FeeStructureTranslator.toString(internal.provider_fee_structure),
         };
     }
     /**
@@ -2377,13 +2484,6 @@ class OrdersResource {
      */
     async get(id) {
         const response = await this.client.get(`/orders/${id}`);
-        if (response.data) {
-            const translatedOrder = this.translateOrderToUserFacing(response.data);
-            return {
-                state: response.state,
-                data: translatedOrder
-            };
-        }
         if (response.result) {
             const translatedOrder = this.translateOrderToUserFacing(response.result);
             return {
@@ -2393,7 +2493,6 @@ class OrdersResource {
         }
         return {
             state: response.state,
-            data: response.data,
             result: response.result
         };
     }
@@ -2404,13 +2503,6 @@ class OrdersResource {
     async update(id, data) {
         const internalData = this.translateStatusUpdate(data);
         const response = await this.client.put(`/orders/${id}`, internalData);
-        if (response.data) {
-            const translatedOrder = this.translateOrderToUserFacing(response.data);
-            return {
-                state: response.state,
-                data: translatedOrder
-            };
-        }
         if (response.result) {
             const translatedOrder = this.translateOrderToUserFacing(response.result);
             return {
@@ -2420,7 +2512,6 @@ class OrdersResource {
         }
         return {
             state: response.state,
-            data: response.data,
             result: response.result
         };
     }
@@ -2436,13 +2527,6 @@ class OrdersResource {
      */
     async getStatus(id) {
         const response = await this.client.get(`/orders/status/${id}`);
-        if (response.data) {
-            const translatedOrder = this.translateOrderToUserFacing(response.data);
-            return {
-                state: response.state,
-                data: translatedOrder
-            };
-        }
         if (response.result) {
             const translatedOrder = this.translateOrderToUserFacing(response.result);
             return {
@@ -2452,7 +2536,6 @@ class OrdersResource {
         }
         return {
             state: response.state,
-            data: response.data,
             result: response.result
         };
     }
@@ -2462,20 +2545,10 @@ class OrdersResource {
      * Requires Client-Id header to be set in the configuration
      */
     async list(params) {
-        var _a, _b;
+        var _a;
         const translatedParams = this.translateFilters(params);
         const response = await this.client.get('/orders', translatedParams);
-        if ((_a = response.data) === null || _a === void 0 ? void 0 : _a.entries) {
-            const translatedEntries = response.data.entries.map(order => this.translateOrderToUserFacing(order));
-            return {
-                state: response.state,
-                data: {
-                    entries: translatedEntries,
-                    page_info: response.data.page_info
-                }
-            };
-        }
-        if ((_b = response.result) === null || _b === void 0 ? void 0 : _b.entries) {
+        if ((_a = response.result) === null || _a === void 0 ? void 0 : _a.entries) {
             const translatedEntries = response.result.entries.map(order => this.translateOrderToUserFacing(order));
             return {
                 state: response.state,
@@ -2487,7 +2560,6 @@ class OrdersResource {
         }
         return {
             state: response.state,
-            data: response.data,
             result: response.result
         };
     }
@@ -2522,23 +2594,13 @@ class OrdersResource {
      * })
      */
     async query(params) {
-        var _a, _b;
+        var _a;
         // Process the query through the transformation system with validation
-        const processedQuery = processQuery(params || {}, ORDER_FIELD_TYPES, { });
+        const processedQuery = processQuery(params || {}, ORDER_FIELD_TYPES, { validate: true });
         // Apply contextual translations for status and kind
         const translatedQuery = this.translateFilters(processedQuery);
         const response = await this.client.get('/orders', translatedQuery);
-        if ((_a = response.data) === null || _a === void 0 ? void 0 : _a.entries) {
-            const translatedEntries = response.data.entries.map(order => this.translateOrderToUserFacing(order));
-            return {
-                state: response.state,
-                data: {
-                    entries: translatedEntries,
-                    page_info: response.data.page_info
-                }
-            };
-        }
-        if ((_b = response.result) === null || _b === void 0 ? void 0 : _b.entries) {
+        if ((_a = response.result) === null || _a === void 0 ? void 0 : _a.entries) {
             const translatedEntries = response.result.entries.map(order => this.translateOrderToUserFacing(order));
             return {
                 state: response.state,
@@ -2550,7 +2612,6 @@ class OrdersResource {
         }
         return {
             state: response.state,
-            data: response.data,
             result: response.result
         };
     }
@@ -2614,20 +2675,10 @@ class ProductsResource {
      * Requires Client-Id header to be set in the configuration
      */
     async list(params) {
-        var _a, _b;
+        var _a;
         const translatedParams = this.translateFilters(params);
         const response = await this.client.get('/products', translatedParams);
-        if ((_a = response.data) === null || _a === void 0 ? void 0 : _a.entries) {
-            const translatedEntries = response.data.entries.map(product => this.translateProductToUserFacing(product));
-            return {
-                state: response.state,
-                data: {
-                    entries: translatedEntries,
-                    page_info: response.data.page_info
-                }
-            };
-        }
-        if ((_b = response.result) === null || _b === void 0 ? void 0 : _b.entries) {
+        if ((_a = response.result) === null || _a === void 0 ? void 0 : _a.entries) {
             const translatedEntries = response.result.entries.map(product => this.translateProductToUserFacing(product));
             return {
                 state: response.state,
@@ -2639,7 +2690,6 @@ class ProductsResource {
         }
         return {
             state: response.state,
-            data: response.data,
             result: response.result
         };
     }
@@ -2649,13 +2699,6 @@ class ProductsResource {
      */
     async get(id) {
         const response = await this.client.get(`/products/${id}`);
-        if (response.data) {
-            const translatedProduct = this.translateProductToUserFacing(response.data);
-            return {
-                state: response.state,
-                data: translatedProduct
-            };
-        }
         if (response.result) {
             const translatedProduct = this.translateProductToUserFacing(response.result);
             return {
@@ -2665,7 +2708,6 @@ class ProductsResource {
         }
         return {
             state: response.state,
-            data: response.data,
             result: response.result
         };
     }
@@ -2676,13 +2718,6 @@ class ProductsResource {
     async create(data) {
         const internalData = this.translateProductToInternal(data);
         const response = await this.client.post('/products', internalData);
-        if (response.data) {
-            const translatedProduct = this.translateProductToUserFacing(response.data);
-            return {
-                state: response.state,
-                data: translatedProduct
-            };
-        }
         if (response.result) {
             const translatedProduct = this.translateProductToUserFacing(response.result);
             return {
@@ -2692,7 +2727,6 @@ class ProductsResource {
         }
         return {
             state: response.state,
-            data: response.data,
             result: response.result
         };
     }
@@ -2703,13 +2737,6 @@ class ProductsResource {
     async update(id, data) {
         const internalData = this.translateProductToInternal(data);
         const response = await this.client.put(`/products/${id}`, internalData);
-        if (response.data) {
-            const translatedProduct = this.translateProductToUserFacing(response.data);
-            return {
-                state: response.state,
-                data: translatedProduct
-            };
-        }
         if (response.result) {
             const translatedProduct = this.translateProductToUserFacing(response.result);
             return {
@@ -2719,7 +2746,6 @@ class ProductsResource {
         }
         return {
             state: response.state,
-            data: response.data,
             result: response.result
         };
     }
@@ -2758,23 +2784,13 @@ class ProductsResource {
      * })
      */
     async query(params) {
-        var _a, _b;
+        var _a;
         // Process the query through the transformation system with validation
-        const processedQuery = processQuery(params || {}, PRODUCT_FIELD_TYPES, { });
+        const processedQuery = processQuery(params || {}, PRODUCT_FIELD_TYPES, { validate: true });
         // Apply contextual translations for status
         const translatedQuery = this.translateFilters(processedQuery);
         const response = await this.client.get('/products', translatedQuery);
-        if ((_a = response.data) === null || _a === void 0 ? void 0 : _a.entries) {
-            const translatedEntries = response.data.entries.map(product => this.translateProductToUserFacing(product));
-            return {
-                state: response.state,
-                data: {
-                    entries: translatedEntries,
-                    page_info: response.data.page_info
-                }
-            };
-        }
-        if ((_b = response.result) === null || _b === void 0 ? void 0 : _b.entries) {
+        if ((_a = response.result) === null || _a === void 0 ? void 0 : _a.entries) {
             const translatedEntries = response.result.entries.map(product => this.translateProductToUserFacing(product));
             return {
                 state: response.state,
@@ -2786,7 +2802,6 @@ class ProductsResource {
         }
         return {
             state: response.state,
-            data: response.data,
             result: response.result
         };
     }
@@ -2811,6 +2826,16 @@ class ProductsResource {
 class BillingPlansResource {
     constructor(client) {
         this.client = client;
+    }
+    /**
+     * Convert internal billing plan data (integers) to user-facing data (strings)
+     */
+    translateToUserFacing(internal) {
+        return {
+            ...internal,
+            status: StatusTranslator.toStringWithoutContext(internal.status, 'billing_plan'),
+            kind: KindTranslator.toStringWithoutContext(internal.kind, 'billing_plan'),
+        };
     }
     /**
      * Convert filter parameters (strings to integers where needed)
@@ -2847,15 +2872,41 @@ class BillingPlansResource {
      * Requires Client-Id header to be set in the configuration
      */
     async list(params) {
+        var _a;
         const translatedParams = this.translateFilters(params);
-        return this.client.get('/billing_plans', translatedParams);
+        const response = await this.client.get('/billing_plans', translatedParams);
+        if ((_a = response.result) === null || _a === void 0 ? void 0 : _a.entries) {
+            const translatedEntries = response.result.entries.map(plan => this.translateToUserFacing(plan));
+            return {
+                state: response.state,
+                result: {
+                    entries: translatedEntries,
+                    page_info: response.result.page_info
+                }
+            };
+        }
+        return {
+            state: response.state,
+            result: response.result
+        };
     }
     /**
      * Get a specific billing plan by ID
      * Requires Client-Id header to be set in the configuration
      */
     async get(id) {
-        return this.client.get(`/billing_plans/${id}`);
+        const response = await this.client.get(`/billing_plans/${id}`);
+        if (response.result) {
+            const translatedPlan = this.translateToUserFacing(response.result);
+            return {
+                state: response.state,
+                result: translatedPlan
+            };
+        }
+        return {
+            state: response.state,
+            result: response.result
+        };
     }
     /**
      * Create a new billing plan
@@ -2863,7 +2914,18 @@ class BillingPlansResource {
      */
     async create(data) {
         const internalData = this.translateToInternal(data);
-        return this.client.post('/billing_plans', internalData);
+        const response = await this.client.post('/billing_plans', internalData);
+        if (response.result) {
+            const translatedPlan = this.translateToUserFacing(response.result);
+            return {
+                state: response.state,
+                result: translatedPlan
+            };
+        }
+        return {
+            state: response.state,
+            result: response.result
+        };
     }
     /**
      * Update an existing billing plan
@@ -2871,7 +2933,18 @@ class BillingPlansResource {
      */
     async update(id, data) {
         const internalData = this.translateToInternal(data);
-        return this.client.put(`/billing_plans/${id}`, internalData);
+        const response = await this.client.put(`/billing_plans/${id}`, internalData);
+        if (response.result) {
+            const translatedPlan = this.translateToUserFacing(response.result);
+            return {
+                state: response.state,
+                result: translatedPlan
+            };
+        }
+        return {
+            state: response.state,
+            result: response.result
+        };
     }
     /**
      * Delete a billing plan
@@ -2886,9 +2959,24 @@ class BillingPlansResource {
      * await billingPlans.query({ kind: 'subscription', public: true })
      */
     async query(params) {
-        const processedQuery = processQuery(params || {}, BILLING_PLAN_FIELD_TYPES, { });
+        var _a;
+        const processedQuery = processQuery(params || {}, BILLING_PLAN_FIELD_TYPES, { validate: true });
         const translatedQuery = this.translateFilters(processedQuery);
-        return this.client.get('/billing_plans', translatedQuery);
+        const response = await this.client.get('/billing_plans', translatedQuery);
+        if ((_a = response.result) === null || _a === void 0 ? void 0 : _a.entries) {
+            const translatedEntries = response.result.entries.map(plan => this.translateToUserFacing(plan));
+            return {
+                state: response.state,
+                result: {
+                    entries: translatedEntries,
+                    page_info: response.result.page_info
+                }
+            };
+        }
+        return {
+            state: response.state,
+            result: response.result
+        };
     }
     /**
      * Create a query builder for billing plans
@@ -2903,6 +2991,31 @@ class BillingPlansResource {
 class SubscriptionsResource {
     constructor(client) {
         this.client = client;
+    }
+    /**
+     * Convert internal subscription data (integers) to user-facing data (strings)
+     */
+    translateToUserFacing(internal) {
+        const result = {
+            ...internal,
+            status: StatusTranslator.toStringWithoutContext(internal.status, 'billing_subscription'),
+            kind: KindTranslator.toStringWithoutContext(internal.kind, 'billing_subscription'),
+        };
+        // Translate nested billing plan if present
+        if (internal.billing_plan) {
+            result.billing_plan = this.translateBillingPlanToUserFacing(internal.billing_plan);
+        }
+        return result;
+    }
+    /**
+     * Convert internal billing plan data to user-facing billing plan
+     */
+    translateBillingPlanToUserFacing(internal) {
+        return {
+            ...internal,
+            status: StatusTranslator.toStringWithoutContext(internal.status, 'billing_plan'),
+            kind: KindTranslator.toStringWithoutContext(internal.kind, 'billing_plan'),
+        };
     }
     /**
      * Convert filter parameters (strings to integers where needed)
@@ -2936,15 +3049,41 @@ class SubscriptionsResource {
      * Requires Client-Id header to be set in the configuration
      */
     async list(params) {
+        var _a;
         const translatedParams = this.translateFilters(params);
-        return this.client.get('/billing_subscriptions', translatedParams);
+        const response = await this.client.get('/billing_subscriptions', translatedParams);
+        if ((_a = response.result) === null || _a === void 0 ? void 0 : _a.entries) {
+            const translatedEntries = response.result.entries.map(sub => this.translateToUserFacing(sub));
+            return {
+                state: response.state,
+                result: {
+                    entries: translatedEntries,
+                    page_info: response.result.page_info
+                }
+            };
+        }
+        return {
+            state: response.state,
+            result: response.result
+        };
     }
     /**
      * Gets a billing subscription by ID
      * Requires Client-Id header to be set in the configuration
      */
     async get(id) {
-        return this.client.get(`/billing_subscriptions/${id}`);
+        const response = await this.client.get(`/billing_subscriptions/${id}`);
+        if (response.result) {
+            const translatedSub = this.translateToUserFacing(response.result);
+            return {
+                state: response.state,
+                result: translatedSub
+            };
+        }
+        return {
+            state: response.state,
+            result: response.result
+        };
     }
     /**
      * Create a new subscription
@@ -2952,7 +3091,18 @@ class SubscriptionsResource {
      */
     async create(data) {
         const internalData = this.translateToInternal(data);
-        return this.client.post('/billing_subscriptions', internalData);
+        const response = await this.client.post('/billing_subscriptions', internalData);
+        if (response.result) {
+            const translatedSub = this.translateToUserFacing(response.result);
+            return {
+                state: response.state,
+                result: translatedSub
+            };
+        }
+        return {
+            state: response.state,
+            result: response.result
+        };
     }
     /**
      * Delete a subscription
@@ -3002,7 +3152,7 @@ class SubscriptionsResource {
      * await subscriptions.query({ status: 'active', billing_plan_id: 123 })
      */
     async query(params) {
-        const processedQuery = processQuery(params || {}, SUBSCRIPTION_FIELD_TYPES, { });
+        const processedQuery = processQuery(params || {}, SUBSCRIPTION_FIELD_TYPES, { validate: true });
         const translatedQuery = this.translateFilters(processedQuery);
         return this.client.get('/billing_subscriptions', translatedQuery);
     }
@@ -3112,25 +3262,18 @@ class UsersResource {
      * await users.query({ status: 'approved', level: { min: 5 } })
      */
     async query(params) {
-        var _a, _b;
-        const processedQuery = processQuery(params || {}, USER_FIELD_TYPES, { });
+        var _a;
+        const processedQuery = processQuery(params || {}, USER_FIELD_TYPES, { validate: true });
         const translatedQuery = this.translateFilters(processedQuery);
         const response = await this.client.get('/users', translatedQuery);
-        if ((_a = response.data) === null || _a === void 0 ? void 0 : _a.entries) {
-            const translatedEntries = response.data.entries.map(user => this.translateUserToUserFacing(user));
-            return {
-                state: response.state,
-                data: { entries: translatedEntries, page_info: response.data.page_info }
-            };
-        }
-        if ((_b = response.result) === null || _b === void 0 ? void 0 : _b.entries) {
+        if ((_a = response.result) === null || _a === void 0 ? void 0 : _a.entries) {
             const translatedEntries = response.result.entries.map(user => this.translateUserToUserFacing(user));
             return {
                 state: response.state,
                 result: { entries: translatedEntries, page_info: response.result.page_info }
             };
         }
-        return { state: response.state, data: response.data, result: response.result };
+        return { state: response.state, result: response.result };
     }
     /**
      * Create a query builder for users
@@ -3232,6 +3375,16 @@ class PaymentLinksResource {
         this.client = client;
     }
     /**
+     * Convert internal payment link data (integers) to user-facing data (strings)
+     */
+    translateToUserFacing(internal) {
+        return {
+            ...internal,
+            status: StatusTranslator.toStringWithoutContext(internal.status, 'payment_link'),
+            kind: KindTranslator.toStringWithoutContext(internal.kind, 'order'),
+        };
+    }
+    /**
      * Convert filter parameters (strings to integers where needed)
      */
     translateFilters(params) {
@@ -3263,28 +3416,76 @@ class PaymentLinksResource {
      * List payment links with filtering
      */
     async list(params) {
+        var _a;
         const translatedParams = this.translateFilters(params);
-        return this.client.get('/payment_links', translatedParams);
+        const response = await this.client.get('/payment_links', translatedParams);
+        if ((_a = response.result) === null || _a === void 0 ? void 0 : _a.entries) {
+            const translatedEntries = response.result.entries.map(link => this.translateToUserFacing(link));
+            return {
+                state: response.state,
+                result: {
+                    entries: translatedEntries,
+                    page_info: response.result.page_info
+                }
+            };
+        }
+        return {
+            state: response.state,
+            result: response.result
+        };
     }
     /**
      * Get payment link by ID
      */
     async get(id) {
-        return this.client.get(`/payment_links/${id}`);
+        const response = await this.client.get(`/payment_links/${id}`);
+        if (response.result) {
+            const translatedLink = this.translateToUserFacing(response.result);
+            return {
+                state: response.state,
+                result: translatedLink
+            };
+        }
+        return {
+            state: response.state,
+            result: response.result
+        };
     }
     /**
      * Create a new payment link
      */
     async create(data) {
         const internalData = this.translateToInternal(data);
-        return this.client.post('/payment_links', internalData);
+        const response = await this.client.post('/payment_links', internalData);
+        if (response.result) {
+            const translatedLink = this.translateToUserFacing(response.result);
+            return {
+                state: response.state,
+                result: translatedLink
+            };
+        }
+        return {
+            state: response.state,
+            result: response.result
+        };
     }
     /**
      * Update a payment link
      */
     async update(id, data) {
         const internalData = this.translateToInternal(data);
-        return this.client.put(`/payment_links/${id}`, internalData);
+        const response = await this.client.put(`/payment_links/${id}`, internalData);
+        if (response.result) {
+            const translatedLink = this.translateToUserFacing(response.result);
+            return {
+                state: response.state,
+                result: translatedLink
+            };
+        }
+        return {
+            state: response.state,
+            result: response.result
+        };
     }
     /**
      * Delete a payment link
@@ -3304,7 +3505,7 @@ class PaymentLinksResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params);
+        const processedQuery = processQuery(params, PAYMENT_LINK_FIELD_TYPES);
         return this.list(processedQuery);
     }
     /**
@@ -3362,7 +3563,7 @@ class FinancialAccountsResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params);
+        const processedQuery = processQuery(params, FINANCIAL_ACCOUNT_FIELD_TYPES);
         return this.list(processedQuery);
     }
     /**
@@ -3437,7 +3638,7 @@ class FinancialRequestsResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params);
+        const processedQuery = processQuery(params, FINANCIAL_REQUEST_FIELD_TYPES);
         return this.list(processedQuery);
     }
     /**
@@ -3499,7 +3700,7 @@ class WebhookUrlsResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params);
+        const processedQuery = processQuery(params, WEBHOOK_URL_FIELD_TYPES);
         return this.list(processedQuery);
     }
     /**
@@ -3587,7 +3788,7 @@ class TokensResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params);
+        const processedQuery = processQuery(params, TOKEN_FIELD_TYPES);
         return this.list(processedQuery);
     }
     /**
@@ -3674,7 +3875,7 @@ class AddressesResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params);
+        const processedQuery = processQuery(params, ADDRESS_FIELD_TYPES);
         return this.list(processedQuery);
     }
     /**
@@ -3723,7 +3924,7 @@ class CurrenciesResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params);
+        const processedQuery = processQuery(params, CURRENCY_FIELD_TYPES);
         return this.list(processedQuery);
     }
     /**
@@ -3785,7 +3986,7 @@ class ExchangeRatesResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params);
+        const processedQuery = processQuery(params, EXCHANGE_RATE_FIELD_TYPES);
         return this.list(processedQuery);
     }
     /**
@@ -3872,7 +4073,7 @@ class FeesResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params);
+        const processedQuery = processQuery(params, FEE_FIELD_TYPES);
         return this.list(processedQuery);
     }
     /**
@@ -3933,7 +4134,7 @@ class PaymentMethodsResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params);
+        const processedQuery = processQuery(params, PAYMENT_METHOD_FIELD_TYPES);
         return this.list(processedQuery);
     }
     /**
@@ -3946,99 +4147,6 @@ class PaymentMethodsResource {
      */
     createQueryBuilder() {
         return new PaymentMethodQueryBuilder(this);
-    }
-}
-
-class PostsResource {
-    constructor(client) {
-        this.client = client;
-    }
-    /**
-     * Convert filter parameters (strings to integers where needed)
-     */
-    translateFilters(params) {
-        if (!params)
-            return params;
-        const translated = { ...params };
-        if (params.status && typeof params.status === 'string') {
-            translated.status = StatusTranslator.toIntegerWithContext(params.status, 'post');
-        }
-        if (params.kind && typeof params.kind === 'string') {
-            translated.kind = KindTranslator.toIntegerWithContext(params.kind, 'post');
-        }
-        return translated;
-    }
-    /**
-     * Convert user-facing data to internal format
-     */
-    translateToInternal(data) {
-        const internal = { ...data };
-        if ('status' in data && data.status && typeof data.status === 'string') {
-            internal.status = StatusTranslator.toIntegerWithContext(data.status, 'post');
-        }
-        if ('kind' in data && data.kind && typeof data.kind === 'string') {
-            internal.kind = KindTranslator.toIntegerWithContext(data.kind, 'post');
-        }
-        return internal;
-    }
-    /**
-     * List posts with filtering
-     */
-    async list(params) {
-        const translatedParams = this.translateFilters(params);
-        return this.client.get('/posts', translatedParams);
-    }
-    /**
-     * Get post by ID
-     */
-    async get(id) {
-        return this.client.get(`/posts/${id}`);
-    }
-    /**
-     * Create a new post
-     */
-    async create(data) {
-        const internalData = this.translateToInternal(data);
-        return this.client.post('/posts', internalData);
-    }
-    /**
-     * Update a post
-     */
-    async update(id, data) {
-        const internalData = this.translateToInternal(data);
-        return this.client.put(`/posts/${id}`, internalData);
-    }
-    /**
-     * Delete a post
-     */
-    async delete(id) {
-        return this.client.delete(`/posts/${id}`);
-    }
-    /**
-     * Advanced query interface with full type safety
-     *
-     * @example
-     * const posts = await sdk.posts.query({
-     *   status: [1, 2],
-     *   kind: [1],
-     *   author_id: 123
-     * });
-     */
-    async query(params) {
-        const processedQuery = processQuery(params);
-        return this.list(processedQuery);
-    }
-    /**
-     * Create a fluent query builder for posts
-     *
-     * @example
-     * const posts = await sdk.posts.createQueryBuilder()
-     *   .whereStatusIn([1, 2])
-     *   .whereAuthorIdEquals(123)
-     *   .execute();
-     */
-    createQueryBuilder() {
-        return new PostQueryBuilder(this);
     }
 }
 
@@ -4079,7 +4187,7 @@ class TransactionEntriesResource {
      * });
      */
     async query(params) {
-        const processedQuery = processQuery(params);
+        const processedQuery = processQuery(params, TRANSACTION_ENTRY_FIELD_TYPES);
         return this.list(processedQuery);
     }
     /**
@@ -4218,7 +4326,6 @@ class InkressSDK {
         this.exchangeRates = new ExchangeRatesResource(this.client);
         this.fees = new FeesResource(this.client);
         this.paymentMethods = new PaymentMethodsResource(this.client);
-        this.posts = new PostsResource(this.client);
         this.transactionEntries = new TransactionEntriesResource(this.client);
         this.generics = new GenericsResource(this.client);
     }
@@ -4261,11 +4368,9 @@ exports.ORDER_FIELD_TYPES = ORDER_FIELD_TYPES;
 exports.OrderQueryBuilder = OrderQueryBuilder;
 exports.PAYMENT_LINK_FIELD_TYPES = PAYMENT_LINK_FIELD_TYPES;
 exports.PAYMENT_METHOD_FIELD_TYPES = PAYMENT_METHOD_FIELD_TYPES;
-exports.POST_FIELD_TYPES = POST_FIELD_TYPES;
 exports.PRODUCT_FIELD_TYPES = PRODUCT_FIELD_TYPES;
 exports.PaymentLinkQueryBuilder = PaymentLinkQueryBuilder;
 exports.PaymentMethodQueryBuilder = PaymentMethodQueryBuilder;
-exports.PostQueryBuilder = PostQueryBuilder;
 exports.ProductQueryBuilder = ProductQueryBuilder;
 exports.QueryBuilder = QueryBuilder;
 exports.SUBSCRIPTION_FIELD_TYPES = SUBSCRIPTION_FIELD_TYPES;

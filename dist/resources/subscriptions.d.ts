@@ -79,6 +79,14 @@ export declare class SubscriptionsResource {
     private client;
     constructor(client: HttpClient);
     /**
+     * Convert internal subscription data (integers) to user-facing data (strings)
+     */
+    private translateToUserFacing;
+    /**
+     * Convert internal billing plan data to user-facing billing plan
+     */
+    private translateBillingPlanToUserFacing;
+    /**
      * Convert filter parameters (strings to integers where needed)
      */
     private translateFilters;

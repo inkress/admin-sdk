@@ -24,7 +24,7 @@ export declare class HttpClient {
 }
 export declare class InkressApiError extends Error {
     readonly status: number;
-    readonly data: any;
-    constructor(message: string, status: number, data?: any);
+    readonly result: any;
+    constructor(message: string, status: number, result?: any);
 }
 //# sourceMappingURL=client.d.ts.map

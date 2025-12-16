@@ -11,6 +11,10 @@ export declare class BillingPlansResource {
     private client;
     constructor(client: HttpClient);
     /**
+     * Convert internal billing plan data (integers) to user-facing data (strings)
+     */
+    private translateToUserFacing;
+    /**
      * Convert filter parameters (strings to integers where needed)
      */
     private translateFilters;

@@ -228,7 +228,11 @@ export function transformQuery<T>(query: any): Record<string, any> {
     }
     
     // Transform based on value type
-    result[key] = transformFieldValue(key, value);
+    const transformedValue = transformFieldValue(key, value);
+    // Skip null values (e.g., from empty objects)
+    if (transformedValue !== null) {
+      result[key] = transformedValue;
+    }
   }
   
   return result;
@@ -285,9 +289,14 @@ function transformFieldValue(key: string, value: any): any {
     if (Object.keys(transformedObject).length > 0) {
       return transformedObject;
     }
+    
+    // Empty object with no transformation keys - return null to skip it
+    if (Object.keys(value).length === 0) {
+      return null;
+    }
   }
   
-  // Direct value → equality (no transformation needed at this level)
+  // Direct value → wrap for consistent structure that will be flattened later
   return { [key]: value };
 }
 
@@ -310,24 +319,33 @@ function transformJsonQuery(data: JsonQueryParams): Record<string, any> {
     }
     
     if (typeof value === 'object' && value !== null) {
-      // Transform JSON-specific operations
-      if ('in' in value && value.in !== undefined) {
-        result[`in_${key}`] = value.in;
-      }
-      if ('not' in value && value.not !== undefined) {
-        result[`not_${key}`] = value.not;
-      }
-      if ('null' in value && value.null !== undefined) {
-        result[`null_${key}`] = value.null;
-      }
-      if ('not_null' in value && value.not_null !== undefined) {
-        result[`not_null_${key}`] = value.not_null;
-      }
-      if ('min' in value && value.min !== undefined) {
-        result[`${key}_min`] = value.min;
-      }
-      if ('max' in value && value.max !== undefined) {
-        result[`${key}_max`] = value.max;
+      // Check if this is a JSON query operation (has special keys)
+      const hasJsonQueryOps = 'in' in value || 'not' in value || 'null' in value || 
+                              'not_null' in value || 'min' in value || 'max' in value;
+      
+      if (hasJsonQueryOps) {
+        // Transform JSON-specific operations
+        if ('in' in value && value.in !== undefined) {
+          result[`in_${key}`] = value.in;
+        }
+        if ('not' in value && value.not !== undefined) {
+          result[`not_${key}`] = value.not;
+        }
+        if ('null' in value && value.null !== undefined) {
+          result[`null_${key}`] = value.null;
+        }
+        if ('not_null' in value && value.not_null !== undefined) {
+          result[`not_null_${key}`] = value.not_null;
+        }
+        if ('min' in value && value.min !== undefined) {
+          result[`${key}_min`] = value.min;
+        }
+        if ('max' in value && value.max !== undefined) {
+          result[`${key}_max`] = value.max;
+        }
+      } else {
+        // Complex object without query operators - pass through as-is
+        result[key] = value;
       }
     } else {
       // Direct value in JSON field
@@ -346,9 +364,12 @@ export function flattenTransformedQuery(transformed: Record<string, any>): Recor
   
   for (const [key, value] of Object.entries(transformed)) {
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      // If it's a transformation object, merge its properties
+      // If it's a transformation object with special keys, merge its properties
       if (hasTransformationKeys(value)) {
         Object.assign(result, value);
+      } else if (isWrappedDirectValue(key, value)) {
+        // Unwrap direct values like { id: { id: 5 } } → { id: 5 }
+        result[key] = value[key];
       } else {
         // Regular object (like data field)
         result[key] = value;
@@ -360,6 +381,15 @@ export function flattenTransformedQuery(transformed: Record<string, any>): Recor
   }
   
   return result;
+}
+
+/**
+ * Check if a value is a wrapped direct value (e.g., { id: { id: 5 } })
+ * This happens when transformFieldValue wraps a direct value for consistency
+ */
+function isWrappedDirectValue(key: string, obj: Record<string, any>): boolean {
+  const keys = Object.keys(obj);
+  return keys.length === 1 && keys[0] === key;
 }
 
 /**

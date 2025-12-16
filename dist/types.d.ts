@@ -71,12 +71,11 @@ export interface PaginatedResponse<T> {
 }
 export interface ApiResponse<T = any> {
     state: 'ok' | 'error';
-    data?: T;
     result?: T;
 }
 export interface ErrorResponse {
     state: 'error';
-    data: {
+    result: {
         result: string;
     } | {
         reason: string;
@@ -84,7 +83,7 @@ export interface ErrorResponse {
 }
 export interface ValidationError {
     state: 'error';
-    data: Record<string, string[]>;
+    result: Record<string, string[]>;
 }
 export interface Currency {
     id: number;
@@ -192,6 +191,10 @@ export interface Merchant {
     data?: Record<string, any>;
     inserted_at: string;
     updated_at: string;
+    address?: Address;
+    owner?: User;
+    organisation?: Organisation;
+    parent_merchant?: Merchant;
 }
 export interface CreateMerchantData {
     name: string;
@@ -283,6 +286,7 @@ export interface Category {
     uid: string;
     inserted_at: string;
     updated_at: string;
+    parent?: Category;
 }
 export interface CreateCategoryData {
     name: string;
@@ -320,6 +324,9 @@ export interface Product {
     user_id?: number;
     inserted_at: string;
     updated_at: string;
+    category?: Category;
+    currency?: Currency;
+    user?: User;
 }
 export interface CreateProductData {
     title: string;
@@ -367,11 +374,20 @@ export interface Order {
     customer_id?: number;
     payment_link_id?: number;
     billing_plan_id?: number;
+    billing_subscription_id?: number;
     meta_data?: Record<string, any>;
     session_id?: string;
     data?: Record<string, any>;
     inserted_at: string;
     updated_at: string;
+    currency?: Currency;
+    customer?: Customer;
+    payment_link?: PaymentLink;
+    billing_plan?: BillingPlan;
+    billing_subscription?: Subscription;
+    order_lines?: OrderLine[];
+    merchant?: Merchant;
+    organisation?: Organisation;
 }
 export interface OrderLine {
     product_id: number;
@@ -389,6 +405,7 @@ export interface CreateOrderData {
     customer_id?: number;
     payment_link_id?: number;
     billing_plan_id?: number;
+    billing_subscription_id?: number;
     meta_data?: Record<string, any>;
     session_id?: string;
     data?: Record<string, any>;
@@ -404,6 +421,7 @@ export interface UpdateOrderData {
     customer_id?: number;
     payment_link_id?: number;
     billing_plan_id?: number;
+    billing_subscription_id?: number;
     meta_data?: Record<string, any>;
     session_id?: string;
     data?: Record<string, any>;
@@ -421,6 +439,7 @@ export interface PaymentMethod {
     financial_account_id?: number;
     inserted_at: string;
     updated_at: string;
+    financial_account?: FinancialAccount;
 }
 export interface CreatePaymentMethodData {
     name: string;
@@ -452,6 +471,8 @@ export interface Customer {
     organisation_id?: number;
     inserted_at: string;
     updated_at: string;
+    merchant?: Merchant;
+    organisation?: Organisation;
 }
 export interface PaymentLink {
     id: number;
@@ -461,14 +482,17 @@ export interface PaymentLink {
     total: number;
     usage_limit: number;
     expires_at?: string;
-    status: number;
-    kind: number;
+    status: StatusKey;
+    kind: KindKey;
     data?: Record<string, any>;
     customer_id?: number;
     currency_id: number;
     order_id?: number;
     inserted_at: string;
     updated_at: string;
+    customer?: Customer;
+    currency?: Currency;
+    order?: Order;
 }
 export interface CreatePaymentLinkData {
     title: string;
@@ -563,6 +587,12 @@ export interface FinancialRequest {
     evidence_file_id?: number;
     inserted_at: string;
     updated_at: string;
+    source?: FinancialAccount;
+    destination?: FinancialAccount;
+    merchant?: Merchant;
+    requester?: User;
+    reviewer?: User;
+    currency?: Currency;
 }
 export interface CreateFinancialRequestData {
     total: number;
@@ -601,6 +631,8 @@ export interface WebhookUrl {
     org_id?: number;
     inserted_at: string;
     updated_at: string;
+    merchant?: Merchant;
+    organisation?: Organisation;
 }
 export interface CreateWebhookUrlData {
     url: string;
@@ -626,6 +658,7 @@ export interface Token {
     role_id?: number;
     inserted_at: string;
     updated_at: string;
+    user?: User;
 }
 export interface CreateTokenData {
     title?: string;
@@ -652,6 +685,9 @@ export interface ExchangeRate {
     user_id?: number;
     inserted_at: string;
     updated_at: string;
+    source_currency?: Currency;
+    destination_currency?: Currency;
+    user?: User;
 }
 export interface CreateExchangeRateData {
     source_id: number;
@@ -682,6 +718,8 @@ export interface Fee {
     user_id?: number;
     inserted_at: string;
     updated_at: string;
+    currency?: Currency;
+    user?: User;
 }
 export interface CreateFeeData {
     title?: string;
@@ -709,32 +747,6 @@ export interface UpdateFeeData {
     currency_id?: number;
     user_id?: number;
 }
-export interface Post {
-    id: number;
-    title: string;
-    content: string;
-    status: number;
-    kind: number;
-    author_id: number;
-    data?: Record<string, any>;
-    inserted_at: string;
-    updated_at: string;
-}
-export interface CreatePostData {
-    title: string;
-    content: string;
-    status?: number;
-    kind?: number;
-    author_id: number;
-    data?: Record<string, any>;
-}
-export interface UpdatePostData {
-    title?: string;
-    content?: string;
-    status?: number;
-    kind?: number;
-    data?: Record<string, any>;
-}
 export interface TransactionEntry {
     id: number;
     amount: number;
@@ -743,6 +755,7 @@ export interface TransactionEntry {
     financial_account_id: number;
     inserted_at: string;
     updated_at: string;
+    financial_account?: FinancialAccount;
 }
 export interface CreateTransactionEntryData {
     amount: number;
@@ -791,6 +804,7 @@ export interface BillingPlan {
     payment_provider_id?: number;
     inserted_at: string;
     updated_at: string;
+    currency?: Currency;
 }
 export interface CreateBillingPlanData {
     name: string;
@@ -859,9 +873,15 @@ export interface Subscription {
     token?: string;
     billing_plan_id: number;
     customer_id?: number;
+    order_id?: number;
     data?: Record<string, any>;
+    meta_data?: Record<string, any>;
     inserted_at: string;
     updated_at: string;
+    billing_plan?: BillingPlan;
+    customer?: Customer;
+    order?: Order;
+    subscription_periods?: SubscriptionPeriod[];
 }
 export interface CreateSubscriptionData {
     billing_plan_id: number;
@@ -876,7 +896,9 @@ export interface CreateSubscriptionData {
     trial_end?: string;
     token?: string;
     customer_id?: number;
+    order_id?: number;
     data?: Record<string, any>;
+    meta_data?: Record<string, any>;
 }
 export interface SubscriptionPeriod {
     id: number;
@@ -927,6 +949,7 @@ export interface User {
     role_id?: number;
     inserted_at: string;
     updated_at: string;
+    organisation?: Organisation;
 }
 export interface CreateUserData {
     email: string;
@@ -1008,6 +1031,7 @@ export interface KycRequest {
     data?: Record<string, any>;
     inserted_at: string;
     updated_at: string;
+    user?: User;
 }
 export interface CreateKycRequestData {
     kind: KindKey;
@@ -1039,6 +1063,10 @@ export interface PayoutRequest {
     currency_id: number;
     inserted_at: string;
     updated_at: string;
+    merchant?: Merchant;
+    requester?: User;
+    reviewer?: User;
+    currency?: Currency;
 }
 export interface CreatePayoutRequestData {
     total: number;
@@ -1151,6 +1179,7 @@ export interface InternalOrder {
     customer?: Customer;
     currency: Currency;
     billing_plan?: any | null;
+    billing_subscription_id?: number;
     order_detail?: Record<string, any>;
     transactions?: any[];
     payment_methods?: PaymentMethod[];
@@ -1183,6 +1212,23 @@ export interface InternalUser {
     inserted_at: string;
     updated_at: string;
 }
+export interface InternalPaymentLink {
+    id: number;
+    uid: string;
+    title: string;
+    description?: string;
+    total: number;
+    usage_limit: number;
+    expires_at?: string;
+    status: number;
+    kind: number;
+    data?: Record<string, any>;
+    customer_id?: number;
+    currency_id: number;
+    order_id?: number;
+    inserted_at: string;
+    updated_at: string;
+}
 export interface InternalBillingPlan {
     id: number;
     name: string;
@@ -1196,14 +1242,23 @@ export interface InternalBillingPlan {
     duration: number;
     status: number;
     kind: number;
-    billing_cycle: number;
+    billing_cycle?: number;
     trial_period: number;
     charge_strategy: number;
     auto_charge: boolean;
-    currency: Currency;
-    features?: string[];
+    public: boolean;
+    payout_period: number;
+    payout_value_limit: number;
+    payout_percentage_limit: number;
+    features?: Record<string, any>;
+    data?: Record<string, any>;
+    meta_data?: Record<string, any>;
+    uid: string;
+    currency_id: number;
+    payment_provider_id?: number;
     inserted_at: string;
     updated_at: string;
+    currency?: Currency;
 }
 export interface InternalSubscription {
     id: number;
@@ -1218,12 +1273,15 @@ export interface InternalSubscription {
     record: string;
     record_id: number;
     customer_id?: number;
+    order_id?: number;
     uid: string;
     token?: string;
     billing_plan_id: number;
     has_token: boolean;
     billing_plan: InternalBillingPlan;
     subscription_periods?: SubscriptionPeriod[];
+    data?: Record<string, any>;
+    meta_data?: Record<string, any>;
     inserted_at: string;
     updated_at: string;
 }

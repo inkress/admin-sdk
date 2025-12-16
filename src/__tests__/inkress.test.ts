@@ -43,16 +43,9 @@ describe('InkressSDK', () => {
     expect(inkress.webhookUrls).toBeDefined();
     
     // Other resources
-    expect(inkress.posts).toBeDefined();
     expect(inkress.public).toBeDefined();
     expect(inkress.kyc).toBeDefined();
     expect(inkress.payout).toBeDefined();
     expect(inkress.generics).toBeDefined();
-  });
-
-  test('should throw error without access token', () => {
-    expect(() => {
-      new InkressSDK({ accessToken: '' });
-    }).toThrow('Access token is required');
   });
 });

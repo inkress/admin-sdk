@@ -13,6 +13,8 @@
  * - Direct values → equality check (no transformation)
  */
 
+import { StatusTranslator, KindTranslator } from './translators';
+
 // Range queries for numeric/date fields
 export type RangeQuery<T> = {
   min?: T;  // SDK adds _min suffix
@@ -435,20 +437,10 @@ export function processQuery<T>(
   fieldTypes?: Partial<Record<keyof T, 'string' | 'number' | 'boolean' | 'date' | 'array'>>,
   options: { validate?: boolean; context?: string } = { validate: false }
 ): Record<string, any> {
-  // Import translators dynamically to avoid circular dependencies
-  let StatusTranslator: any, KindTranslator: any;
-  try {
-    const translators = require('./translators');
-    StatusTranslator = translators.StatusTranslator;
-    KindTranslator = translators.KindTranslator;
-  } catch {
-    // Translators not available
-  }
-
   // Translate contextual strings to integers BEFORE validation and transformation
   const translatedQuery = { ...query };
   
-  if (StatusTranslator && KindTranslator && fieldTypes) {
+  if (fieldTypes && options.context) {
     for (const [key, value] of Object.entries(translatedQuery)) {
       const fieldType = fieldTypes[key as keyof T];
       
@@ -457,12 +449,12 @@ export function processQuery<T>(
       
       // Translate status fields (contextual strings to integers)
       if (key === 'status' && fieldType === 'number') {
-        translatedQuery[key] = translateValue(value, StatusTranslator, options.context || '');
+        translatedQuery[key] = translateValue(value, StatusTranslator, options.context);
       }
       
       // Translate kind fields (contextual strings to integers)
       if (key === 'kind' && fieldType === 'number') {
-        translatedQuery[key] = translateValue(value, KindTranslator, options.context || '');
+        translatedQuery[key] = translateValue(value, KindTranslator, options.context);
       }
     }
   }

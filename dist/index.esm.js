@@ -842,19 +842,9 @@ function hasTransformationKeys(obj) {
  * Handles translation of contextual strings to integers before transformation
  */
 function processQuery(query, fieldTypes, options = { validate: false }) {
-    // Import translators dynamically to avoid circular dependencies
-    let StatusTranslator, KindTranslator;
-    try {
-        const translators = require('./translators');
-        StatusTranslator = translators.StatusTranslator;
-        KindTranslator = translators.KindTranslator;
-    }
-    catch (_a) {
-        // Translators not available
-    }
     // Translate contextual strings to integers BEFORE validation and transformation
     const translatedQuery = { ...query };
-    if (StatusTranslator && KindTranslator && fieldTypes) {
+    if (fieldTypes && options.context) {
         for (const [key, value] of Object.entries(translatedQuery)) {
             const fieldType = fieldTypes[key];
             // Skip special fields
@@ -862,11 +852,11 @@ function processQuery(query, fieldTypes, options = { validate: false }) {
                 continue;
             // Translate status fields (contextual strings to integers)
             if (key === 'status' && fieldType === 'number') {
-                translatedQuery[key] = translateValue(value, StatusTranslator, options.context || '');
+                translatedQuery[key] = translateValue(value, StatusTranslator, options.context);
             }
             // Translate kind fields (contextual strings to integers)
             if (key === 'kind' && fieldType === 'number') {
-                translatedQuery[key] = translateValue(value, KindTranslator, options.context || '');
+                translatedQuery[key] = translateValue(value, KindTranslator, options.context);
             }
         }
     }

@@ -514,6 +514,8 @@ export interface CreateOrderData {
     kind: 'online' | 'cart' | 'subscription' | 'invoice' | 'offline';
     /** Customer information */
     customer: CustomerInfo;
+    /** Currency code */
+    currency_code?: string;
     /** Products to order */
     title?: string;
     products?: ProductItem[];
@@ -545,8 +547,6 @@ export interface CreateOrderResponseData {
     status_on?: number;
     /** Financial */
     total: number;
-    /** Currency code */
-    currency_code?: string;
     /** Timestamps */
     created_at: string;
     inserted_at: string;
@@ -557,6 +557,8 @@ export interface CreateOrderResponseData {
         last_name: string;
         email: string;
     };
+    /** Currency code */
+    currency: string;
     /** Merchant information */
     merchant: {
         name: string;

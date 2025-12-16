@@ -157,7 +157,7 @@ export class OrdersResource {
    * Get order status (public endpoint - no auth required)
    */
   async getStatus(id: number): Promise<ApiResponse<Order>> {
-    const response = await this.client.post<InternalOrder>(`/orders/status/${id}`);
+    const response = await this.client.get<InternalOrder>(`/orders/status/${id}`);
     
     if (response.result) {
       const translatedOrder = this.translateOrderToUserFacing(response.result);

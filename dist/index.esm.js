@@ -2667,7 +2667,7 @@ class OrdersResource {
      * Get order status (public endpoint - no auth required)
      */
     async getStatus(id) {
-        const response = await this.client.post(`/orders/status/${id}`);
+        const response = await this.client.get(`/orders/status/${id}`);
         if (response.result) {
             const translatedOrder = this.translateOrderToUserFacing(response.result);
             return {

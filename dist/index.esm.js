@@ -350,6 +350,15 @@ const reverseFeeStructure = createReverseMapping(mappings.FeeStructure);
 const reverseKind = createReverseMapping(mappings.Kind);
 const reverseStatus = createReverseMapping(mappings.Status);
 createReverseMapping(mappings.Access);
+// Helper to find a key by value and prefix, useful when multiple keys map to the same value
+const findKeyByValueAndPrefix = (mapping, value, prefix) => {
+    for (const [key, val] of Object.entries(mapping)) {
+        if (val === value && key.startsWith(prefix)) {
+            return key;
+        }
+    }
+    return undefined;
+};
 /**
  * Translation functions for Fee Structures
  */
@@ -416,8 +425,14 @@ const KindTranslator = {
      * Convert integer to string and remove context prefix
      */
     toStringWithoutContext(value, context) {
-        const fullKey = this.toString(value);
         const prefix = `${context}_`;
+        // Try to find a key that matches the value and starts with the prefix
+        const contextKey = findKeyByValueAndPrefix(mappings.Kind, value, prefix);
+        if (contextKey) {
+            return contextKey.substring(prefix.length);
+        }
+        // Fallback to the global reverse mapping if no context-specific key is found
+        const fullKey = this.toString(value);
         if (fullKey.startsWith(prefix)) {
             return fullKey.substring(prefix.length);
         }
@@ -484,8 +499,14 @@ const StatusTranslator = {
      * Convert integer to string and remove context prefix
      */
     toStringWithoutContext(value, context) {
-        const fullKey = this.toString(value);
         const prefix = `${context}_`;
+        // Try to find a key that matches the value and starts with the prefix
+        const contextKey = findKeyByValueAndPrefix(mappings.Status, value, prefix);
+        if (contextKey) {
+            return contextKey.substring(prefix.length);
+        }
+        // Fallback to the global reverse mapping if no context-specific key is found
+        const fullKey = this.toString(value);
         if (fullKey.startsWith(prefix)) {
             return fullKey.substring(prefix.length);
         }

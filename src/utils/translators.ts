@@ -26,6 +26,20 @@ const reverseKind = createReverseMapping(mappings.Kind);
 const reverseStatus = createReverseMapping(mappings.Status);
 const reverseAccess = createReverseMapping(mappings.Access);
 
+// Helper to find a key by value and prefix, useful when multiple keys map to the same value
+const findKeyByValueAndPrefix = <T extends Record<string, number>>(
+  mapping: T, 
+  value: number, 
+  prefix: string
+): keyof T | undefined => {
+  for (const [key, val] of Object.entries(mapping)) {
+    if (val === value && key.startsWith(prefix)) {
+      return key as keyof T;
+    }
+  }
+  return undefined;
+};
+
 /**
  * Translation functions for Fee Structures
  */
@@ -101,8 +115,17 @@ export const KindTranslator = {
    * Convert integer to string and remove context prefix
    */
   toStringWithoutContext(value: KindValue, context: string): string {
-    const fullKey = this.toString(value);
     const prefix = `${context}_`;
+    
+    // Try to find a key that matches the value and starts with the prefix
+    const contextKey = findKeyByValueAndPrefix(mappings.Kind, value, prefix);
+    
+    if (contextKey) {
+      return (contextKey as string).substring(prefix.length);
+    }
+
+    // Fallback to the global reverse mapping if no context-specific key is found
+    const fullKey = this.toString(value);
     
     if (fullKey.startsWith(prefix)) {
       return fullKey.substring(prefix.length);
@@ -181,8 +204,17 @@ export const StatusTranslator = {
    * Convert integer to string and remove context prefix
    */
   toStringWithoutContext(value: StatusValue, context: string): string {
-    const fullKey = this.toString(value);
     const prefix = `${context}_`;
+    
+    // Try to find a key that matches the value and starts with the prefix
+    const contextKey = findKeyByValueAndPrefix(mappings.Status, value, prefix);
+    
+    if (contextKey) {
+      return (contextKey as string).substring(prefix.length);
+    }
+
+    // Fallback to the global reverse mapping if no context-specific key is found
+    const fullKey = this.toString(value);
     
     if (fullKey.startsWith(prefix)) {
       return fullKey.substring(prefix.length);

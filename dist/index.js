@@ -10,9 +10,13 @@ class HttpClient {
         const endpoint = config.mode === 'sandbox'
             ? 'https://api-dev.inkress.com'
             : 'https://api.inkress.com';
+        let mode = 'live';
+        if (config.accessToken.includes('_test_')) {
+            mode = 'sandbox';
+        }
         this.config = {
             accessToken: config.accessToken,
-            mode: config.mode || 'live',
+            mode: config.mode || mode,
             apiVersion: config.apiVersion || 'v1',
             username: config.username || '',
             timeout: config.timeout || 30000,

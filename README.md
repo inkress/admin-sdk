@@ -42,7 +42,7 @@ import { InkressSDK } from '@inkress/admin-sdk';
 
 const inkress = new InkressSDK({
   accessToken: 'your-jwt-token',
-  username: 'merchant-username', // Optional - automatically prepended with 'm-'
+  username: 'merchant-username', // Optional
   mode: 'live', // Optional - 'live' (default) or 'sandbox'
 });
 ```
@@ -55,7 +55,7 @@ const inkress = new InkressSDK({
   accessToken: 'your-jwt-token',
   
   // Optional
-  username: 'merchant-username',    // Prepended with 'm-' for Client-Id header
+  username: 'merchant-username',    // For Client-Id header
   mode: 'live',                     // 'live' = api.inkress.com, 'sandbox' = api-dev.inkress.com
   apiVersion: 'v1',                 // API version (default: 'v1')
   timeout: 30000,                   // Request timeout in ms (default: 30000)
@@ -1346,9 +1346,9 @@ async function handleOrder(orderId: number, statusAction: OrderStatusAction) {
 
 ```typescript
 const inkress = new InkressSDK({
-  bearerToken: process.env.INKRESS_DEV_TOKEN,
-  endpoint: 'https://api-dev.inkress.com',
-  clientId: 'm-your-dev-merchant'
+  accessToken: process.env.INKRESS_DEV_TOKEN,
+  mode: 'sandbox',
+  username: 'mour-dev-merchant-username'
 });
 ```
 
@@ -1356,9 +1356,9 @@ const inkress = new InkressSDK({
 
 ```typescript
 const inkress = new InkressSDK({
-  bearerToken: process.env.INKRESS_PROD_TOKEN,
-  endpoint: 'https://api.inkress.com',
-  clientId: 'm-your-merchant'
+  accessToken: process.env.INKRESS_PROD_TOKEN,
+  mode: 'live',
+  username: 'your-merchant-username'
 });
 ```
 
@@ -1371,8 +1371,8 @@ const inkress = new InkressSDK({
 import { InkressSDK } from '@inkress/admin-sdk';
 
 const inkress = new InkressSDK({
-  bearerToken: process.env.INKRESS_TOKEN!,
-  clientId: process.env.INKRESS_CLIENT_ID!
+  accessToken: process.env.INKRESS_TOKEN!,
+  username: process.env.INKRESS_USERNAME!
 });
 
 export async function GET() {
@@ -1388,8 +1388,8 @@ export async function GET() {
 import { InkressSDK } from '@inkress/admin-sdk';
 
 const sdk = new InkressSDK({
-  bearerToken: '', // Empty for public endpoints
-  endpoint: 'https://api.inkress.com'
+  accessToken: '', // Empty for public endpoints
+  mode: 'live'
 });
 
 export async function getPublicMerchant(username: string) {
@@ -1405,8 +1405,7 @@ Store sensitive configuration in environment variables:
 
 ```env
 INKRESS_TOKEN=your-jwt-token
-INKRESS_CLIENT_ID=m-your-merchant
-INKRESS_ENDPOINT=https://api.inkress.com
+INKRESS_USERNAME=your-merchant
 ```
 
 ### 2. Error Handling

@@ -1642,7 +1642,7 @@ export interface InternalProduct {
   meta?: Record<string, any>;
   uid: string;
   category_id?: number;
-  currency_code?: string;
+  currency_code: string;
   user_id?: number;
   inserted_at: string;
   updated_at: string;

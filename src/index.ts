@@ -138,6 +138,13 @@ export class InkressSDK {
 // Export everything users might need
 export * from './types';
 export * from './client';
+
+// Export webhook verification types and utilities
+export type {
+  WebhookPayload,
+  WebhookVerificationOptions,
+  IncomingWebhookRequest,
+} from './resources/webhook-urls';
 export { InkressSDK as default };
 
 // Export resource-specific types for better IntelliSense

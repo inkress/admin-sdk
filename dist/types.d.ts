@@ -334,7 +334,7 @@ export interface Product {
     meta?: Record<string, any>;
     uid: string;
     category_id?: number;
-    currency_id?: number;
+    currency_code: string;
     user_id?: number;
     inserted_at: string;
     updated_at: string;
@@ -355,7 +355,7 @@ export interface CreateProductData {
     data?: Record<string, any>;
     meta?: Record<string, any>;
     category_id?: number;
-    currency_id?: number;
+    currency_code: string;
     user_id?: number;
 }
 export interface UpdateProductData {
@@ -372,7 +372,7 @@ export interface UpdateProductData {
     data?: Record<string, any>;
     meta?: Record<string, any>;
     category_id?: number;
-    currency_id?: number;
+    currency_code?: string;
     user_id?: number;
 }
 export interface Order {
@@ -384,7 +384,7 @@ export interface Order {
     status_on: number;
     uid: string;
     cart_id?: number | null;
-    currency_id?: number;
+    currency_code: string;
     customer_id?: number;
     payment_link_id?: number;
     billing_plan_id?: number;
@@ -669,7 +669,7 @@ export interface PaymentLink {
     kind: KindKey;
     data?: Record<string, any>;
     customer_id?: number;
-    currency_id: number;
+    currency_code: string;
     order_id?: number;
     inserted_at: string;
     updated_at: string;
@@ -687,7 +687,7 @@ export interface CreatePaymentLinkData {
     kind?: number;
     data?: Record<string, any>;
     customer_id?: number;
-    currency_id: number;
+    currency_code: string;
     order_id?: number;
 }
 export interface UpdatePaymentLinkData {
@@ -700,7 +700,7 @@ export interface UpdatePaymentLinkData {
     kind?: number;
     data?: Record<string, any>;
     customer_id?: number;
-    currency_id?: number;
+    currency_code?: string;
     order_id?: number;
 }
 export interface FinancialAccount {
@@ -766,7 +766,7 @@ export interface FinancialRequest {
     merchant_id: number;
     requester_id: number;
     reviewer_id?: number;
-    currency_id: number;
+    currency_code: string;
     evidence_file_id?: number;
     inserted_at: string;
     updated_at: string;
@@ -786,7 +786,7 @@ export interface CreateFinancialRequestData {
     data?: Record<string, any>;
     source_id?: number;
     destination_id?: number;
-    currency_id: number;
+    currency_code: string;
     evidence_file_id?: number;
 }
 export interface UpdateFinancialRequestData {
@@ -802,7 +802,7 @@ export interface UpdateFinancialRequestData {
     source_id?: number;
     destination_id?: number;
     reviewer_id?: number;
-    currency_id?: number;
+    currency_code?: string;
     evidence_file_id?: number;
 }
 export interface WebhookUrl {
@@ -897,7 +897,6 @@ export interface Fee {
     currency_code?: string;
     hash?: string;
     fee_set_id?: number;
-    currency_id?: number;
     user_id?: number;
     inserted_at: string;
     updated_at: string;
@@ -914,7 +913,6 @@ export interface CreateFeeData {
     fee_payer?: number;
     currency_code?: string;
     fee_set_id?: number;
-    currency_id?: number;
     user_id?: number;
 }
 export interface UpdateFeeData {
@@ -927,7 +925,6 @@ export interface UpdateFeeData {
     fee_payer?: number;
     currency_code?: string;
     fee_set_id?: number;
-    currency_id?: number;
     user_id?: number;
 }
 export interface TransactionEntry {
@@ -983,7 +980,7 @@ export interface BillingPlan {
     data?: Record<string, any>;
     meta_data?: Record<string, any>;
     uid: string;
-    currency_id: number;
+    currency_code: string;
     payment_provider_id?: number;
     inserted_at: string;
     updated_at: string;
@@ -1011,7 +1008,7 @@ export interface CreateBillingPlanData {
     features?: Record<string, any>;
     data?: Record<string, any>;
     meta_data?: Record<string, any>;
-    currency_id: number;
+    currency_code: string;
     payment_provider_id?: number;
 }
 export interface UpdateBillingPlanData {
@@ -1037,7 +1034,7 @@ export interface UpdateBillingPlanData {
     features?: Record<string, any>;
     data?: Record<string, any>;
     meta_data?: Record<string, any>;
-    currency_id?: number;
+    currency_code?: string;
     payment_provider_id?: number;
 }
 export interface Subscription {
@@ -1264,6 +1261,8 @@ export interface PayoutRequest {
     balance_on_request: number;
     reference_id?: string;
     evidence_file_id?: number;
+    source_id: number;
+    destination_id: number;
     merchant_id: number;
     requester_id: number;
     type: KindKey;
@@ -1272,7 +1271,9 @@ export interface PayoutRequest {
     reviewed_at?: string;
     due_at: string;
     fee_total: number;
-    currency_id: number;
+    source: FinancialAccount;
+    destination: FinancialAccount;
+    currency_code: string;
     inserted_at: string;
     updated_at: string;
     merchant?: Merchant;
@@ -1286,8 +1287,10 @@ export interface CreatePayoutRequestData {
     sub_type?: KindKey;
     reference_id?: string;
     evidence_file_id?: number;
+    source_id: number;
+    destination_id: number;
     due_at?: string;
-    currency_id?: number;
+    currency_code: string;
 }
 export interface UpdatePayoutRequestData {
     total?: number;
@@ -1300,7 +1303,7 @@ export interface UpdatePayoutRequestData {
     reviewed_at?: string;
     due_at?: string;
     fee_total?: number;
-    currency_id?: number;
+    currency_code?: string;
 }
 export interface InternalMerchant {
     id: number;
@@ -1374,7 +1377,7 @@ export interface InternalProduct {
     meta?: Record<string, any>;
     uid: string;
     category_id?: number;
-    currency_id?: number;
+    currency_code?: string;
     user_id?: number;
     inserted_at: string;
     updated_at: string;
@@ -1436,7 +1439,7 @@ export interface InternalPaymentLink {
     kind: number;
     data?: Record<string, any>;
     customer_id?: number;
-    currency_id: number;
+    currency_code: string;
     order_id?: number;
     inserted_at: string;
     updated_at: string;
@@ -1466,7 +1469,7 @@ export interface InternalBillingPlan {
     data?: Record<string, any>;
     meta_data?: Record<string, any>;
     uid: string;
-    currency_id: number;
+    currency_code: string;
     payment_provider_id?: number;
     inserted_at: string;
     updated_at: string;

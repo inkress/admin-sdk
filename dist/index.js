@@ -1917,7 +1917,7 @@ const ORDER_FIELD_TYPES = {
     status_on: 'number',
     uid: 'string',
     cart_id: 'number',
-    currency_id: 'number',
+    currency_code: 'string',
     customer_id: 'number',
     payment_link_id: 'number',
     billing_plan_id: 'number',
@@ -1945,7 +1945,7 @@ const PRODUCT_FIELD_TYPES = {
     tag_ids: 'array',
     uid: 'string',
     category_id: 'number',
-    currency_id: 'number',
+    currency_code: 'string',
     user_id: 'number',
     inserted_at: 'date',
     updated_at: 'date',
@@ -2037,7 +2037,7 @@ const BILLING_PLAN_FIELD_TYPES = {
     payout_value_limit: 'number',
     payout_percentage_limit: 'number',
     uid: 'string',
-    currency_id: 'number',
+    currency_code: 'string',
     payment_provider_id: 'number',
     inserted_at: 'date',
     updated_at: 'date',
@@ -2078,7 +2078,7 @@ const PAYMENT_LINK_FIELD_TYPES = {
     status: 'number',
     kind: 'number',
     customer_id: 'number',
-    currency_id: 'number',
+    currency_code: 'string',
     order_id: 'number',
     inserted_at: 'date',
     updated_at: 'date',
@@ -2122,7 +2122,7 @@ const FINANCIAL_REQUEST_FIELD_TYPES = {
     merchant_id: 'number',
     requester_id: 'number',
     reviewer_id: 'number',
-    currency_id: 'number',
+    currency_code: 'string',
     evidence_file_id: 'number',
     inserted_at: 'date',
     updated_at: 'date',
@@ -2216,7 +2216,6 @@ const FEE_FIELD_TYPES = {
     currency_code: 'string',
     hash: 'string',
     fee_set_id: 'number',
-    currency_id: 'number',
     user_id: 'number',
     inserted_at: 'date',
     updated_at: 'date',
@@ -3842,6 +3841,15 @@ class FinancialRequestsResource {
     }
 }
 
+let crypto;
+try {
+    if (typeof require !== 'undefined') {
+        crypto = require('crypto');
+    }
+}
+catch (_a) {
+    // Fallback for environments without Node.js crypto
+}
 class WebhookUrlsResource {
     constructor(client) {
         this.client = client;
@@ -3900,6 +3908,160 @@ class WebhookUrlsResource {
      */
     createQueryBuilder() {
         return new WebhookUrlQueryBuilder(this);
+    }
+    // ============================================================================
+    // WEBHOOK VERIFICATION METHODS
+    // ============================================================================
+    /**
+     * Verify webhook signature using HMAC SHA256
+     * Inkress webhooks use the format: crypto.mac(:hmac, :sha256, secret, body) |> Base.encode64()
+     */
+    verifySignature(body, signature, secret) {
+        if (!crypto) {
+            throw new Error('Node.js crypto module not available. Cannot verify webhook signature.');
+        }
+        try {
+            // Generate expected signature using HMAC SHA256
+            const expectedSignature = crypto
+                .createHmac('sha256', secret)
+                .update(body, 'utf8')
+                .digest('base64');
+            // Use constant-time comparison to prevent timing attacks
+            return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+        }
+        catch (error) {
+            return false;
+        }
+    }
+    /**
+     * Parse webhook payload from a string
+     */
+    parsePayload(payload) {
+        try {
+            const parsed = JSON.parse(payload);
+            if (!parsed.id || !parsed.timestamp || !parsed.event) {
+                throw new Error('Invalid webhook payload structure: missing required fields (id, timestamp, or event)');
+            }
+            return parsed;
+        }
+        catch (error) {
+            if (error instanceof Error) {
+                throw new Error(`Failed to parse webhook payload: ${error.message}`);
+            }
+            throw new Error('Failed to parse webhook payload');
+        }
+    }
+    /**
+     * Verify and parse an incoming webhook request
+     * This method clones the request body, validates the signature, and returns the parsed payload
+     *
+     * @param request - The incoming HTTP request object with headers and body
+     * @param secret - Your webhook secret for signature verification
+     * @param options - Optional verification options (e.g., timestamp tolerance)
+     * @returns Promise that resolves to the parsed webhook payload
+     * @throws Error if signature verification fails or payload is invalid
+     *
+     * @example
+     * ```typescript
+     * // Express.js example
+     * app.post('/webhooks', async (req, res) => {
+     *   try {
+     *     const payload = await sdk.webhookUrls.verifyRequest(
+     *       { headers: req.headers, body: req.body },
+     *       'your-webhook-secret'
+     *     );
+     *
+     *     // Process the webhook
+     *     console.log('Received webhook:', payload.event.type);
+     *
+     *     res.status(200).json({ received: true });
+     *   } catch (error) {
+     *     console.error('Webhook verification failed:', error);
+     *     res.status(400).json({ error: error.message });
+     *   }
+     * });
+     * ```
+     */
+    async verifyRequest(request, secret, options) {
+        // Extract signature from headers (case-insensitive)
+        const signature = request.headers['x-inkress-webhook-signature'] ||
+            request.headers['X-Inkress-Webhook-Signature'];
+        if (!signature || typeof signature !== 'string') {
+            throw new Error('Missing X-Inkress-Webhook-Signature header');
+        }
+        // Clone and ensure body is a string
+        let body;
+        if (typeof request.body === 'string') {
+            body = request.body;
+        }
+        else if (request.body && typeof request.body === 'object') {
+            body = JSON.stringify(request.body);
+        }
+        else {
+            throw new Error('Invalid request body format: body must be a string or object');
+        }
+        // Verify signature
+        const isValid = this.verifySignature(body, signature, secret);
+        if (!isValid) {
+            throw new Error('Webhook signature verification failed: signature does not match');
+        }
+        // Parse the payload
+        const payload = this.parsePayload(body);
+        // Optional: Verify timestamp tolerance
+        if (options === null || options === void 0 ? void 0 : options.tolerance) {
+            const currentTimestamp = Math.floor(Date.now() / 1000);
+            const timeDifference = Math.abs(currentTimestamp - payload.timestamp);
+            if (timeDifference > options.tolerance) {
+                throw new Error(`Webhook timestamp outside tolerance window: ${timeDifference}s (max: ${options.tolerance}s)`);
+            }
+        }
+        return payload;
+    }
+    /**
+     * Verify webhook signature only (without parsing)
+     * Useful for custom verification flows
+     *
+     * @param body - The raw webhook request body as a string
+     * @param signature - The signature from X-Inkress-Webhook-Signature header
+     * @param secret - Your webhook secret
+     * @returns Promise that resolves to true if valid, rejects with error if invalid
+     */
+    async verify(body, signature, secret) {
+        if (!this.verifySignature(body, signature, secret)) {
+            throw new Error('Webhook signature verification failed');
+        }
+        return true;
+    }
+    /**
+     * Generate webhook signature for testing
+     * Matches Inkress signature generation: crypto.mac(:hmac, :sha256, secret, body) |> Base.encode64()
+     *
+     * @example
+     * ```typescript
+     * const testBody = JSON.stringify({ id: '123', timestamp: Date.now(), event: {...} });
+     * const signature = sdk.webhookUrls.generateSignature(testBody, 'your-secret');
+     * ```
+     */
+    generateSignature(body, secret) {
+        if (!crypto) {
+            throw new Error('Node.js crypto module not available. Cannot generate signature.');
+        }
+        return crypto
+            .createHmac('sha256', secret)
+            .update(body, 'utf8')
+            .digest('base64');
+    }
+    /**
+     * Extract event data from webhook payload with type safety
+     *
+     * @example
+     * ```typescript
+     * const payload = await sdk.webhookUrls.verifyRequest(request, secret);
+     * const orderData = sdk.webhookUrls.extractEventData<Order>(payload);
+     * ```
+     */
+    extractEventData(payload) {
+        return payload.event.data;
     }
 }
 

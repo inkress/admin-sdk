@@ -29,7 +29,7 @@ export interface PublicProductFilterParams extends BaseFilterParams {
   tag_ids?: number[];
   uid?: string;
   category_id?: number;
-  currency_id?: number;
+  currency_code?: string;
   user_id?: number;
   inserted_at?: string;
   updated_at?: string;

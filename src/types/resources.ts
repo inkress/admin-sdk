@@ -61,7 +61,7 @@ export const ORDER_FIELD_TYPES = {
   status_on: 'number',
   uid: 'string',
   cart_id: 'number',
-  currency_id: 'number',
+  currency_code: 'string',
   customer_id: 'number',
   payment_link_id: 'number',
   billing_plan_id: 'number',
@@ -90,7 +90,7 @@ export const PRODUCT_FIELD_TYPES = {
   tag_ids: 'array',
   uid: 'string',
   category_id: 'number',
-  currency_id: 'number',
+  currency_code: 'string',
   user_id: 'number',
   inserted_at: 'date',
   updated_at: 'date',
@@ -186,7 +186,7 @@ export const BILLING_PLAN_FIELD_TYPES = {
   payout_value_limit: 'number',
   payout_percentage_limit: 'number',
   uid: 'string',
-  currency_id: 'number',
+  currency_code: 'string',
   payment_provider_id: 'number',
   inserted_at: 'date',
   updated_at: 'date',
@@ -229,7 +229,7 @@ export const PAYMENT_LINK_FIELD_TYPES = {
   status: 'number',
   kind: 'number',
   customer_id: 'number',
-  currency_id: 'number',
+  currency_code: 'string',
   order_id: 'number',
   inserted_at: 'date',
   updated_at: 'date',
@@ -275,7 +275,7 @@ export const FINANCIAL_REQUEST_FIELD_TYPES = {
   merchant_id: 'number',
   requester_id: 'number',
   reviewer_id: 'number',
-  currency_id: 'number',
+  currency_code: 'string',
   evidence_file_id: 'number',
   inserted_at: 'date',
   updated_at: 'date',
@@ -375,7 +375,6 @@ export const FEE_FIELD_TYPES = {
   currency_code: 'string',
   hash: 'string',
   fee_set_id: 'number',
-  currency_id: 'number',
   user_id: 'number',
   inserted_at: 'date',
   updated_at: 'date',
@@ -424,7 +423,7 @@ export interface OrderQueryParams {
   total?: number | number[] | RangeQuery<number>;
   status_on?: number | number[] | RangeQuery<number>;
   cart_id?: number | number[];
-  currency_id?: number | number[];
+  currency_code?: string | string[] | StringQuery;
   customer_id?: number | number[];
   payment_link_id?: number | number[];
   billing_plan_id?: number | number[];
@@ -473,7 +472,7 @@ export interface ProductQueryParams {
   rating_sum?: number | number[] | RangeQuery<number>;
   rating_count?: number | number[] | RangeQuery<number>;
   category_id?: number | number[];
-  currency_id?: number | number[];
+  currency_code?: string | string[] | StringQuery;
   user_id?: number | number[];
   
   // String fields
@@ -659,7 +658,7 @@ export interface BillingPlanQueryParams {
   payout_period?: number | number[] | RangeQuery<number>;
   payout_value_limit?: number | number[] | RangeQuery<number>;
   payout_percentage_limit?: number | number[] | RangeQuery<number>;
-  currency_id?: number | number[];
+  currency_code?: string | string[] | StringQuery;
   payment_provider_id?: number | number[];
   
   // String fields
@@ -750,7 +749,7 @@ export interface PaymentLinkQueryParams {
   status?: number | number[];
   kind?: number | number[];
   customer_id?: number | number[];
-  currency_id?: number | number[];
+  currency_code?: string | string[] | StringQuery;
   order_id?: number | number[];
   
   // String fields
@@ -837,7 +836,7 @@ export interface FinancialRequestQueryParams {
   merchant_id?: number | number[];
   requester_id?: number | number[];
   reviewer_id?: number | number[];
-  currency_id?: number | number[];
+  currency_code?: string | string[] | StringQuery;
   evidence_file_id?: number | number[];
   
   // String fields
@@ -1054,7 +1053,6 @@ export interface FeeQueryParams {
   priority?: number | number[] | RangeQuery<number>;
   fee_payer?: number | number[];
   fee_set_id?: number | number[];
-  currency_id?: number | number[];
   user_id?: number | number[];
   
   // String fields
@@ -1169,7 +1167,7 @@ export interface OrderFilterParams extends BaseFilterParams {
   status_on?: number;
   uid?: string;
   cart_id?: number;
-  currency_id?: number;
+  currency_code?: string;
   customer_id?: number;
   payment_link_id?: number;
   billing_plan_id?: number;
@@ -1202,7 +1200,7 @@ export interface ProductFilterParams extends BaseFilterParams {
   tag_ids?: number[];
   uid?: string;
   category_id?: number;
-  currency_id?: number;
+  currency_code?: string;
   user_id?: number;
   inserted_at?: string;
   updated_at?: string;
@@ -1309,7 +1307,7 @@ export interface BillingPlanFilterParams extends BaseFilterParams {
   payout_value_limit?: number;
   payout_percentage_limit?: number;
   uid?: string;
-  currency_id?: number;
+  currency_code?: string;
   payment_provider_id?: number;
   inserted_at?: string;
   updated_at?: string;
@@ -1349,7 +1347,7 @@ export interface PaymentLinkFilterParams extends BaseFilterParams {
   kind?: number;
   total?: number;
   customer_id?: number;
-  currency_id?: number;
+  currency_code?: string;
   order_id?: number;
   uid?: string;
   title?: string;
@@ -1378,7 +1376,7 @@ export interface FinancialRequestFilterParams extends BaseFilterParams {
   type?: number;
   total?: number;
   merchant_id?: number;
-  currency_id?: number;
+  currency_code?: string;
   limit?: number;
 }
 

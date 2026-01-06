@@ -128,7 +128,7 @@ const products = await inkress.public.getMerchantProducts('merchant-username', {
 
 // Get merchant fees
 const fees = await inkress.public.getMerchantFees('merchant-username', {
-  currency: 'JMD',
+  currency_code: 'JMD',  // JMD = 1, USD = 2
   total: 1000
 });
 ```
@@ -554,7 +554,7 @@ await inkress.billingPlans.get(planId);
 await inkress.billingPlans.create({
   name: 'Premium Plan',
   amount: 29.99,
-  currency: 'USD',
+  currency_code: 'USD',  // JMD = 1, USD = 2
   kind: 'subscription',     // Contextual
   status: 'active'
 });
@@ -674,7 +674,7 @@ await inkress.paymentLinks.list({ status: 'active' });
 await inkress.paymentLinks.create({
   title: 'Product Payment',
   amount: 99.99,
-  currency: 'USD',
+  currency_code: 'USD',  // JMD = 1, USD = 2
   status: 'active'
 });
 
@@ -695,7 +695,7 @@ await inkress.financialAccounts.list();
 await inkress.financialAccounts.create({
   name: 'Main Account',
   type: 'checking',
-  currency: 'USD'
+  currency_code: 'USD'  // JMD = 1, USD = 2
 });
 
 // Update account
@@ -807,7 +807,7 @@ await inkress.public.getMerchantProducts('merchant-name', {
 
 // Get merchant fees (fully typed)
 const fees = await inkress.public.getMerchantFees('merchant-name', {
-  currency: 'USD',
+  currency_code: 'USD',  // JMD = 1, USD = 2
   total: 100
 });
 // Returns: PublicMerchantFees

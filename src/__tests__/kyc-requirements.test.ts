@@ -236,7 +236,6 @@ describe('KycResource - Document Requirements', () => {
         },
       };
 
-      // @ts-ignore - Mock the client.get method
       sdk.kyc['client'].get = jest.fn().mockResolvedValue(mockResponse);
 
       const result = await sdk.kyc.getRequirementsStatus('personal');
@@ -292,7 +291,6 @@ describe('KycResource - Document Requirements', () => {
         },
       };
 
-      // @ts-ignore
       sdk.kyc['client'].get = jest.fn().mockResolvedValue(mockResponse);
 
       const result = await sdk.kyc.getRequirementsStatus('personal');

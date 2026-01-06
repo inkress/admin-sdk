@@ -142,8 +142,8 @@ The SDK automatically translates human-readable strings to API integers:
 const order = await inkress.orders.create({
   total: 99.99,
   currency_code: 'USD',
-  status: 'pending',      // SDK converts 'pending' → integer
-  kind: 'online',         // SDK converts 'online' → integer
+  status: 'pending',
+  kind: 'online',
   customer: {
     email: 'customer@example.com',
     first_name: 'John',
@@ -154,19 +154,16 @@ const order = await inkress.orders.create({
 
 // Update merchant with contextual values
 const merchant = await inkress.merchants.update(123, {
-  status: 'approved',               // SDK converts to integer
-  platform_fee_structure: 'customer_pay',  // SDK converts to integer
+  status: 'approved',
+  platform_fee_structure: 'customer_pay',
   provider_fee_structure: 'merchant_absorb'
 });
 
-// Create user with contextual status and kind
+// Create user
 const user = await inkress.users.create({
   email: 'user@example.com',
   first_name: 'John',
   last_name: 'Doe',
-  password: 'secure-password',
-  status: 'pending',       // SDK converts to account_pending integer
-  kind: 'organisation'     // SDK converts to user_organisation integer
 });
 ```
 
@@ -180,7 +177,7 @@ const orders = await inkress.orders.query({
   status: ['confirmed', 'shipped'],  // Array → IN query
   total: { min: 100, max: 1000 },   // Range query
   reference_id: { contains: 'VIP' }, // String search
-  inserted_at: { after: '2024-01-01' },
+  inserted_at: { min: '2024-01-01' },
   page: 1,
   page_size: 20
 });

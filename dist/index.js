@@ -3657,7 +3657,6 @@ class KycResource {
      * });
      */
     async getRequirementsStatus(entityType) {
-        var _a;
         // Get required documents for this entity type
         const requiredDocuments = this.getRequiredDocuments(entityType);
         // Fetch all KYC requests for the authenticated merchant
@@ -3665,10 +3664,12 @@ class KycResource {
             kind: 'document_submission',
         };
         const response = await this.list(params);
-        if (response.state === 'error') {
-            return response;
+        if (response.state === 'error' || !response.result) {
+            return {
+                state: 'error',
+            };
         }
-        const kycRequests = ((_a = response.result) === null || _a === void 0 ? void 0 : _a.entries) || [];
+        const kycRequests = response.result.entries || [];
         // Map submitted documents
         const submittedDocs = new Map();
         kycRequests.forEach(request => {
@@ -3698,14 +3699,16 @@ class KycResource {
             const statusString = StatusTranslator.toStringWithoutContext(submission.status, 'legal_request');
             // Map to our simplified status types
             let status;
-            if (statusString === 'pending' || statusString === 'in_review') {
-                status = 'pending';
-            }
-            else if (statusString === 'approved') {
-                status = 'approved';
-            }
-            else if (statusString === 'rejected') {
-                status = 'rejected';
+            if (statusString) {
+                if (statusString === 'pending' || statusString === 'in_review') {
+                    status = 'pending';
+                }
+                else if (statusString === 'approved') {
+                    status = 'approved';
+                }
+                else if (statusString === 'rejected') {
+                    status = 'rejected';
+                }
             }
             const reviewedAt = submission.updated_at !== submission.inserted_at
                 ? submission.updated_at

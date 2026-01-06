@@ -145,6 +145,16 @@ export type {
   WebhookVerificationOptions,
   IncomingWebhookRequest,
 } from './resources/webhook-urls';
+
+// Export KYC document requirements types and constants
+export {
+  KYC_DOCUMENT_REQUIREMENTS,
+  type EntityType,
+  type KycDocumentType,
+  type KycDocumentStatus,
+  type KycRequirements,
+} from './resources/kyc';
+
 export { InkressSDK as default };
 
 // Export resource-specific types for better IntelliSense

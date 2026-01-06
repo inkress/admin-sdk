@@ -3469,6 +3469,62 @@ class PublicResource {
     }
 }
 
+/**
+ * KYC document requirements by entity type
+ * These are the standard documents required for each type of business entity
+ */
+const KYC_DOCUMENT_REQUIREMENTS = {
+    personal: [
+        'Proof of Identity',
+        'Proof of Address',
+        'Proof of Bank Account Ownership',
+    ],
+    'sole-trader': [
+        'Proof of Identity',
+        'Proof of Address',
+        'Proof of Bank Account Ownership',
+        'Business Certificate',
+        'Articles of Incorporation',
+    ],
+    llc: [
+        'Proof of Identity',
+        'Proof of Address',
+        'Proof of Bank Account Ownership',
+        'Business Certificate',
+        'Articles of Incorporation',
+        'Annual Return',
+        'Notice of Directors',
+        'Notice of Secretary',
+        'Tax Compliance Certificate',
+    ],
+    'non-profit': [
+        'Proof of Identity',
+        'Proof of Address',
+        'Proof of Bank Account Ownership',
+        'Business Certificate',
+        'Articles of Incorporation',
+        'Annual Return',
+    ],
+    alumni: [
+        'Proof of Identity',
+        'Proof of Address',
+        'Proof of Bank Account Ownership',
+        'Business Certificate',
+        'Articles of Incorporation',
+        'Annual Return',
+    ],
+    other: [
+        'Proof of Identity',
+        'Proof of Address',
+        'Proof of Bank Account Ownership',
+        'Business Certificate',
+        'Articles of Incorporation',
+        'Annual Return',
+        'Notice of Directors',
+        'Notice of Secretary',
+        'Tax Compliance Certificate',
+    ],
+};
 // Field type definitions for query validation
 const KYC_FIELD_TYPES = {
     id: 'number',
@@ -3548,6 +3604,182 @@ class KycResource {
      */
     async updateBankInfo(data) {
         return this.client.post('/legal_requests', data);
+    }
+    // ============================================================================
+    // KYC DOCUMENT REQUIREMENTS & STATUS
+    // ============================================================================
+    /**
+     * Get required KYC documents for a specific entity type
+     * This is a client-side method that doesn't make an API call
+     *
+     * @param entityType - The type of business entity
+     * @returns Array of required document types
+     *
+     * @example
+     * const docs = kyc.getRequiredDocuments('llc');
+     * // Returns: ['Proof of Identity', 'Proof of Address', ...]
+     */
+    getRequiredDocuments(entityType) {
+        return [...KYC_DOCUMENT_REQUIREMENTS[entityType]];
+    }
+    /**
+     * Get all KYC document requirements (without making an API call)
+     * Useful for displaying the full list in your application
+     *
+     * @returns Complete mapping of entity types to required documents
+     *
+     * @example
+     * const allRequirements = kyc.getAllRequirements();
+     * console.log(allRequirements.llc); // ['Proof of Identity', ...]
+     */
+    getAllRequirements() {
+        return { ...KYC_DOCUMENT_REQUIREMENTS };
+    }
+    /**
+     * Get KYC requirements and submission status for the authenticated merchant
+     * Fetches all KYC requests and maps them to required documents
+     *
+     * @param entityType - The merchant's business entity type
+     * @returns Complete KYC requirements with submission status
+     *
+     * @example
+     * const status = await kyc.getRequirementsStatus('llc');
+     * console.log(`Completion: ${status.completion_percentage}%`);
+     * console.log(`Approved: ${status.total_approved}/${status.total_required}`);
+     *
+     * // Check individual document status
+     * status.document_statuses.forEach(doc => {
+     *   console.log(`${doc.document_type}: ${doc.status || 'not submitted'}`);
+     * });
+     */
+    async getRequirementsStatus(entityType) {
+        var _a;
+        // Get required documents for this entity type
+        const requiredDocuments = this.getRequiredDocuments(entityType);
+        // Fetch all KYC requests for the authenticated merchant
+        const params = {
+            kind: 'document_submission',
+        };
+        const response = await this.list(params);
+        if (response.state === 'error') {
+            return response;
+        }
+        const kycRequests = ((_a = response.result) === null || _a === void 0 ? void 0 : _a.entries) || [];
+        // Map submitted documents
+        const submittedDocs = new Map();
+        kycRequests.forEach(request => {
+            var _a;
+            const docType = (_a = request.data) === null || _a === void 0 ? void 0 : _a.document_type;
+            if (docType && requiredDocuments.includes(docType)) {
+                // Keep the most recent submission for each document type
+                const existing = submittedDocs.get(docType);
+                if (!existing || new Date(request.inserted_at) > new Date(existing.inserted_at)) {
+                    submittedDocs.set(docType, request);
+                }
+            }
+        });
+        // Build document statuses
+        const documentStatuses = requiredDocuments.map(docType => {
+            var _a;
+            const submission = submittedDocs.get(docType);
+            if (!submission) {
+                return {
+                    document_type: docType,
+                    required: true,
+                    submitted: false,
+                };
+            }
+            // Convert integer status to string using translator
+            // The API returns status as a number, but the type says it's a string
+            const statusString = StatusTranslator.toStringWithoutContext(submission.status, 'legal_request');
+            // Map to our simplified status types
+            let status;
+            if (statusString === 'pending' || statusString === 'in_review') {
+                status = 'pending';
+            }
+            else if (statusString === 'approved') {
+                status = 'approved';
+            }
+            else if (statusString === 'rejected') {
+                status = 'rejected';
+            }
+            const reviewedAt = submission.updated_at !== submission.inserted_at
+                ? submission.updated_at
+                : undefined;
+            return {
+                document_type: docType,
+                required: true,
+                submitted: true,
+                status,
+                submitted_at: submission.inserted_at,
+                reviewed_at: reviewedAt,
+                rejection_reason: (_a = submission.data) === null || _a === void 0 ? void 0 : _a.rejection_reason,
+            };
+        });
+        // Calculate statistics
+        const totalRequired = requiredDocuments.length;
+        const totalSubmitted = documentStatuses.filter(d => d.submitted).length;
+        const totalApproved = documentStatuses.filter(d => d.status === 'approved').length;
+        const totalRejected = documentStatuses.filter(d => d.status === 'rejected').length;
+        const totalPending = documentStatuses.filter(d => d.status === 'pending').length;
+        const completionPercentage = totalRequired > 0
+            ? Math.round((totalApproved / totalRequired) * 100)
+            : 0;
+        const isComplete = totalApproved === totalRequired;
+        const requirements = {
+            entity_type: entityType,
+            required_documents: requiredDocuments,
+            document_statuses: documentStatuses,
+            total_required: totalRequired,
+            total_submitted: totalSubmitted,
+            total_approved: totalApproved,
+            total_rejected: totalRejected,
+            total_pending: totalPending,
+            completion_percentage: completionPercentage,
+            is_complete: isComplete,
+        };
+        return {
+            state: 'ok',
+            result: requirements,
+        };
+    }
+    /**
+     * Check if all required documents have been approved for the authenticated merchant
+     *
+     * @param entityType - The merchant's business entity type
+     * @returns True if all required documents are approved
+     *
+     * @example
+     * const isComplete = await kyc.isKycComplete('llc');
+     * if (isComplete) {
+     *   console.log('Merchant is fully verified!');
+     * }
+     */
+    async isKycComplete(entityType) {
+        var _a;
+        const response = await this.getRequirementsStatus(entityType);
+        return ((_a = response.result) === null || _a === void 0 ? void 0 : _a.is_complete) || false;
+    }
+    /**
+     * Get list of missing (not submitted or rejected) documents for the authenticated merchant
+     *
+     * @param entityType - The merchant's business entity type
+     * @returns Array of document types that need to be submitted or resubmitted
+     *
+     * @example
+     * const missing = await kyc.getMissingDocuments('llc');
+     * if (missing.length > 0) {
+     *   console.log('Please submit:', missing.join(', '));
+     * }
+     */
+    async getMissingDocuments(entityType) {
+        const response = await this.getRequirementsStatus(entityType);
+        if (response.state === 'error' || !response.result) {
+            return [];
+        }
+        return response.result.document_statuses
+            .filter(doc => !doc.submitted || doc.status === 'rejected')
+            .map(doc => doc.document_type);
     }
 }
 
@@ -4700,5 +4932,5 @@ class InkressSDK {
     }
 }
 
-export { ADDRESS_FIELD_TYPES, AddressQueryBuilder, BILLING_PLAN_FIELD_TYPES, BillingPlanQueryBuilder, CATEGORY_FIELD_TYPES, CURRENCY_FIELD_TYPES, CategoryQueryBuilder, CurrencyQueryBuilder, EXCHANGE_RATE_FIELD_TYPES, ExchangeRateQueryBuilder, FEE_FIELD_TYPES, FINANCIAL_ACCOUNT_FIELD_TYPES, FINANCIAL_REQUEST_FIELD_TYPES, FeeQueryBuilder, FinancialAccountQueryBuilder, FinancialRequestQueryBuilder, HttpClient, InkressApiError, InkressSDK, MERCHANT_FIELD_TYPES, MerchantQueryBuilder, ORDER_FIELD_TYPES, OrderQueryBuilder, PAYMENT_LINK_FIELD_TYPES, PAYMENT_METHOD_FIELD_TYPES, PRODUCT_FIELD_TYPES, PaymentLinkQueryBuilder, PaymentMethodQueryBuilder, ProductQueryBuilder, QueryBuilder, SUBSCRIPTION_FIELD_TYPES, SubscriptionQueryBuilder, TOKEN_FIELD_TYPES, TRANSACTION_ENTRY_FIELD_TYPES, TokenQueryBuilder, TransactionEntryQueryBuilder, USER_FIELD_TYPES, UserQueryBuilder, WEBHOOK_URL_FIELD_TYPES, WebhookUrlQueryBuilder, InkressSDK as default, processQuery };
+export { ADDRESS_FIELD_TYPES, AddressQueryBuilder, BILLING_PLAN_FIELD_TYPES, BillingPlanQueryBuilder, CATEGORY_FIELD_TYPES, CURRENCY_FIELD_TYPES, CategoryQueryBuilder, CurrencyQueryBuilder, EXCHANGE_RATE_FIELD_TYPES, ExchangeRateQueryBuilder, FEE_FIELD_TYPES, FINANCIAL_ACCOUNT_FIELD_TYPES, FINANCIAL_REQUEST_FIELD_TYPES, FeeQueryBuilder, FinancialAccountQueryBuilder, FinancialRequestQueryBuilder, HttpClient, InkressApiError, InkressSDK, KYC_DOCUMENT_REQUIREMENTS, MERCHANT_FIELD_TYPES, MerchantQueryBuilder, ORDER_FIELD_TYPES, OrderQueryBuilder, PAYMENT_LINK_FIELD_TYPES, PAYMENT_METHOD_FIELD_TYPES, PRODUCT_FIELD_TYPES, PaymentLinkQueryBuilder, PaymentMethodQueryBuilder, ProductQueryBuilder, QueryBuilder, SUBSCRIPTION_FIELD_TYPES, SubscriptionQueryBuilder, TOKEN_FIELD_TYPES, TRANSACTION_ENTRY_FIELD_TYPES, TokenQueryBuilder, TransactionEntryQueryBuilder, USER_FIELD_TYPES, UserQueryBuilder, WEBHOOK_URL_FIELD_TYPES, WebhookUrlQueryBuilder, InkressSDK as default, processQuery };
 //# sourceMappingURL=index.esm.js.map

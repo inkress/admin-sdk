@@ -238,11 +238,10 @@ The SDK provides access to 23+ fully-typed resources:
 - **Addresses** - Address management
 - **Tokens** - API token management
 - **Webhook URLs** - Webhook configuration
+- **KYC** - Know Your Customer verification and compliance
 
 ### Content & Other
 - **Generics** - Dynamic endpoint access
-- **KYC** - Know Your Customer operations
-- **Payout** - Payout processing
 - **Public** - Public-facing merchant data
 
 ---
@@ -813,6 +812,249 @@ const fees = await inkress.public.getMerchantFees('merchant-name', {
 });
 // Returns: PublicMerchantFees
 ```
+
+---
+
+## KYC (Know Your Customer) Module
+
+The KYC module helps you manage merchant verification and compliance documents. It provides both client-side document requirements and server-side status tracking.
+
+### Understanding Entity Types
+
+Different merchant types require different KYC documents:
+
+| Entity Type | Description | Required Documents |
+|------------|-------------|-------------------|
+| `personal` | Individual merchant | 3 documents |
+| `sole-trader` | Sole proprietorship | 5 documents |
+| `llc` | Limited Liability Company | 9 documents |
+| `non-profit` | Non-profit organization | 6 documents |
+| `alumni` | Alumni association | 6 documents |
+| `other` | Other business types | 9 documents |
+
+### Document Types
+
+```typescript
+type KycDocumentType = 
+  | 'Proof of Identity'
+  | 'Proof of Address'
+  | 'Proof of Bank Account Ownership'
+  | 'Business Certificate'
+  | 'Articles of Incorporation'
+  | 'Annual Return'
+  | 'Notice of Directors'
+  | 'Notice of Secretary'
+  | 'Tax Compliance Certificate';
+```
+
+### Quick Status Check
+
+```typescript
+// Check if KYC is complete for the authenticated merchant
+const isComplete = await inkress.kyc.isKycComplete('llc');
+
+if (isComplete) {
+  console.log('✅ Merchant is fully verified!');
+} else {
+  console.log('⚠️ Verification incomplete');
+}
+```
+
+### Get Requirements Status (with API call)
+
+Fetch the complete KYC status including all document submissions:
+
+```typescript
+const response = await inkress.kyc.getRequirementsStatus('llc');
+
+if (response.state === 'ok') {
+  const status = response.result!;
+  
+  console.log(`Completion: ${status.completion_percentage}%`);
+  console.log(`Complete: ${status.is_complete ? 'Yes' : 'No'}`);
+  console.log(`Approved: ${status.total_approved}/${status.total_required}`);
+  console.log(`Pending: ${status.total_pending}`);
+  console.log(`Rejected: ${status.total_rejected}`);
+  
+  // Check individual documents
+  status.document_statuses.forEach(doc => {
+    console.log(`${doc.document_type}: ${doc.status || 'not submitted'}`);
+    
+    if (doc.status === 'rejected' && doc.rejection_reason) {
+      console.log(`  Reason: ${doc.rejection_reason}`);
+    }
+  });
+}
+```
+
+### Get Missing Documents
+
+Find out which documents still need to be submitted:
+
+```typescript
+const missing = await inkress.kyc.getMissingDocuments('llc');
+
+if (missing.length > 0) {
+  console.log('Please submit the following documents:');
+  missing.forEach(doc => console.log(`  • ${doc}`));
+} else {
+  console.log('All documents submitted!');
+}
+```
+
+### Client-Side Requirements (no API call)
+
+View required documents without making an API request:
+
+```typescript
+// Get requirements for a specific entity type
+const docs = inkress.kyc.getRequiredDocuments('llc');
+console.log(`LLC requires ${docs.length} documents:`, docs);
+// Returns: ['Proof of Identity', 'Proof of Address', ...]
+
+// Get all requirements at once
+const allRequirements = inkress.kyc.getAllRequirements();
+console.log('Personal:', allRequirements.personal);
+console.log('LLC:', allRequirements.llc);
+// Returns complete mapping of all entity types to their required documents
+```
+
+### Submit KYC Documents
+
+```typescript
+// Upload a document
+await inkress.kyc.uploadDocument({
+  kind: 'document_submission',
+  status: 'pending',
+  data: {
+    document_type: 'Proof of Identity',
+    document_url: 'https://cdn.example.com/id-card.pdf',
+    notes: 'Government-issued ID card'
+  }
+});
+
+// Update bank information
+await inkress.kyc.updateBankInfo({
+  kind: 'bank_info_update',
+  status: 'pending',
+  data: {
+    account_number: '123456789',
+    routing_number: '987654321',
+    bank_name: 'Example Bank',
+    account_holder_name: 'John Doe'
+  }
+});
+```
+
+### Complete Onboarding Flow Example
+
+```typescript
+async function checkKycOnboarding(entityType: 'llc' | 'personal' | 'sole-trader') {
+  console.log('🚀 Starting KYC Onboarding Check...\n');
+
+  // Step 1: Show what's required
+  const required = inkress.kyc.getRequiredDocuments(entityType);
+  console.log(`📋 ${entityType} requires ${required.length} documents:`);
+  required.forEach((doc, i) => console.log(`  ${i + 1}. ${doc}`));
+  console.log('');
+
+  // Step 2: Check current status
+  const statusResponse = await inkress.kyc.getRequirementsStatus(entityType);
+  
+  if (statusResponse.state === 'ok') {
+    const status = statusResponse.result!;
+    
+    console.log('📊 Current Status:');
+    console.log(`  Completion: ${status.completion_percentage}%`);
+    console.log(`  Approved: ${status.total_approved}/${status.total_required}`);
+    console.log(`  Pending: ${status.total_pending}`);
+    console.log(`  Rejected: ${status.total_rejected}`);
+    console.log('');
+  }
+
+  // Step 3: Check if complete
+  const isComplete = await inkress.kyc.isKycComplete(entityType);
+  
+  if (isComplete) {
+    console.log('✅ KYC Complete - Merchant is verified!');
+  } else {
+    // Step 4: Show what's missing
+    const missing = await inkress.kyc.getMissingDocuments(entityType);
+    console.log('⚠️ Action Required:');
+    console.log(`Please submit ${missing.length} document(s):`);
+    missing.forEach(doc => console.log(`  • ${doc}`));
+  }
+}
+
+// Run the check
+await checkKycOnboarding('llc');
+```
+
+### TypeScript Types
+
+```typescript
+import type {
+  EntityType,
+  KycDocumentType,
+  KycRequirements,
+  KycDocumentStatus,
+  KYC_DOCUMENT_REQUIREMENTS
+} from '@inkress/admin-sdk';
+
+// Document status interface
+interface KycDocumentStatus {
+  document_type: KycDocumentType;
+  required: boolean;
+  submitted: boolean;
+  status?: 'pending' | 'approved' | 'rejected';
+  submitted_at?: string;
+  reviewed_at?: string;
+  rejection_reason?: string;
+}
+
+// Complete requirements interface
+interface KycRequirements {
+  entity_type: EntityType;
+  required_documents: KycDocumentType[];
+  document_statuses: KycDocumentStatus[];
+  total_required: number;
+  total_submitted: number;
+  total_approved: number;
+  total_rejected: number;
+  total_pending: number;
+  completion_percentage: number;
+  is_complete: boolean;
+}
+```
+
+### KYC Status Values
+
+The API returns integer status codes that are automatically converted:
+
+| Integer | API Value | Simplified |
+|---------|-----------|------------|
+| 1 | `pending` | `pending` |
+| 2 | `in_review` | `pending` |
+| 3 | `approved` | `approved` |
+| 4 | `rejected` | `rejected` |
+
+The SDK automatically handles the conversion between integers and human-readable strings.
+
+### Best Practices
+
+1. **Cache Requirements**: The `getRequiredDocuments()` and `getAllRequirements()` methods don't make API calls - use them freely for UI display.
+
+2. **Periodic Status Checks**: Poll `getRequirementsStatus()` periodically to track verification progress.
+
+3. **Handle Rejections**: Check `rejection_reason` when a document is rejected to provide clear feedback to users.
+
+4. **Track Submissions**: Use `submitted_at` and `reviewed_at` timestamps to show processing time.
+
+5. **Authentication**: All KYC methods use the authenticated merchant from the `Client-Id` header (set via `username` config).
+
+See [examples/kyc-requirements.ts](examples/kyc-requirements.ts) for complete working examples.
+
+---
 
 ## Advanced Query System
 

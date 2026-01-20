@@ -1,7 +1,33 @@
 import { HttpClient } from '../client';
-import { Merchant, CreateMerchantData, UpdateMerchantData, ApiResponse, MerchantBalance, MerchantLimits, MerchantSubscription, MerchantInvoice } from '../types';
+import { Merchant, CreateMerchantData, UpdateMerchantData, ApiResponse, MerchantBalance, MerchantLimits, MerchantSubscription, MerchantInvoice, FinancialAccount } from '../types';
 import { MerchantQueryBuilder } from '../utils/query-builders';
 import { MerchantFilterParams, MerchantQueryParams, MerchantListResponse } from '../types/resources';
+export interface BankInfoUpdateRequestData {
+    account_holder_name: string;
+    account_holder_type: "Personal" | "Business";
+    account_number: number;
+    account_type: "Checking" | "Saving";
+    bank_name: string;
+    branch_name: string;
+    branch_code?: string;
+    routing_number?: string;
+    swift_code?: string;
+    country_code: string;
+    currency_code: string;
+}
+export interface BankAccountUpdateRequestResponse {
+    message: string | null;
+    success: boolean;
+    error: string | null;
+    reason: string | null;
+}
+export interface BankAccountUpdateConfirmResponse {
+    account: FinancialAccount | null;
+    saved: boolean;
+    success: boolean;
+    error: string | null;
+    reason: string | null;
+}
 /**
  * @deprecated Use MerchantFilterParams from types/resources instead
  */
@@ -58,6 +84,14 @@ export declare class MerchantsResource {
      * Get a specific merchant invoice by ID
      */
     invoice(invoiceId: string): Promise<ApiResponse<MerchantInvoice>>;
+    /**
+     * Request for bank account update
+     */
+    updateBankInfo(data: BankInfoUpdateRequestData): Promise<ApiResponse<BankAccountUpdateRequestResponse>>;
+    /**
+     * Confirm bank account information update with OTP codde
+     */
+    confirmBankInfo(otp: string): Promise<ApiResponse<BankAccountUpdateConfirmResponse>>;
     /**
      * Query merchants with enhanced query support
      * @example

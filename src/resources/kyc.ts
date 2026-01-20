@@ -176,22 +176,8 @@ export interface DocumentSubmissionRequestData {
   [key: string]: string;
 }
 
-export interface BankInfoUpdateRequestData {
-  account_holder_name: string;
-  account_holder_type: "Personal" | "Business";
-  account_number: number;
-  account_type: "Checking" | "Saving";
-  bank_name: string;
-  branch_name: string;
-  branch_code?: string;
-  routing_number?: string;
-  swift_code?: string;
-  country_code: string;
-  currency_code: string;
-}
-
 export interface CreateKycRequestPayload<T> {
-  kind: 'limit_increase' | 'document_submission' | 'bank_info_update';
+  kind: 'limit_increase' | 'document_submission';
   data: T;
 }
 
@@ -261,14 +247,6 @@ export class KycResource {
    * Requires Client-Id header to be set in the configuration
    */
   async uploadDocument(data: CreateKycRequestPayload<DocumentSubmissionRequestData>): Promise<ApiResponse<KycRequest>> {
-    return this.client.post<KycRequest>('/legal_requests', data);
-  }
-
-  /**
-   * Update bank information
-   * Requires Client-Id header to be set in the configuration
-   */
-  async updateBankInfo(data: CreateKycRequestPayload<BankInfoUpdateRequestData>): Promise<ApiResponse<KycRequest>> {
     return this.client.post<KycRequest>('/legal_requests', data);
   }
 

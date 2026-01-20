@@ -302,6 +302,26 @@ const invoices = await inkress.merchants.invoices();
 const invoice = await inkress.merchants.invoice('invoice-123');
 // Returns: MerchantInvoice
 
+// Request bank account update (initiates OTP verification)
+const updateRequest = await inkress.merchants.updateBankInfo({
+  account_holder_name: 'John Doe',
+  account_holder_type: 'Personal',  // 'Personal' | 'Business'
+  account_number: 123456789,
+  account_type: 'Checking',          // 'Checking' | 'Saving'
+  bank_name: 'First National Bank',
+  branch_name: 'Main Branch',
+  branch_code: '001',                // Optional
+  routing_number: '021000021',       // Optional
+  swift_code: 'FNBKUS33',            // Optional
+  country_code: 'JM',
+  currency_code: 'JMD'
+});
+// Returns: { message: string | null, success: boolean, error: string | null, reason: string | null }
+
+// Confirm bank account update with OTP code
+const confirmResult = await inkress.merchants.confirmBankInfo('123456');
+// Returns: { account: FinancialAccount | null, saved: boolean, success: boolean, error: string | null, reason: string | null }
+
 // Query builder
 const merchants = await inkress.merchants
   .createQueryBuilder()
@@ -927,18 +947,6 @@ await inkress.kyc.uploadDocument({
     document_type: 'Proof of Identity',
     document_url: 'https://cdn.example.com/id-card.pdf',
     notes: 'Government-issued ID card'
-  }
-});
-
-// Update bank information
-await inkress.kyc.updateBankInfo({
-  kind: 'bank_info_update',
-  status: 'pending',
-  data: {
-    account_number: '123456789',
-    routing_number: '987654321',
-    bank_name: 'Example Bank',
-    account_holder_name: 'John Doe'
   }
 });
 ```

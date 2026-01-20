@@ -155,6 +155,13 @@ export {
   type KycRequirements,
 } from './resources/kyc';
 
+// Export bank account update types
+export type {
+  BankInfoUpdateRequestData,
+  BankAccountUpdateRequestResponse,
+  BankAccountUpdateConfirmResponse,
+} from './resources/merchants';
+
 export { InkressSDK as default };
 
 // Export resource-specific types for better IntelliSense

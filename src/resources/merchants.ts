@@ -12,6 +12,7 @@ import {
   MerchantLimits,
   MerchantSubscription,
   MerchantInvoice,
+  FinancialAccount,
 } from '../types';
 import {
   StatusTranslator,
@@ -27,6 +28,35 @@ import {
   MerchantListResponse,
   MERCHANT_FIELD_TYPES,
 } from '../types/resources';
+
+export interface BankInfoUpdateRequestData {
+  account_holder_name: string;
+  account_holder_type: "Personal" | "Business";
+  account_number: number;
+  account_type: "Checking" | "Saving";
+  bank_name: string;
+  branch_name: string;
+  branch_code?: string;
+  routing_number?: string;
+  swift_code?: string;
+  country_code: string;
+  currency_code: string;
+}
+
+export interface BankAccountUpdateRequestResponse {
+  message: string | null;
+  success: boolean;
+  error: string | null;
+  reason: string | null;
+}
+
+export interface BankAccountUpdateConfirmResponse {
+  account: FinancialAccount | null;
+  saved: boolean;
+  success: boolean;
+  error: string | null;
+  reason: string | null;
+}
 
 /**
  * @deprecated Use MerchantFilterParams from types/resources instead
@@ -219,6 +249,21 @@ export class MerchantsResource {
    */
   async invoice(invoiceId: string): Promise<ApiResponse<MerchantInvoice>> {
     return this.client.post<MerchantInvoice>(`/merchants/account/invoice/${invoiceId}`);
+  }
+
+  /**
+   * Request for bank account update
+   */
+  async updateBankInfo(data: BankInfoUpdateRequestData): Promise<ApiResponse<BankAccountUpdateRequestResponse>> {
+    return this.client.post<BankAccountUpdateRequestResponse>('/merchants/bank_account/update_request', { bank_account: data });
+  }
+
+
+  /**
+   * Confirm bank account information update with OTP codde
+   */
+  async confirmBankInfo(otp: string): Promise<ApiResponse<BankAccountUpdateConfirmResponse>> {
+    return this.client.post<BankAccountUpdateConfirmResponse>('/merchants/bank_account/update_confirm', { otp });
   }
 
   /**

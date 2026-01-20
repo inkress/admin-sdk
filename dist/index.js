@@ -2408,6 +2408,18 @@ class MerchantsResource {
         return this.client.post(`/merchants/account/invoice/${invoiceId}`);
     }
     /**
+     * Request for bank account update
+     */
+    async updateBankInfo(data) {
+        return this.client.post('/merchants/bank_account/update_request', { bank_account: data });
+    }
+    /**
+     * Confirm bank account information update with OTP codde
+     */
+    async confirmBankInfo(otp) {
+        return this.client.post('/merchants/bank_account/update_confirm', { otp });
+    }
+    /**
      * Query merchants with enhanced query support
      * @example
      * await merchants.query({ status: 'approved', sector: 'retail' })
@@ -3600,13 +3612,6 @@ class KycResource {
      * Requires Client-Id header to be set in the configuration
      */
     async uploadDocument(data) {
-        return this.client.post('/legal_requests', data);
-    }
-    /**
-     * Update bank information
-     * Requires Client-Id header to be set in the configuration
-     */
-    async updateBankInfo(data) {
         return this.client.post('/legal_requests', data);
     }
     // ============================================================================

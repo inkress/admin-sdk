@@ -85,21 +85,8 @@ export interface DocumentSubmissionRequestData {
     document_url: string;
     [key: string]: string;
 }
-export interface BankInfoUpdateRequestData {
-    account_holder_name: string;
-    account_holder_type: "Personal" | "Business";
-    account_number: number;
-    account_type: "Checking" | "Saving";
-    bank_name: string;
-    branch_name: string;
-    branch_code?: string;
-    routing_number?: string;
-    swift_code?: string;
-    country_code: string;
-    currency_code: string;
-}
 export interface CreateKycRequestPayload<T> {
-    kind: 'limit_increase' | 'document_submission' | 'bank_info_update';
+    kind: 'limit_increase' | 'document_submission';
     data: T;
 }
 export declare class KycResource {
@@ -149,11 +136,6 @@ export declare class KycResource {
      * Requires Client-Id header to be set in the configuration
      */
     uploadDocument(data: CreateKycRequestPayload<DocumentSubmissionRequestData>): Promise<ApiResponse<KycRequest>>;
-    /**
-     * Update bank information
-     * Requires Client-Id header to be set in the configuration
-     */
-    updateBankInfo(data: CreateKycRequestPayload<BankInfoUpdateRequestData>): Promise<ApiResponse<KycRequest>>;
     /**
      * Get required KYC documents for a specific entity type
      * This is a client-side method that doesn't make an API call

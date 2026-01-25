@@ -23,6 +23,7 @@ import { FeesResource } from './resources/fees';
 import { PaymentMethodsResource } from './resources/payment-methods';
 import { TransactionEntriesResource } from './resources/transaction-entries';
 import { GenericsResource } from './resources/generics';
+import { CheckoutSessionsResource } from './resources/checkout-sessions';
 
 /**
  * Main Inkress Commerce API SDK class
@@ -92,6 +93,7 @@ export class InkressSDK {
   public readonly paymentMethods: PaymentMethodsResource;
   public readonly transactionEntries: TransactionEntriesResource;
   public readonly generics: GenericsResource;
+  public readonly checkoutSessions: CheckoutSessionsResource;
 
   constructor(config: InkressConfig) {
     this.client = new HttpClient(config);
@@ -118,6 +120,7 @@ export class InkressSDK {
     this.paymentMethods = new PaymentMethodsResource(this.client);
     this.transactionEntries = new TransactionEntriesResource(this.client);
     this.generics = new GenericsResource(this.client);
+    this.checkoutSessions = new CheckoutSessionsResource(this.client);
   }
 
   /**
@@ -154,6 +157,19 @@ export {
   type KycDocumentStatus,
   type KycRequirements,
 } from './resources/kyc';
+
+// Export checkout session types
+export type {
+  CheckoutSession,
+  CheckoutSessionStatus,
+  CheckoutSessionFees,
+  CheckoutSessionFeeMapping,
+  CheckoutSessionTotals,
+  CheckoutSessionCurrency,
+  CheckoutSessionCustomer,
+  CreateCheckoutSessionResponseData,
+  DeleteCheckoutSessionResponseData,
+} from './resources/checkout-sessions';
 
 // Export bank account update types
 export type {

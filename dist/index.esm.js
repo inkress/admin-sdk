@@ -4858,6 +4858,93 @@ class GenericsResource {
 }
 
 /**
+ * Checkout Sessions Resource
+ *
+ * Handles creation and management of checkout sessions for payments.
+ * Checkout sessions provide a way to create temporary payment sessions
+ * with pre-calculated fees and payment URLs.
+ */
+class CheckoutSessionsResource {
+    constructor(client) {
+        this.client = client;
+    }
+    /**
+     * Create a new checkout session
+     *
+     * Creates a checkout session with pre-calculated fees and returns
+     * payment URLs for processing the payment.
+     *
+     * Requires Client-Id header to be set in the configuration.
+     *
+     * @param data - Order data for the checkout session (same as order creation)
+     * @returns The created checkout session with payment URLs and fee breakdown
+     *
+     * @example
+     * ```typescript
+     * const session = await sdk.checkoutSessions.create({
+     *   reference_id: 'order-123',
+     *   total: 100.00,
+     *   kind: 'online',
+     *   currency_code: 'JMD',
+     *   customer: {
+     *     email: 'customer@example.com',
+     *     first_name: 'John',
+     *     last_name: 'Doe',
+     *     phone: '+1234567890'
+     *   },
+     *   title: 'My Order'
+     * });
+     *
+     * // Redirect customer to payment URL
+     * console.log(session.result.payment_url);
+     * ```
+     */
+    async create(data) {
+        return this.client.post('/checkout/sessions', data);
+    }
+    /**
+     * Get checkout session details by session ID
+     *
+     * Retrieves the current state of a checkout session including
+     * payment status, customer info, and fee breakdown.
+     *
+     * Requires Client-Id header to be set in the configuration.
+     *
+     * @param sessionId - The session ID (e.g., 'S.75a29ad32e52')
+     * @returns The checkout session details
+     *
+     * @example
+     * ```typescript
+     * const session = await sdk.checkoutSessions.get('S.75a29ad32e52');
+     * console.log(session.result.status); // 'awaiting_payment'
+     * ```
+     */
+    async get(sessionId) {
+        return this.client.get(`/checkout/sessions/${sessionId}`);
+    }
+    /**
+     * Delete (cancel) a checkout session
+     *
+     * Cancels an active checkout session. Once cancelled, the session
+     * can no longer be used for payment.
+     *
+     * Requires Client-Id header to be set in the configuration.
+     *
+     * @param sessionId - The session ID to cancel (e.g., 'S.75a29ad32e52')
+     * @returns Confirmation of the cancellation
+     *
+     * @example
+     * ```typescript
+     * const result = await sdk.checkoutSessions.delete('S.75a29ad32e52');
+     * console.log(result.result); // 'Session cancelled'
+     * ```
+     */
+    async delete(sessionId) {
+        return this.client.delete(`/checkout/sessions/${sessionId}`);
+    }
+}
+
+/**
  * Main Inkress Commerce API SDK class
  *
  * @example
@@ -4925,6 +5012,7 @@ class InkressSDK {
         this.paymentMethods = new PaymentMethodsResource(this.client);
         this.transactionEntries = new TransactionEntriesResource(this.client);
         this.generics = new GenericsResource(this.client);
+        this.checkoutSessions = new CheckoutSessionsResource(this.client);
     }
     /**
      * Update the SDK configuration

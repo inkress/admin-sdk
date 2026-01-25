@@ -20,6 +20,7 @@ import { FeesResource } from './resources/fees';
 import { PaymentMethodsResource } from './resources/payment-methods';
 import { TransactionEntriesResource } from './resources/transaction-entries';
 import { GenericsResource } from './resources/generics';
+import { CheckoutSessionsResource } from './resources/checkout-sessions';
 /**
  * Main Inkress Commerce API SDK class
  *
@@ -86,6 +87,7 @@ export declare class InkressSDK {
     readonly paymentMethods: PaymentMethodsResource;
     readonly transactionEntries: TransactionEntriesResource;
     readonly generics: GenericsResource;
+    readonly checkoutSessions: CheckoutSessionsResource;
     constructor(config: InkressConfig);
     /**
      * Update the SDK configuration
@@ -100,6 +102,7 @@ export * from './types';
 export * from './client';
 export type { WebhookPayload, WebhookVerificationOptions, IncomingWebhookRequest, } from './resources/webhook-urls';
 export { KYC_DOCUMENT_REQUIREMENTS, type EntityType, type KycDocumentType, type KycDocumentStatus, type KycRequirements, } from './resources/kyc';
+export type { CheckoutSession, CheckoutSessionStatus, CheckoutSessionFees, CheckoutSessionFeeMapping, CheckoutSessionTotals, CheckoutSessionCurrency, CheckoutSessionCustomer, CreateCheckoutSessionResponseData, DeleteCheckoutSessionResponseData, } from './resources/checkout-sessions';
 export type { BankInfoUpdateRequestData, BankAccountUpdateRequestResponse, BankAccountUpdateConfirmResponse, } from './resources/merchants';
 export { InkressSDK as default };
 export type { OrderQueryParams, ProductQueryParams, UserQueryParams, MerchantQueryParams, CategoryQueryParams, BillingPlanQueryParams, SubscriptionQueryParams, PaymentLinkQueryParams, FinancialAccountQueryParams, FinancialRequestQueryParams, WebhookUrlQueryParams, TokenQueryParams, AddressQueryParams, CurrencyQueryParams, ExchangeRateQueryParams, FeeQueryParams, PaymentMethodQueryParams, TransactionEntryQueryParams, OrderFilterParams, ProductFilterParams, UserFilterParams, MerchantFilterParams, CategoryFilterParams, BillingPlanFilterParams, SubscriptionFilterParams, PaymentLinkFilterParams, FinancialAccountFilterParams, FinancialRequestFilterParams, WebhookUrlFilterParams, TokenFilterParams, AddressFilterParams, CurrencyFilterParams, ExchangeRateFilterParams, FeeFilterParams, PaymentMethodFilterParams, TransactionEntryFilterParams, OrderListResponse, ProductListResponse, UserListResponse, MerchantListResponse, CategoryListResponse, BillingPlanListResponse, SubscriptionListResponse, PaymentLinkListResponse, FinancialAccountListResponse, FinancialRequestListResponse, WebhookUrlListResponse, TokenListResponse, AddressListResponse, CurrencyListResponse, ExchangeRateListResponse, FeeListResponse, PaymentMethodListResponse, TransactionEntryListResponse, PageInfo, } from './types/resources';

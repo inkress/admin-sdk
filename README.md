@@ -42,7 +42,7 @@ import { InkressSDK } from '@inkress/admin-sdk';
 
 const inkress = new InkressSDK({
   accessToken: 'your-jwt-token',
-  username: 'merchant-username', // Optional
+  username: 'merchant-username', // Optional - only needed for merchant operations
   mode: 'live', // Optional - 'live' (default) or 'sandbox'
 });
 ```
@@ -222,6 +222,7 @@ The SDK provides access to 23+ fully-typed resources:
 - **Subscriptions** - Recurring billing and subscriptions
 - **Payment Links** - Payment link generation
 - **Payment Methods** - Payment method configuration
+- **Checkout Sessions** - Embedded checkout for card payments
 
 ### Financial
 - **Financial Accounts** - Account management
@@ -700,6 +701,231 @@ await inkress.paymentLinks.update(linkId, { amount: 89.99 });
 
 // Delete payment link
 await inkress.paymentLinks.delete(linkId);
+```
+
+### Checkout Sessions (Embedded Checkout)
+
+Checkout Sessions enable embedded payment forms that can be integrated directly into your website via an iframe. This provides a seamless checkout experience without redirecting customers away from your site.
+
+```typescript
+// Create a checkout session
+const session = await inkress.checkoutSessions.create({
+  reference_id: 'order-123',
+  total: 100.00,
+  kind: 'online',
+  currency_code: 'JMD',
+  title: 'Premium Subscription',
+  customer: {
+    email: 'customer@example.com',
+    first_name: 'John',
+    last_name: 'Doe',
+    phone: '+1234567890'
+  }
+});
+
+// Access the iframe URL for embedding
+const iframeUrl = session.result.frame_url;
+const sessionId = session.result.session_id;
+
+// Get session details
+const details = await inkress.checkoutSessions.get('S.75a29ad32e52');
+console.log(details.result.status); // 'pending', 'awaiting_payment', 'completed', etc.
+
+// Cancel a session
+await inkress.checkoutSessions.delete('S.75a29ad32e52');
+```
+
+#### Embedding the Checkout Iframe
+
+The checkout session returns a `frame_url` that you can embed in your page:
+
+```html
+<!-- Embed the checkout iframe -->
+<iframe
+  id="inkress-checkout"
+  src="https://inkress.com/checkout/session/S.75a29ad32e52"
+  style="width: 100%; height: 600px; border: none;"
+  allow="payment"
+></iframe>
+```
+
+#### Handling Checkout Events
+
+The embedded checkout iframe emits two important `postMessage` events that your application should listen for:
+
+| Event | Description | When Fired |
+|-------|-------------|------------|
+| `frame_unload` | User has entered card information | Card details submitted to payment processor |
+| `payment_posted` | Payment attempt completed | After 3DS verification or payment processing |
+
+```typescript
+const session_id = mySession.id;
+// Listen for checkout events from the iframe
+window.addEventListener('message', (event) => {
+  // Verify the origin for security
+  if (event.origin !== 'https://inkress.com') {
+    return;
+  }
+
+  const { type, data } = event.data;
+
+  switch (type) {
+    case 'frame_unload':
+      // User has entered their card information
+      // The iframe is processing the payment
+      console.log('Payment processing started...');
+      expandFrameFor3DS();
+      break;
+
+    case 'payment_posted':
+      // Payment attempt has completed
+      // Check the session status to determine outcome
+      handlePaymentResult();
+      break;
+  }
+});
+
+async function handlePaymentResult() {
+  // Fetch the updated session to get the final status
+  const session = await inkress.checkoutSessions.get(dsession_id);
+  
+  if (session.result.status === 'completed') {
+    // Payment successful!
+    showSuccessMessage();
+    redirectToConfirmation(session.result.order_id);
+  } else {
+    // Payment failed or requires action
+    showErrorMessage('Payment could not be completed. Please try again.');
+  }
+}
+```
+
+#### Complete Integration Example
+
+```typescript
+import { InkressSDK } from '@inkress/admin-sdk';
+
+const inkress = new InkressSDK({
+  accessToken: 'your-jwt-token',
+  username: 'your-merchant'
+});
+
+async function initializeCheckout(orderData: {
+  total: number;
+  currency: string;
+  customer: { email: string; firstName: string; lastName: string; phone: string };
+}) {
+  // 1. Create the checkout session
+  const session = await inkress.checkoutSessions.create({
+    reference_id: `${Math.random().toString(36).substring(2, 9)}`,
+    total: orderData.total,
+    kind: 'online',
+    currency_code: orderData.currency,
+    title: 'Your Order',
+    customer: {
+      email: orderData.customer.email,
+      first_name: orderData.customer.firstName,
+      last_name: orderData.customer.lastName,
+      phone: orderData.customer.phone
+    }
+  });
+
+  // 2. Store session details for later reference
+  const sessionId = session.result.session_id;
+  const expiresAt = session.result.expires;
+
+  // 3. Display the checkout iframe
+  const iframe = document.createElement('iframe');
+  iframe.src = session.result.frame_url;
+  iframe.style.cssText = 'width: 100%; height: 600px; border: none;';
+  iframe.allow = 'payment';
+  document.getElementById('checkout-container')!.appendChild(iframe);
+
+  // 4. Set up event listeners
+  window.addEventListener('message', async (event) => {
+    if (event.origin !== 'https://inkress.com') return;
+
+    const { type } = event.data;
+
+    if (type === 'frame_unload') {
+      // Show loading state while payment processes
+      document.getElementById('loading-overlay')!.style.display = 'flex';
+    }
+
+    if (type === 'payment_posted') {
+      // Check final payment status
+      const updatedSession = await inkress.checkoutSessions.get(sessionId);
+      
+      if (updatedSession.result.status === 'completed') {
+        window.location.href = `/order-confirmation?order=${updatedSession.result.order_id}`;
+      } else {
+        document.getElementById('loading-overlay')!.style.display = 'none';
+        alert('Payment failed. Please try again.');
+      }
+    }
+  });
+
+  // 5. Handle session expiration
+  const timeUntilExpiry = expiresAt - Date.now();
+  setTimeout(() => {
+    alert('Your checkout session has expired. Please try again.');
+    window.location.reload();
+  }, timeUntilExpiry);
+
+  return { sessionId, expiresAt };
+}
+```
+
+#### Session Response Structure
+
+```typescript
+interface CreateCheckoutSessionResponse {
+  session_id: string;           // e.g., 'S.75a29ad32e52'
+  reference_id: string;         // Your order reference
+  status: string;               // 'pending'
+  order_id: string;             // Internal order ID
+  currency: string;             // e.g., 'JMD'
+  currency_code: string;        // e.g., 'JMD'
+  created_at: string;           // ISO timestamp
+  payment_initiated_at: string; // ISO timestamp
+  completed_at: string | null;  // null until completed
+  expires: number;              // Expiration timestamp (ms)
+  
+  // Payment totals breakdown
+  totals: {
+    sub_total: number;
+    customer_total: number;     // Amount customer pays
+    merchant_total: number;     // Amount merchant receives
+    platform_total: number;
+    provider_total: number;
+    shipping_total: number;
+    tax_total: number;
+    discount_total: number;
+  };
+  
+  // Customer info
+  customer: {
+    id: number | null;
+    email: string;
+    first_name: string;
+    last_name: string;
+    phone: string;
+  };
+  
+  // Iframe and payment data
+  frame_url: string;            // URL to embed in iframe
+  redirect_data: string;        // 3DS redirect HTML (if needed)
+  spi_token: string;            // Payment processor token
+  transaction_id: string;       // Transaction UUID
+  amount: number;               // Total amount
+  
+  // Additional fields
+  title: string;
+  products: any[];
+  transaction_type: string | null;
+  three_d_secure: any | null;
+  is_subscription: boolean;
+}
 ```
 
 ### Financial Accounts

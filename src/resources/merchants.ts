@@ -13,6 +13,8 @@ import {
   MerchantSubscription,
   MerchantInvoice,
   FinancialAccount,
+  RevenueByAppResponse,
+  AppContributionResponse,
 } from '../types';
 import {
   StatusTranslator,
@@ -249,6 +251,34 @@ export class MerchantsResource {
    */
   async invoice(invoiceId: string): Promise<ApiResponse<MerchantInvoice>> {
     return this.client.post<MerchantInvoice>(`/merchants/account/invoice/${invoiceId}`);
+  }
+
+  /**
+   * Per-app revenue + activity rollup for the merchant — drives the
+   * Connected Apps performance section of the dashboard. First-party
+   * dashboard callers only; OAuth tokens get 403 (cross-app leak).
+   *
+   * @param params.window         "7d" | "30d" | "90d" | "all_time" (default "30d")
+   * @param params.currency_code  optional ISO-4217 to narrow the report
+   */
+  async revenueByApp(params?: { window?: '7d' | '30d' | '90d' | 'all_time'; currency_code?: string }): Promise<ApiResponse<RevenueByAppResponse>> {
+    return this.client.post<RevenueByAppResponse>('/merchants/account/revenue_by_app', params || {});
+  }
+
+  /**
+   * The calling OAuth app's net contribution to the merchant's wallet
+   * — SUM (credits − debits) over the entries tagged with this app.
+   * OAuth-only; the app id is taken from the bearer token, never from
+   * params. Returns 403 for first-party callers.
+   *
+   * Note: contribution ≠ balance. A merchant payout the app didn't
+   * initiate doesn't decrease this number — it's "what did my
+   * activity contribute," not "what's mine to draw on."
+   *
+   * @param params.currency_code  optional ISO-4217 to narrow the figure
+   */
+  async contribution(params?: { currency_code?: string }): Promise<ApiResponse<AppContributionResponse>> {
+    return this.client.post<AppContributionResponse>('/merchants/account/contribution', params || {});
   }
 
   /**

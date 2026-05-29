@@ -374,6 +374,37 @@ export interface MerchantInvoice {
   paid_date?: string;
 }
 
+export interface AppRevenue {
+  oauth_client_id: number | null;
+  app_name: string;
+  app_logo_url: string | null;
+  connected_at: string | null;
+  status: 'active' | 'revoked' | '—';
+  revenue: number;
+  currency_code: string | null;
+  order_count: number;
+  average_order_value: number;
+  payouts: { pending: number; completed: number };
+  last_activity_at: string | null;
+}
+
+export interface RevenueByAppResponse {
+  window: '7d' | '30d' | '90d' | 'all_time';
+  currency_code: string | null;
+  start_date: string;
+  end_date: string;
+  apps: AppRevenue[];
+}
+
+export interface AppContributionResponse {
+  oauth_client_id: number;
+  merchant_id: number;
+  currency_code: string | null;
+  net_contribution: number;
+  entry_count: number;
+  last_activity_at: string | null;
+}
+
 export interface PublicMerchant {
   id: number;
   name: string;

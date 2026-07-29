@@ -89,6 +89,18 @@ export interface CreateKycRequestPayload<T> {
     kind: 'limit_increase' | 'document_submission';
     data: T;
 }
+/**
+ * A minted merchant KYC verify link — a single-use, ~3-hour capability link you send to a
+ * merchant so they complete identity verification. It is write-only (it cannot read KYC data).
+ */
+export interface KycVerifyLink {
+    /** The URL to hand to the merchant to start the `/verify` capture flow. */
+    verify_url: string;
+    /** ISO-8601 expiry timestamp (~3 hours out), or null if not reported. */
+    expires_at: string | null;
+    /** Always true — the link becomes invalid once used. */
+    single_use: boolean;
+}
 export declare class KycResource {
     private client;
     constructor(client: HttpClient);
@@ -136,6 +148,23 @@ export declare class KycResource {
      * Requires Client-Id header to be set in the configuration
      */
     uploadDocument(data: CreateKycRequestPayload<DocumentSubmissionRequestData>): Promise<ApiResponse<KycRequest>>;
+    /**
+     * Mint a merchant-facing KYC `/verify` link for a merchant you own, to send the merchant so
+     * they complete identity verification.
+     *
+     * Intended for integrator (organisation) tokens: the authenticated token must carry the
+     * `kyc:write` scope and own `merchantId`. The returned link is a single-use, ~3-hour, write-only
+     * capability — it can start the verify flow but can't read any KYC data. If the merchant needs a
+     * fresh link (e.g. it expired), mint another.
+     *
+     * @param merchantId - The owned merchant to mint a verify link for
+     * @returns `{ verify_url, expires_at, single_use }`
+     *
+     * @example
+     * const { result } = await inkress.kyc.createVerifyLink(123);
+     * // hand result.verify_url to your merchant (email/SMS/in-app)
+     */
+    createVerifyLink(merchantId: number): Promise<ApiResponse<KycVerifyLink>>;
     /**
      * Get required KYC documents for a specific entity type
      * This is a client-side method that doesn't make an API call

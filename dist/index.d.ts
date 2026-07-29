@@ -101,7 +101,7 @@ export declare class InkressSDK {
 export * from './types';
 export * from './client';
 export type { WebhookPayload, WebhookVerificationOptions, IncomingWebhookRequest, } from './resources/webhook-urls';
-export { KYC_DOCUMENT_REQUIREMENTS, type EntityType, type KycDocumentType, type KycDocumentStatus, type KycRequirements, } from './resources/kyc';
+export { KYC_DOCUMENT_REQUIREMENTS, type EntityType, type KycDocumentType, type KycDocumentStatus, type KycRequirements, type KycVerifyLink, } from './resources/kyc';
 export type { CheckoutSession, CheckoutSessionStatus, CheckoutSessionFees, CheckoutSessionFeeMapping, CheckoutSessionTotals, CheckoutSessionCurrency, CheckoutSessionCustomer, CreateCheckoutSessionResponseData, DeleteCheckoutSessionResponseData, } from './resources/checkout-sessions';
 export type { BankInfoUpdateRequestData, BankAccountUpdateRequestResponse, BankAccountUpdateConfirmResponse, } from './resources/merchants';
 export { InkressSDK as default };

@@ -2404,6 +2404,32 @@ class MerchantsResource {
         return this.client.post(`/merchants/account/invoice/${invoiceId}`);
     }
     /**
+     * Per-app revenue + activity rollup for the merchant — drives the
+     * Connected Apps performance section of the dashboard. First-party
+     * dashboard callers only; OAuth tokens get 403 (cross-app leak).
+     *
+     * @param params.window         "7d" | "30d" | "90d" | "all_time" (default "30d")
+     * @param params.currency_code  optional ISO-4217 to narrow the report
+     */
+    async revenueByApp(params) {
+        return this.client.post('/merchants/account/revenue_by_app', params || {});
+    }
+    /**
+     * The calling OAuth app's net contribution to the merchant's wallet
+     * — SUM (credits − debits) over the entries tagged with this app.
+     * OAuth-only; the app id is taken from the bearer token, never from
+     * params. Returns 403 for first-party callers.
+     *
+     * Note: contribution ≠ balance. A merchant payout the app didn't
+     * initiate doesn't decrease this number — it's "what did my
+     * activity contribute," not "what's mine to draw on."
+     *
+     * @param params.currency_code  optional ISO-4217 to narrow the figure
+     */
+    async contribution(params) {
+        return this.client.post('/merchants/account/contribution', params || {});
+    }
+    /**
      * Request for bank account update
      */
     async updateBankInfo(data) {
@@ -3609,6 +3635,25 @@ class KycResource {
      */
     async uploadDocument(data) {
         return this.client.post('/legal_requests', data);
+    }
+    /**
+     * Mint a merchant-facing KYC `/verify` link for a merchant you own, to send the merchant so
+     * they complete identity verification.
+     *
+     * Intended for integrator (organisation) tokens: the authenticated token must carry the
+     * `kyc:write` scope and own `merchantId`. The returned link is a single-use, ~3-hour, write-only
+     * capability — it can start the verify flow but can't read any KYC data. If the merchant needs a
+     * fresh link (e.g. it expired), mint another.
+     *
+     * @param merchantId - The owned merchant to mint a verify link for
+     * @returns `{ verify_url, expires_at, single_use }`
+     *
+     * @example
+     * const { result } = await inkress.kyc.createVerifyLink(123);
+     * // hand result.verify_url to your merchant (email/SMS/in-app)
+     */
+    async createVerifyLink(merchantId) {
+        return this.client.post(`/merchants/${merchantId}/kyc/verify-link`, {});
     }
     // ============================================================================
     // KYC DOCUMENT REQUIREMENTS & STATUS

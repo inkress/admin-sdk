@@ -3318,6 +3318,25 @@ class SubscriptionsResource {
         return this.client.post('/billing_subscriptions/link', { ...data, plan_id: data.plan_uid });
     }
     /**
+     * Mint a self-serve card-update magic-link for a subscription.
+     *
+     * Merchant-authed. Returns a signed, single-subscription link you send the subscriber; they open
+     * it to replace the card on file — a small temporary ($1 authorize-only) hold verifies the new
+     * card, so no login or support ticket is needed. Only works while the subscription is ACTIVE
+     * (a cancelled/ended subscription returns an error).
+     *
+     * @param uid - The subscription uid
+     * @param data - Optional `{ storefront_base }` to override the magic-link host
+     * @returns `{ link, token }` — hand `link` to the subscriber
+     *
+     * @example
+     * const { result } = await inkress.subscriptions.createCardUpdateLink('sub_abc');
+     * // send result.link to the subscriber (email / SMS)
+     */
+    async createCardUpdateLink(uid, data) {
+        return this.client.post(`/billing_subscriptions/${uid}/card-update-link`, data !== null && data !== void 0 ? data : {});
+    }
+    /**
      * Charge an existing subscription
      * Requires Client-Id header to be set in the configuration
      */

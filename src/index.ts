@@ -159,6 +159,12 @@ export {
   type KycVerifyLink,
 } from './resources/kyc';
 
+// Export subscription card-update types
+export type {
+  CreateCardUpdateLinkData,
+  CardUpdateLinkResponse,
+} from './resources/subscriptions';
+
 // Export checkout session types
 export type {
   CheckoutSession,

@@ -51,6 +51,18 @@ export interface CreateSubscriptionLinkResponse {
   subscription_uid: string;
 }
 
+export interface CreateCardUpdateLinkData {
+  /** Storefront base URL the magic-link is built on (falls back to the API's STOREFRONT_BASE_URL). */
+  storefront_base?: string;
+}
+
+export interface CardUpdateLinkResponse {
+  /** The signed self-serve magic-link to send the subscriber — they open it to update the card on file. */
+  link: string;
+  /** The raw HMAC token embedded in `link` (scoped to this one subscription uid). */
+  token: string;
+}
+
 export interface ChargeSubscriptionData {
   reference_id: string;
   total: number;
@@ -235,6 +247,26 @@ export class SubscriptionsResource {
    */
   async createLink(data: CreateSubscriptionLinkData): Promise<ApiResponse<CreateSubscriptionLinkResponse>> {
     return this.client.post<CreateSubscriptionLinkResponse>('/billing_subscriptions/link', {...data, plan_id: data.plan_uid });
+  }
+
+  /**
+   * Mint a self-serve card-update magic-link for a subscription.
+   *
+   * Merchant-authed. Returns a signed, single-subscription link you send the subscriber; they open
+   * it to replace the card on file — a small temporary ($1 authorize-only) hold verifies the new
+   * card, so no login or support ticket is needed. Only works while the subscription is ACTIVE
+   * (a cancelled/ended subscription returns an error).
+   *
+   * @param uid - The subscription uid
+   * @param data - Optional `{ storefront_base }` to override the magic-link host
+   * @returns `{ link, token }` — hand `link` to the subscriber
+   *
+   * @example
+   * const { result } = await inkress.subscriptions.createCardUpdateLink('sub_abc');
+   * // send result.link to the subscriber (email / SMS)
+   */
+  async createCardUpdateLink(uid: string, data?: CreateCardUpdateLinkData): Promise<ApiResponse<CardUpdateLinkResponse>> {
+    return this.client.post<CardUpdateLinkResponse>(`/billing_subscriptions/${uid}/card-update-link`, data ?? {});
   }
 
   /**

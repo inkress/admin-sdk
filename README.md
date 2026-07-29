@@ -643,6 +643,14 @@ const link = await inkress.subscriptions.createLink({
 });
 // Returns: CreateSubscriptionLinkResponse
 
+// Self-serve card-update link — send it to a subscriber so they replace the card on file.
+// A small temporary ($1 authorize-only) hold verifies the new card; no login or support ticket.
+// Only works while the subscription is ACTIVE (cancelled/ended returns an error).
+const { result } = await inkress.subscriptions.createCardUpdateLink('sub-uid');
+// hand result.link to the subscriber (email / SMS). Optionally override the magic-link host:
+await inkress.subscriptions.createCardUpdateLink('sub-uid', { storefront_base: 'https://shop.example.com' });
+// Returns: CardUpdateLinkResponse { link, token }
+
 // Charge subscription (fully typed)
 const charge = await inkress.subscriptions.charge('sub-uid', {
   reference_id: 'charge-123',

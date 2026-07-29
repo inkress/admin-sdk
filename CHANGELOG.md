@@ -5,17 +5,7 @@ All notable changes to the Inkress Admin SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.0] - 2026-07-29
-
-### 🚀 Added
-
-- **`subscriptions.createCardUpdateLink(uid, { storefront_base? })`** — mint a self-serve card-update
-  magic-link for a subscription (`POST /billing_subscriptions/:uid/card-update-link`). Returns
-  `{ link, token }` (exported type `CardUpdateLinkResponse`); send `link` to the subscriber so they
-  replace the card on file — a temporary $1 authorize-only hold verifies the new card, no login or
-  support ticket needed. Merchant-authed; only works while the subscription is active.
-
-## [1.2.0] - 2026-07-29
+## [1.1.49] - 2026-07-29
 
 ### 🚀 Added
 
@@ -24,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (exported type `KycVerifyLink`). The authenticated token must carry the `kyc:write` scope and own
   the merchant; the returned link is single-use, expires in ~3 hours, and is write-only. See the
   "Mint a Merchant Verify Link (integrators)" section in the README.
+- **`subscriptions.createCardUpdateLink(uid, { storefront_base? })`** — mint a self-serve card-update
+  magic-link for a subscription (`POST /billing_subscriptions/:uid/card-update-link`). Returns
+  `{ link, token }` (exported type `CardUpdateLinkResponse`); send `link` to the subscriber so they
+  replace the card on file — a temporary $1 authorize-only hold verifies the new card, no login or
+  support ticket needed. Merchant-authed; only works while the subscription is active.
 
 ## [1.1.0] - 2024-12-16
 

@@ -156,6 +156,7 @@ export {
   type KycDocumentType,
   type KycDocumentStatus,
   type KycRequirements,
+  type KycVerifyLink,
 } from './resources/kyc';
 
 // Export checkout session types

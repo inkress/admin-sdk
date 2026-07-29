@@ -1177,6 +1177,35 @@ await inkress.kyc.uploadDocument({
 });
 ```
 
+### Mint a Merchant Verify Link (integrators)
+
+If you're an integrator (an organisation account that owns merchant accounts), you can mint a
+merchant-facing KYC `/verify` link and send it to your merchant so they complete identity
+verification themselves.
+
+Unlike the other KYC methods (which act on the *authenticated* merchant), `createVerifyLink` takes
+an explicit `merchantId`. The authenticated token must carry the **`kyc:write`** scope and **own**
+that merchant. The returned link is **single-use**, expires in **~3 hours**, and is **write-only**
+(it can start the verify flow but cannot read any KYC data). If it expires before the merchant opens
+it, just mint another.
+
+```typescript
+const { result } = await inkress.kyc.createVerifyLink(123); // owned merchant id
+
+// result: { verify_url, expires_at, single_use }
+console.log(result.verify_url);  // e.g. https://auditor.inkress.com/verify?token=…
+// deliver result.verify_url to your merchant (email / SMS / in-app)
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `verify_url` | `string` | Hand this to the merchant to start the `/verify` flow. |
+| `expires_at` | `string \| null` | ISO-8601 expiry (~3h out). |
+| `single_use` | `boolean` | Always `true` — invalid once used. |
+
+Errors: `403` (token missing `kyc:write`), `404` (merchant not owned/unknown), `429` (rate limited),
+`503` (rate limiter unavailable), `502` (verification service unavailable).
+
 ### Complete Onboarding Flow Example
 
 ```typescript
@@ -1281,7 +1310,7 @@ The SDK automatically handles the conversion between integers and human-readable
 
 4. **Track Submissions**: Use `submitted_at` and `reviewed_at` timestamps to show processing time.
 
-5. **Authentication**: All KYC methods use the authenticated merchant from the `Client-Id` header (set via `username` config).
+5. **Authentication**: Most KYC methods act on the authenticated merchant from the `Client-Id` header (set via `username` config). The exception is `createVerifyLink(merchantId)`, which takes an explicit merchant id — for integrator tokens that own multiple merchants (requires the `kyc:write` scope + ownership of that merchant).
 
 See [examples/kyc-requirements.ts](examples/kyc-requirements.ts) for complete working examples.
 

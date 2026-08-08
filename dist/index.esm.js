@@ -337,7 +337,10 @@ const mappings = {
         "financial_request_pending": 1,
         "financial_request_in_review": 2,
         "financial_request_approved": 3,
-        "financial_request_rejected": 4
+        "financial_request_rejected": 4,
+        "payment_link_active": 1,
+        "payment_link_draft": 2,
+        "payment_link_cancelled": 3
     }
 };
 
@@ -377,6 +380,12 @@ const FeeStructureTranslator = {
      * Convert integer to string for user display
      */
     toString(value) {
+        // A translated object often embeds a related record that carries only SOME of its columns - an
+        // order's merchant, for instance, has an id and status but no platform/provider fee_structure.
+        // Translating an absent value must yield an absent value, not throw, or one missing optional
+        // column takes down the whole read (was: `orders.get` crashing on every real order).
+        if (value === null || value === undefined)
+            return value;
         const key = reverseFeeStructure[value];
         if (!key) {
             throw new Error(`Unknown fee structure value: ${value}`);
@@ -419,6 +428,8 @@ const KindTranslator = {
      * Convert integer to string for user display
      */
     toString(value) {
+        if (value === null || value === undefined)
+            return value;
         const key = reverseKind[value];
         if (!key) {
             throw new Error(`Unknown kind value: ${value}`);
@@ -429,6 +440,8 @@ const KindTranslator = {
      * Convert integer to string and remove context prefix
      */
     toStringWithoutContext(value, context) {
+        if (value === null || value === undefined)
+            return value;
         const prefix = `${context}_`;
         // Try to find a key that matches the value and starts with the prefix
         const contextKey = findKeyByValueAndPrefix(mappings.Kind, value, prefix);
@@ -493,6 +506,8 @@ const StatusTranslator = {
      * Convert integer to string for user display
      */
     toString(value) {
+        if (value === null || value === undefined)
+            return value;
         const key = reverseStatus[value];
         if (!key) {
             throw new Error(`Unknown status value: ${value}`);
@@ -503,6 +518,8 @@ const StatusTranslator = {
      * Convert integer to string and remove context prefix
      */
     toStringWithoutContext(value, context) {
+        if (value === null || value === undefined)
+            return value;
         const prefix = `${context}_`;
         // Try to find a key that matches the value and starts with the prefix
         const contextKey = findKeyByValueAndPrefix(mappings.Status, value, prefix);
@@ -3866,7 +3883,10 @@ class PaymentLinksResource {
         return {
             ...internal,
             status: StatusTranslator.toStringWithoutContext(internal.status, 'payment_link'),
-            kind: KindTranslator.toStringWithoutContext(internal.kind, 'order'),
+            // 'payment_link', not 'order' — the read path was translating a payment link's kind in the ORDER
+            // context (so kind 1 came back as "online" instead of "order"), disagreeing with the write/filter
+            // paths (translateFilters/translateToInternal), which both use 'payment_link'.
+            kind: KindTranslator.toStringWithoutContext(internal.kind, 'payment_link'),
         };
     }
     /**

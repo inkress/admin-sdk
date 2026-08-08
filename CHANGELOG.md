@@ -5,6 +5,25 @@ All notable changes to the Inkress Admin SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.50] - 2026-08-08
+
+### 🐛 Fixed
+
+- **Resource reads no longer crash on a partial embedded record.** The `FeeStructure`, `Kind`, and
+  `Status` translators (`toString` / `toStringWithoutContext`) now pass a `null`/`undefined` value
+  through instead of throwing. Previously `orders.get` and `orders.query` threw
+  `Unknown fee structure value: undefined` on **every real order**, because the order's embedded
+  merchant carries an id and status but no `platform_fee_structure` / `provider_fee_structure`
+  column for `translateMerchantToUserFacing` to translate.
+- **Payment link `kind` was translated in the wrong context on read.** `translateToUserFacing` used
+  the `order` context (so `kind: 1` came back as `"online"`), disagreeing with the write/filter paths
+  (`translateFilters` / `translateToInternal`), which both use `payment_link`. It now uses
+  `payment_link` — `kind: 1` → `"order"`, `2` → `"invoice"`.
+- **Payment link `status` had no mapping entries**, so it fell through to the `financial_request`
+  reverse (a draft link came back as `"financial_request_in_review"`). Added `payment_link_active`
+  (1), `payment_link_draft` (2), and `payment_link_cancelled` (3) to the Status map, matching
+  commerce-web and the merchant apps' `PAYMENT_LINK_STATUS`.
+
 ## [1.1.49] - 2026-07-29
 
 ### 🚀 Added

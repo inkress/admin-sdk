@@ -31,7 +31,10 @@ export class PaymentLinksResource {
     return {
       ...internal,
       status: StatusTranslator.toStringWithoutContext(internal.status, 'payment_link') as StatusKey,
-      kind: KindTranslator.toStringWithoutContext(internal.kind, 'order') as KindKey,
+      // 'payment_link', not 'order' — the read path was translating a payment link's kind in the ORDER
+      // context (so kind 1 came back as "online" instead of "order"), disagreeing with the write/filter
+      // paths (translateFilters/translateToInternal), which both use 'payment_link'.
+      kind: KindTranslator.toStringWithoutContext(internal.kind, 'payment_link') as KindKey,
     };
   }
 

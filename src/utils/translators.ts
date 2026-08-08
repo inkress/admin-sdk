@@ -55,6 +55,11 @@ export const FeeStructureTranslator = {
    * Convert integer to string for user display
    */
   toString(value: FeeStructureValue): FeeStructureKey {
+    // A translated object often embeds a related record that carries only SOME of its columns - an
+    // order's merchant, for instance, has an id and status but no platform/provider fee_structure.
+    // Translating an absent value must yield an absent value, not throw, or one missing optional
+    // column takes down the whole read (was: `orders.get` crashing on every real order).
+    if (value === null || value === undefined) return value as unknown as FeeStructureKey;
     const key = reverseFeeStructure[value];
     if (!key) {
       throw new Error(`Unknown fee structure value: ${value}`);
@@ -104,6 +109,7 @@ export const KindTranslator = {
    * Convert integer to string for user display
    */
   toString(value: KindValue): KindKey {
+    if (value === null || value === undefined) return value as unknown as KindKey;
     const key = reverseKind[value];
     if (!key) {
       throw new Error(`Unknown kind value: ${value}`);
@@ -115,8 +121,9 @@ export const KindTranslator = {
    * Convert integer to string and remove context prefix
    */
   toStringWithoutContext(value: KindValue, context: string): string {
+    if (value === null || value === undefined) return value as unknown as string;
     const prefix = `${context}_`;
-    
+
     // Try to find a key that matches the value and starts with the prefix
     const contextKey = findKeyByValueAndPrefix(mappings.Kind, value, prefix);
     
@@ -193,6 +200,7 @@ export const StatusTranslator = {
    * Convert integer to string for user display
    */
   toString(value: StatusValue): StatusKey {
+    if (value === null || value === undefined) return value as unknown as StatusKey;
     const key = reverseStatus[value];
     if (!key) {
       throw new Error(`Unknown status value: ${value}`);
@@ -204,8 +212,9 @@ export const StatusTranslator = {
    * Convert integer to string and remove context prefix
    */
   toStringWithoutContext(value: StatusValue, context: string): string {
+    if (value === null || value === undefined) return value as unknown as string;
     const prefix = `${context}_`;
-    
+
     // Try to find a key that matches the value and starts with the prefix
     const contextKey = findKeyByValueAndPrefix(mappings.Status, value, prefix);
     

@@ -171,6 +171,9 @@ export const mappings = {
     "financial_request_pending": 1,
     "financial_request_in_review": 2,
     "financial_request_approved": 3,
-    "financial_request_rejected": 4
+    "financial_request_rejected": 4,
+    "payment_link_active": 1,
+    "payment_link_draft": 2,
+    "payment_link_cancelled": 3
   }
 }

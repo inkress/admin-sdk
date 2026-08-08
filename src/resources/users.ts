@@ -156,13 +156,13 @@ export class UsersResource {
   async query(params?: UserQueryParams): Promise<ApiResponse<UserListResponse>> {
     const processedQuery = processQuery(params || {}, USER_FIELD_TYPES, { validate: true });
     const translatedQuery = this.translateFilters(processedQuery);
-    const response = await this.client.get<{ entries: InternalUser[]; page_info: any }>('/users', translatedQuery);
+    const response = await this.client.get<{ entries: InternalUser[]; pagination: any }>('/users', translatedQuery);
     
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(user => this.translateUserToUserFacing(user));
       return {
         state: response.state,
-        result: { entries: translatedEntries, page_info: response.result.page_info }
+        result: { entries: translatedEntries, page_info: response.result.pagination }
       };
     }
     

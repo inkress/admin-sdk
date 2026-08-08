@@ -180,7 +180,7 @@ export class OrdersResource {
    */
   async list(params?: OrderFilterParams): Promise<ApiResponse<OrderListResponse>> {
     const translatedParams = this.translateFilters(params);
-    const response = await this.client.get<{ entries: InternalOrder[]; page_info: any }>('/orders', translatedParams);
+    const response = await this.client.get<{ entries: InternalOrder[]; pagination: any }>('/orders', translatedParams);
     
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(order => this.translateOrderToUserFacing(order));
@@ -188,7 +188,7 @@ export class OrdersResource {
         state: response.state,
         result: {
           entries: translatedEntries,
-          page_info: response.result.page_info
+          page_info: response.result.pagination
         }
       };
     }
@@ -233,7 +233,7 @@ export class OrdersResource {
     // Process the query through the transformation system with validation and translation
     const processedQuery = processQuery(params || {}, ORDER_FIELD_TYPES, { validate: true, context: 'order' });
     
-    const response = await this.client.get<{ entries: InternalOrder[]; page_info: any }>('/orders', processedQuery);
+    const response = await this.client.get<{ entries: InternalOrder[]; pagination: any }>('/orders', processedQuery);
     
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(order => this.translateOrderToUserFacing(order));
@@ -241,7 +241,7 @@ export class OrdersResource {
         state: response.state,
         result: {
           entries: translatedEntries,
-          page_info: response.result.page_info
+          page_info: response.result.pagination
         }
       };
     }

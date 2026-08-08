@@ -76,7 +76,7 @@ export class ProductsResource {
    */
   async list(params?: ProductFilterParams): Promise<ApiResponse<ProductListResponse>> {
     const translatedParams = this.translateFilters(params);
-    const response = await this.client.get<{ entries: InternalProduct[]; page_info: any }>('/products', translatedParams);
+    const response = await this.client.get<{ entries: InternalProduct[]; pagination: any }>('/products', translatedParams);
     
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(product => this.translateProductToUserFacing(product));
@@ -84,7 +84,7 @@ export class ProductsResource {
         state: response.state,
         result: {
           entries: translatedEntries,
-          page_info: response.result.page_info
+          page_info: response.result.pagination
         }
       };
     }
@@ -199,7 +199,7 @@ export class ProductsResource {
     // Process the query through the transformation system with validation and translation
     const processedQuery = processQuery(params || {}, PRODUCT_FIELD_TYPES, { validate: true, context: 'product' });
     
-    const response = await this.client.get<{ entries: InternalProduct[]; page_info: any }>('/products', processedQuery);
+    const response = await this.client.get<{ entries: InternalProduct[]; pagination: any }>('/products', processedQuery);
     
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(product => this.translateProductToUserFacing(product));
@@ -207,7 +207,7 @@ export class ProductsResource {
         state: response.state,
         result: {
           entries: translatedEntries,
-          page_info: response.result.page_info
+          page_info: response.result.pagination
         }
       };
     }

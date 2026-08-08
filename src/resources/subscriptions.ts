@@ -171,7 +171,7 @@ export class SubscriptionsResource {
    */
   async list(params?: SubscriptionFilterParams): Promise<ApiResponse<SubscriptionListResponse>> {
     const translatedParams = this.translateFilters(params);
-    const response = await this.client.get<{ entries: InternalSubscription[]; page_info: any }>('/billing_subscriptions', translatedParams);
+    const response = await this.client.get<{ entries: InternalSubscription[]; pagination: any }>('/billing_subscriptions', translatedParams);
     
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(sub => this.translateToUserFacing(sub));
@@ -179,7 +179,7 @@ export class SubscriptionsResource {
         state: response.state,
         result: {
           entries: translatedEntries,
-          page_info: response.result.page_info
+          page_info: response.result.pagination
         }
       };
     }

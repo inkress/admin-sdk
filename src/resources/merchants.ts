@@ -137,7 +137,7 @@ export class MerchantsResource {
    */
   async list(params?: MerchantFilterParams): Promise<ApiResponse<MerchantListResponse>> {
     const translatedParams = this.translateFilters(params);
-    const response = await this.client.get<{ entries: InternalMerchant[]; page_info: any }>('/merchants', translatedParams);
+    const response = await this.client.get<{ entries: InternalMerchant[]; pagination: any }>('/merchants', translatedParams);
     
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(merchant => this.translateMerchantToUserFacing(merchant));
@@ -145,7 +145,7 @@ export class MerchantsResource {
         state: response.state,
         result: {
           entries: translatedEntries,
-          page_info: response.result.page_info
+          page_info: response.result.pagination
         }
       };
     }
@@ -303,13 +303,13 @@ export class MerchantsResource {
    */
   async query(params?: MerchantQueryParams): Promise<ApiResponse<MerchantListResponse>> {
     const processedQuery = processQuery(params || {}, MERCHANT_FIELD_TYPES, { validate: true, context: 'account' });
-    const response = await this.client.get<{ entries: InternalMerchant[]; page_info: any }>('/merchants', processedQuery);
+    const response = await this.client.get<{ entries: InternalMerchant[]; pagination: any }>('/merchants', processedQuery);
     
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(m => this.translateMerchantToUserFacing(m));
       return {
         state: response.state,
-        result: { entries: translatedEntries, page_info: response.result.page_info }
+        result: { entries: translatedEntries, page_info: response.result.pagination }
       };
     }
     

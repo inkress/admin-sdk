@@ -1476,11 +1476,20 @@ export interface TransactionEntryFilterParams extends BaseFilterParams {
 // LIST RESPONSE INTERFACES
 // ============================================================================
 
+// Mirrors what commerce-api actually serialises under `pagination` (lib/api/utils/paginate.ex's
+// `page_map`), surfaced on list responses as `page_info`. The previous shape (`current_page` /
+// `total_pages` only) matched no real response - the API sends `page`, and `more` is what a caller
+// needs to know another page exists. `total_pages`/`next_page`/`last_page` appear only when `more`.
 export interface PageInfo {
-  current_page: number;
-  total_pages: number;
-  total_entries: number;
+  page: number;
   page_size: number;
+  total_entries: number;
+  more: boolean;
+  total_pages?: number;
+  next_page?: number;
+  next_pages?: number[];
+  last_page?: number;
+  last_pages?: number[];
 }
 
 export interface OrderListResponse {

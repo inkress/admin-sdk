@@ -2328,7 +2328,7 @@ class MerchantsResource {
                 state: response.state,
                 result: {
                     entries: translatedEntries,
-                    page_info: response.result.page_info
+                    page_info: response.result.pagination
                 }
             };
         }
@@ -2471,7 +2471,7 @@ class MerchantsResource {
             const translatedEntries = response.result.entries.map(m => this.translateMerchantToUserFacing(m));
             return {
                 state: response.state,
-                result: { entries: translatedEntries, page_info: response.result.page_info }
+                result: { entries: translatedEntries, page_info: response.result.pagination }
             };
         }
         return { state: response.state, result: response.result };
@@ -2540,7 +2540,7 @@ class CategoriesResource {
                 state: response.state,
                 result: {
                     entries: translatedEntries,
-                    page_info: response.result.page_info
+                    page_info: response.result.pagination
                 }
             };
         }
@@ -2620,7 +2620,7 @@ class CategoriesResource {
             const translatedEntries = response.result.entries.map(c => this.translateCategoryToUserFacing(c));
             return {
                 state: response.state,
-                result: { entries: translatedEntries, page_info: response.result.page_info }
+                result: { entries: translatedEntries, page_info: response.result.pagination }
             };
         }
         return { state: response.state, result: response.result };
@@ -2774,7 +2774,7 @@ class OrdersResource {
                 state: response.state,
                 result: {
                     entries: translatedEntries,
-                    page_info: response.result.page_info
+                    page_info: response.result.pagination
                 }
             };
         }
@@ -2824,7 +2824,7 @@ class OrdersResource {
                 state: response.state,
                 result: {
                     entries: translatedEntries,
-                    page_info: response.result.page_info
+                    page_info: response.result.pagination
                 }
             };
         }
@@ -2902,7 +2902,7 @@ class ProductsResource {
                 state: response.state,
                 result: {
                     entries: translatedEntries,
-                    page_info: response.result.page_info
+                    page_info: response.result.pagination
                 }
             };
         }
@@ -3012,7 +3012,7 @@ class ProductsResource {
                 state: response.state,
                 result: {
                     entries: translatedEntries,
-                    page_info: response.result.page_info
+                    page_info: response.result.pagination
                 }
             };
         }
@@ -3097,7 +3097,7 @@ class BillingPlansResource {
                 state: response.state,
                 result: {
                     entries: translatedEntries,
-                    page_info: response.result.page_info
+                    page_info: response.result.pagination
                 }
             };
         }
@@ -3184,7 +3184,7 @@ class BillingPlansResource {
                 state: response.state,
                 result: {
                     entries: translatedEntries,
-                    page_info: response.result.page_info
+                    page_info: response.result.pagination
                 }
             };
         }
@@ -3274,7 +3274,7 @@ class SubscriptionsResource {
                 state: response.state,
                 result: {
                     entries: translatedEntries,
-                    page_info: response.result.page_info
+                    page_info: response.result.pagination
                 }
             };
         }
@@ -3504,7 +3504,7 @@ class UsersResource {
             const translatedEntries = response.result.entries.map(user => this.translateUserToUserFacing(user));
             return {
                 state: response.state,
-                result: { entries: translatedEntries, page_info: response.result.page_info }
+                result: { entries: translatedEntries, page_info: response.result.pagination }
             };
         }
         return { state: response.state, result: response.result };
@@ -3930,7 +3930,7 @@ class PaymentLinksResource {
                 state: response.state,
                 result: {
                     entries: translatedEntries,
-                    page_info: response.result.page_info
+                    page_info: response.result.pagination
                 }
             };
         }

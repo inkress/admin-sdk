@@ -5,6 +5,19 @@ All notable changes to the Inkress Admin SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.51] - 2026-08-08
+
+### 🐛 Fixed
+
+- **List responses now carry pagination.** Every resource's `list` / `query` read
+  `response.result.page_info`, but commerce-api serialises pagination under **`pagination`**
+  (`lib/api/utils/paginate.ex`), so `page_info` came back `undefined` and `total_entries` / `more`
+  (what pagination and infinite scroll depend on) were silently dropped. The reshape now reads the
+  wire's `pagination` and surfaces it as `page_info`. `PageInfo` is redefined to the real wire shape
+  (`page`, `page_size`, `total_entries`, `more`, plus `total_pages` / `next_page` / `next_pages` /
+  `last_page` / `last_pages` when `more` is true); the previous `current_page` / `total_pages`-only
+  shape matched no real response.
+
 ## [1.1.50] - 2026-08-08
 
 ### 🐛 Fixed

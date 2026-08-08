@@ -79,7 +79,7 @@ export class PaymentLinksResource {
    */
   async list(params?: PaymentLinkFilterParams): Promise<ApiResponse<PaymentLinkListResponse>> {
     const translatedParams = this.translateFilters(params);
-    const response = await this.client.get<{ entries: InternalPaymentLink[]; page_info: any }>('/payment_links', translatedParams);
+    const response = await this.client.get<{ entries: InternalPaymentLink[]; pagination: any }>('/payment_links', translatedParams);
     
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(link => this.translateToUserFacing(link));
@@ -87,7 +87,7 @@ export class PaymentLinksResource {
         state: response.state,
         result: {
           entries: translatedEntries,
-          page_info: response.result.page_info
+          page_info: response.result.pagination
         }
       };
     }

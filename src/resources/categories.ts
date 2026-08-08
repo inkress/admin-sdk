@@ -78,7 +78,7 @@ export class CategoriesResource {
    */
   async list(params?: CategoryFilterParams): Promise<ApiResponse<CategoryListResponse>> {
     const translatedParams = this.translateFilters(params);
-    const response = await this.client.get<{ entries: InternalCategory[]; page_info: any }>('/categories', translatedParams);
+    const response = await this.client.get<{ entries: InternalCategory[]; pagination: any }>('/categories', translatedParams);
     
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(category => this.translateCategoryToUserFacing(category));
@@ -86,7 +86,7 @@ export class CategoriesResource {
         state: response.state,
         result: {
           entries: translatedEntries,
-          page_info: response.result.page_info
+          page_info: response.result.pagination
         }
       };
     }
@@ -171,13 +171,13 @@ export class CategoriesResource {
   async query(params?: CategoryQueryParams): Promise<ApiResponse<CategoryListResponse>> {
     const processedQuery = processQuery(params || {}, CATEGORY_FIELD_TYPES, { validate: true });
     const translatedQuery = this.translateFilters(processedQuery);
-    const response = await this.client.get<{ entries: InternalCategory[]; page_info: any }>('/categories', translatedQuery);
+    const response = await this.client.get<{ entries: InternalCategory[]; pagination: any }>('/categories', translatedQuery);
     
     if (response.result?.entries) {
       const translatedEntries = response.result.entries.map(c => this.translateCategoryToUserFacing(c));
       return {
         state: response.state,
-        result: { entries: translatedEntries, page_info: response.result.page_info }
+        result: { entries: translatedEntries, page_info: response.result.pagination }
       };
     }
     

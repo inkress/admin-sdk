@@ -1,4 +1,19 @@
+# Reusable Node/TS CI — the "commerce CI standard" for JavaScript/TypeScript repos.
+#
+# Call it from a repo's own workflow:
+#
+#   jobs:
+#     ci:
+#       uses: jamlance/ci/.github/workflows/node-ci.yml@v1
+#       with:
+#         docker_build: true        # optional; default false
+#
+# It auto-detects the package manager (bun / pnpm / yarn / npm) from the lockfile
+# and runs each of format:check, lint, typecheck, test ONLY if that script exists
+# in package.json — so a repo missing a script sees it as "no script" (a visible
+# gap) instead of a hard failure. gitleaks always runs (advisory by default).
 name: ci
+
 on:
   pull_request:
   push:
@@ -7,6 +22,107 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+permissions:
+  contents: read
+
 jobs:
-  ci:
-    uses: inkress/ci/.github/workflows/node-ci.yml@v1
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Detect package manager
+        id: pm
+        shell: bash
+        run: |
+          if [ -f bun.lock ] || [ -f bun.lockb ]; then pm=bun
+          elif [ -f pnpm-lock.yaml ]; then pm=pnpm
+          elif [ -f yarn.lock ]; then pm=yarn
+          else pm=npm; fi
+          echo "pm=$pm" >> "$GITHUB_OUTPUT"
+          echo "Detected package manager: $pm"
+
+      - name: Setup bun
+        if: steps.pm.outputs.pm == 'bun'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version-file: package.json
+
+      - name: Setup pnpm
+        if: steps.pm.outputs.pm == 'pnpm'
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - name: Setup Node
+        if: steps.pm.outputs.pm != 'bun'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: ${{ steps.pm.outputs.pm }}
+
+      - name: Install (frozen lockfile)
+        shell: bash
+        run: |
+          case "${{ steps.pm.outputs.pm }}" in
+            bun)  bun install --frozen-lockfile ;;
+            pnpm) pnpm install --frozen-lockfile ;;
+            yarn) yarn install --immutable ;;
+            npm)  npm ci ;;
+          esac
+
+      - name: Run checks (format · lint · typecheck · test)
+        shell: bash
+        run: |
+          pm='${{ steps.pm.outputs.pm }}'
+          run_script() {
+            case "$pm" in
+              bun)  bun run "$1" ;;
+              pnpm) pnpm run "$1" ;;
+              yarn) yarn run "$1" ;;
+              *)    npm run "$1" ;;
+            esac
+          }
+          # portable script detection — no node/jq needed (they may be absent on bun runners)
+          has_script() { grep -qE "\"$1\"[[:space:]]*:" package.json; }
+          {
+            echo "### CI checks (pm: $pm)"
+            echo
+            echo "| check | result |"
+            echo "| --- | --- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          fail=0
+          for chk in format:check lint typecheck test; do
+            if has_script "$chk"; then
+              echo "::group::$chk"
+              if run_script "$chk"; then
+                echo "| \`$chk\` | ✅ pass |" >> "$GITHUB_STEP_SUMMARY"
+              else
+                echo "| \`$chk\` | ❌ FAIL |" >> "$GITHUB_STEP_SUMMARY"
+                fail=1
+              fi
+              echo "::endgroup::"
+            else
+              echo "| \`$chk\` | ⏭️ no script |" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+          exit $fail
+
+      - name: Secret scan (gitleaks, pinned + checksum verified)
+        if: always()   # a security scan must run even when other checks fail
+        shell: bash
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          set -uo pipefail
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL "$url" -o gitleaks.tar.gz
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+          if ./gitleaks dir . --redact --no-banner; then
+            echo "| \`secret-scan\` | ✅ clean |" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "| \`secret-scan\` | ⚠️ findings |" >> "$GITHUB_STEP_SUMMARY"
+            if [ "false" = "true" ]; then exit 1; fi
+          fi
+          rm -f gitleaks gitleaks.tar.gz
+

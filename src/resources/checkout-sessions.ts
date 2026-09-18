@@ -32,6 +32,7 @@ export interface CheckoutSessionFees {
   before_tax_fee_total: number;
   customer_total: number;
   discount_total: number;
+  discount_code?: string;
   fee_ids: number[];
   fee_mappings: CheckoutSessionFeeMapping[];
   merchant_total: number;
@@ -54,6 +55,7 @@ export interface CheckoutSessionTotals {
   shipping_total: number;
   tax_total: number;
   discount_total: number;
+  discount_code?: string;
   before_tax_fee_total: number;
   after_tax_fee_total: number;
 }

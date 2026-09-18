@@ -518,6 +518,9 @@ export interface Order {
   id: number;
   reference_id?: string;
   total: number;
+  /** Discount applied to the order (amount + code), frozen at creation */
+  discount_total?: number;
+  discount_code?: string;
   kind: OrderKind; // Contextual kind (e.g., 'online' instead of 'order_online')
   status: OrderStatus; // Contextual status (e.g., 'confirmed' instead of 'order_confirmed')
   status_on: number;
@@ -692,7 +695,11 @@ export interface CreateOrderData {
   
   /** Optional fields */
   fulfillment_total?: number;
-  
+
+  /** Discount code to apply. The server re-validates and re-prices it against the
+   * authoritative subtotal; a client-sent discount amount is never trusted. */
+  discount_code?: string;
+
   /** Payment method */
   method_id?: number;
   
@@ -725,7 +732,10 @@ export interface CreateOrderResponseData {
   
   /** Financial */
   total: number;
-  
+  /** Discount applied to the order (amount + code) */
+  discount_total?: number;
+  discount_code?: string;
+
   /** Timestamps */
   created_at: string;
   inserted_at: string;
@@ -1469,6 +1479,7 @@ export interface PublicMerchantFees {
   /** New detailed fee breakdown (Oct 2, 2025) */
   sub_total: number;
   discount_total: number;
+  discount_code?: string;
   shipping_total: number;
   pre_tax_fee_total: number;
   tax_total: number;
@@ -1683,6 +1694,8 @@ export interface InternalOrder {
   id: number;
   reference_id?: string;
   total: number;
+  discount_total?: number;
+  discount_code?: string;
   kind: number; // Integer for API
   status: number; // Integer for API
   status_on: number;

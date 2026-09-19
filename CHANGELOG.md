@@ -5,6 +5,16 @@ All notable changes to the Inkress Admin SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.52] - 2026-09-18
+
+### ✨ Added
+
+- **Discount codes.** Surfaces the commerce-api discount rollout: `discount_code` on order-create
+  input (the server re-validates and re-prices it against the authoritative subtotal — a
+  client-sent discount amount is never trusted), `discount_total` / `discount_code` on the order,
+  checkout session and fees response, and a new `getDiscount()` helper for the public discount
+  quote endpoint (`/public/m/:username/discount`).
+
 ## [1.1.51] - 2026-08-08
 
 ### 🐛 Fixed

@@ -3536,6 +3536,13 @@ class PublicResource {
         return this.client.get(`/public/m/${merchantUsername}/fees`, params);
     }
     /**
+     * Validate + quote a discount code against a cart (public endpoint - no auth required).
+     * Returns { valid: true, discount_total, ...totals } or { valid: false, reason, message }.
+     */
+    async getDiscount(merchantUsername, params) {
+        return this.client.get(`/public/m/${merchantUsername}/discount`, params);
+    }
+    /**
      * Get merchant products (public endpoint - no auth required)
      */
     async getMerchantProducts(merchantUsername, params) {

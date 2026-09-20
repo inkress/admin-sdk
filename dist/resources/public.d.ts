@@ -59,6 +59,17 @@ export interface DiscountQuoteParams {
     total: number;
     /** Optional shipping cost, in currency units */
     fulfillment_total?: number;
+    /** Cart line items. Required to quote a PRODUCT-SCOPED code (`applies_to: products`):
+     * eligibility and the scoped amount are computed against these. Omit for order-wide
+     * codes; a scoped code quoted without line items returns `not_valid_for_items`. */
+    products?: DiscountLineItem[];
+}
+/** A cart line item, used to quote product-scoped discount codes. */
+export interface DiscountLineItem {
+    /** Product id (the same id the order line records) */
+    id: number;
+    /** This line's total cost, in currency units */
+    cost: number;
 }
 /**
  * Result of validating + quoting a discount code
@@ -69,8 +80,9 @@ export interface DiscountQuoteResult {
     valid: boolean;
     /** Echoed code */
     discount_code?: string;
-    /** Machine-readable rejection reason when valid=false
-     * (not_found | inactive | expired | usage_limit_reached | currency_mismatch | min_spend_not_met) */
+    /** Machine-readable rejection reason when valid=false (not_found | inactive | expired |
+     * usage_limit_reached | per_customer_limit_reached | currency_mismatch | min_spend_not_met |
+     * not_valid_for_items) */
     reason?: string;
     /** Human-readable message when valid=false */
     message?: string;

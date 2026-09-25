@@ -181,19 +181,19 @@ export const StatusTranslator = {
    * Convert string to integer with context prefix
    */
   toIntegerWithContext(key: string, context: string): StatusValue {
-    // If key already has the context prefix, use as-is
-    const fullKey = key.includes('_') ? key as StatusKey : `${context}_${key}` as StatusKey;
-    
-    if (mappings.Status[fullKey] !== undefined) {
-      return mappings.Status[fullKey];
+    // Context-prefixed first: a short status may itself contain "_" ("adhoc_charged",
+    // "payment_failed"), so "contains an underscore" does not mean "already prefixed".
+    const prefixed = `${context}_${key}` as StatusKey;
+    if (mappings.Status[prefixed] !== undefined) {
+      return mappings.Status[prefixed];
     }
-    
-    // Fallback: try the key as-is if it's a valid status
+
+    // Fallback: the key as given (a full key such as "billing_subscription_active").
     if (mappings.Status[key as StatusKey] !== undefined) {
       return mappings.Status[key as StatusKey];
     }
-    
-    throw new Error(`Unknown status value: ${key} (tried with context: ${fullKey})`);
+
+    throw new Error(`Unknown status value: ${key} (tried with context: ${prefixed})`);
   },
 
   /**

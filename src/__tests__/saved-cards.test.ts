@@ -1,5 +1,6 @@
 import { InkressSDK } from '../index';
 import { InkressApiError } from '../client';
+import { SavedCardChargeInProgressError } from '../resources/saved-cards';
 import type { SavedCard, SavedCardChargeOutcome } from '../resources/saved-cards';
 
 type ClientStub = { client: { get: jest.Mock; post: jest.Mock; delete: jest.Mock } };
@@ -106,6 +107,83 @@ describe('SavedCardsResource', () => {
     client(sdk).post = jest.fn().mockResolvedValue({ state: 'ok', result: {} });
 
     await expect(sdk.savedCards.charge(7, { amount: 1, currency: 'USD', idempotency_key: 'k' })).rejects.toBeInstanceOf(InkressApiError);
+  });
+
+  // Fix round 1, item 3 (INFO -> do it): a same-key-same-payload replay's 202 body is the superset
+  // ChargeOutcome.to_json/1 shape (reference/order/failure_reason alongside status/job_id/status_url)
+  // - charge() must pass those through instead of narrowing them away.
+  test('charge passes through reference/order/failure_reason when the server includes them on a replay', async () => {
+    const sdk = new InkressSDK(config);
+    const declinedOrder = { id: 901, total: 100, customer_total: 105.51, fee_total: 5.51, currency: 'USD', status: 2 };
+    client(sdk).post = jest.fn().mockResolvedValue({
+      status: 'declined',
+      job_id: 55,
+      status_url: statusUrl,
+      reference: 'cardchg-1-7-order-981',
+      order: declinedOrder,
+      failure_reason: 'not_authorized',
+    });
+
+    const res = await sdk.savedCards.charge(7, { amount: 100, currency: 'USD', idempotency_key: 'order-981' });
+
+    expect(res.result).toEqual({
+      status: 'declined',
+      job_id: 55,
+      status_url: statusUrl,
+      reference: 'cardchg-1-7-order-981',
+      order: declinedOrder,
+      failure_reason: 'not_authorized',
+    });
+  });
+
+  test('charge omits reference/order/failure_reason on a fresh enqueue (never present on that wire body)', async () => {
+    const sdk = new InkressSDK(config);
+    client(sdk).post = jest.fn().mockResolvedValue({ status: 'queued', job_id: 55, status_url: statusUrl });
+
+    const res = await sdk.savedCards.charge(7, { amount: 100, currency: 'USD', idempotency_key: 'order-981' });
+
+    expect(res.result).toEqual({ status: 'queued', job_id: 55, status_url: statusUrl });
+    expect(res.result).not.toHaveProperty('reference');
+    expect(res.result).not.toHaveProperty('order');
+    expect(res.result).not.toHaveProperty('failure_reason');
+  });
+
+  // Fix round 1, item 1 (MEDIUM): the server's two 409s are NOT the same situation -
+  // idempotency_key_reuse_with_different_payload is a real payload conflict (stays a plain
+  // InkressApiError); request_in_progress is a genuine in-flight race the caller must poll through,
+  // never retry with a new key. They must be distinguishable without string-matching by hand.
+  test('charge maps 409 request_in_progress to SavedCardChargeInProgressError', async () => {
+    const sdk = new InkressSDK(config);
+    const conflictBody = {
+      state: 'error',
+      result: { reason: 'request_in_progress', description: 'An earlier request with this idempotency key is still in flight.', status: 409 },
+    };
+    client(sdk).post = jest.fn().mockRejectedValue(new InkressApiError('HTTP 409', 409, conflictBody));
+
+    const promise = sdk.savedCards.charge(7, { amount: 100, currency: 'USD', idempotency_key: 'order-981' });
+
+    await expect(promise).rejects.toBeInstanceOf(SavedCardChargeInProgressError);
+    await expect(promise).rejects.toBeInstanceOf(InkressApiError);
+    await expect(promise).rejects.toMatchObject({ status: 409, result: conflictBody });
+  });
+
+  test('charge leaves 409 idempotency_key_reuse_with_different_payload as the original InkressApiError', async () => {
+    const sdk = new InkressSDK(config);
+    const conflictBody = {
+      state: 'error',
+      result: {
+        reason: 'idempotency_key_reuse_with_different_payload',
+        description: 'This idempotency key was already used for a different charge (account, amount, currency or description).',
+        status: 409,
+      },
+    };
+    const rejection = new InkressApiError('HTTP 409', 409, conflictBody);
+    client(sdk).post = jest.fn().mockRejectedValue(rejection);
+
+    const promise = sdk.savedCards.charge(7, { amount: 100, currency: 'USD', idempotency_key: 'order-981' });
+
+    await expect(promise).rejects.toBe(rejection);
+    await expect(promise).rejects.not.toBeInstanceOf(SavedCardChargeInProgressError);
   });
 
   test('chargeStatus GETs /cards/:id/charges/:key (key URL-encoded) and returns the outcome', async () => {

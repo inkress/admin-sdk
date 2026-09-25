@@ -168,20 +168,21 @@ export type {
   CardUpdateLinkResponse,
 } from './resources/subscriptions';
 
-// Export saved-card (Ink Pay) types
-export type {
-  SavedCard,
-  SavedCardListParams,
-  SavedCardListResponse,
-  SavedCardRemovalAction,
-  SavedCardRemovalResult,
-  SavedCardChargeData,
-  SavedCardChargeStatus,
-  SavedCardChargeFailureReason,
-  SavedCardChargeOrder,
-  SavedCardChargeAccepted,
-  SavedCardChargeOutcome,
-  SavedCardWaitOptions,
+// Export saved-card (Ink Pay) types + the charge-conflict error class
+export {
+  SavedCardChargeInProgressError,
+  type SavedCard,
+  type SavedCardListParams,
+  type SavedCardListResponse,
+  type SavedCardRemovalAction,
+  type SavedCardRemovalResult,
+  type SavedCardChargeData,
+  type SavedCardChargeStatus,
+  type SavedCardChargeFailureReason,
+  type SavedCardChargeOrder,
+  type SavedCardChargeAccepted,
+  type SavedCardChargeOutcome,
+  type SavedCardWaitOptions,
 } from './resources/saved-cards';
 
 // Export checkout session types

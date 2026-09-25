@@ -50,7 +50,11 @@ export interface SavedCardChargeData {
   /** The base amount (>= 0.01, at most 2 decimals). With a customer-pays fee structure the card is charged amount + fees. */
   amount: number;
   currency: string;
-  /** Required, 8-255 bytes. Reuse the SAME key when retrying - a new key is a new charge; the same key with a different charge is a 409. */
+  /**
+   * Required, 8-200 bytes after trimming (narrower than the platform's general 8-255
+   * idempotency-key rule — this endpoint's order-reference format caps it lower). Reuse the SAME
+   * key when retrying - a new key is a new charge; the same key with a different charge is a 409.
+   */
   idempotency_key: string;
   /** At most 255 characters. */
   description?: string;
@@ -89,13 +93,26 @@ export interface SavedCardChargeOrder {
   status: number;
 }
 
-/** The 202 answer to `charge`: a new charge is `queued`; a replayed key reports its current status. */
+/**
+ * The 202 answer to `charge`: a new charge is `queued`, with only `status`/`job_id`/`status_url`
+ * on the wire. A replayed key (same key, same payload) reports its current status and, on the
+ * wire, also carries the stored charge's `reference`/`order`/`failure_reason` (the same fields
+ * `chargeStatus` returns) — `charge` passes those through here when present rather than making a
+ * caller who wants them do a second round-trip. They're absent (not `null`) on a fresh enqueue,
+ * since nothing has been recorded yet to report.
+ */
 export interface SavedCardChargeAccepted {
   status: SavedCardChargeStatus;
   /** `null` when a replayed key's job is no longer retained. */
   job_id: number | null;
   /** Poll with `chargeStatus` / `waitForCharge`. */
   status_url: string;
+  /** Present only on a replay: the stored charge's canonical reference. */
+  reference?: string;
+  /** Present only on a replay: `null` if the charge hasn't reached an order yet. */
+  order?: SavedCardChargeOrder | null;
+  /** Present only on a replay: `null` if the charge hasn't failed. */
+  failure_reason?: SavedCardChargeFailureReason | null;
 }
 
 export interface SavedCardChargeOutcome {
@@ -115,6 +132,28 @@ export interface SavedCardWaitOptions {
   maxDelayMs?: number;
   /** Injectable for tests. */
   sleep?: (ms: number) => Promise<void>;
+}
+
+/**
+ * Thrown by `charge` on a `409 request_in_progress`: an earlier request with the SAME idempotency
+ * key is still being processed — a genuine in-flight race, distinct from the server's other 409
+ * (`idempotency_key_reuse_with_different_payload`, a real payload conflict, which stays a plain
+ * `InkressApiError`). A subclass of `InkressApiError` (so `instanceof InkressApiError` still
+ * matches it) that lets a caller tell the two apart without string-matching
+ * `error.result.result.reason` itself.
+ *
+ * Wait and poll `chargeStatus` / `waitForCharge` with the SAME key; never retry with a new one —
+ * the in-flight request may still go on to complete the charge.
+ */
+export class SavedCardChargeInProgressError extends InkressApiError {
+  constructor(result?: unknown) {
+    super(
+      'A charge with this idempotency key is still being processed — wait and poll with the SAME key (chargeStatus/waitForCharge); never retry with a new key.',
+      409,
+      result,
+    );
+    this.name = 'SavedCardChargeInProgressError';
+  }
 }
 
 interface SavedCardListResult {
@@ -153,8 +192,8 @@ function isJobId(value: unknown): value is number | null {
   return value === null || typeof value === 'number';
 }
 
-function isChargeAccepted(value: unknown): value is SavedCardChargeAccepted {
-  return isRecord(value) && isChargeStatus(value.status) && isJobId(value.job_id) && typeof value.status_url === 'string';
+function isFailureReason(value: unknown): value is SavedCardChargeFailureReason {
+  return typeof value === 'string' && (FAILURE_REASONS as readonly string[]).includes(value);
 }
 
 function isChargeOrder(value: unknown): value is SavedCardChargeOrder {
@@ -169,6 +208,21 @@ function isChargeOrder(value: unknown): value is SavedCardChargeOrder {
   );
 }
 
+// The 3 required keys are all a fresh enqueue ever sends. A same-key replay's superset body also
+// carries reference/order/failure_reason (the same fields chargeStatus returns) - validated here,
+// when present, so charge() can pass them through instead of silently dropping them.
+function isChargeAccepted(value: unknown): value is SavedCardChargeAccepted {
+  return (
+    isRecord(value) &&
+    isChargeStatus(value.status) &&
+    isJobId(value.job_id) &&
+    typeof value.status_url === 'string' &&
+    (value.reference === undefined || typeof value.reference === 'string') &&
+    (value.order === undefined || value.order === null || isChargeOrder(value.order)) &&
+    (value.failure_reason === undefined || value.failure_reason === null || isFailureReason(value.failure_reason))
+  );
+}
+
 function isChargeOutcome(value: unknown): value is SavedCardChargeOutcome {
   return (
     isRecord(value) &&
@@ -176,9 +230,19 @@ function isChargeOutcome(value: unknown): value is SavedCardChargeOutcome {
     isJobId(value.job_id) &&
     typeof value.reference === 'string' &&
     (value.order === null || isChargeOrder(value.order)) &&
-    (value.failure_reason === null ||
-      (typeof value.failure_reason === 'string' && (FAILURE_REASONS as readonly string[]).includes(value.failure_reason)))
+    (value.failure_reason === null || isFailureReason(value.failure_reason))
   );
+}
+
+/**
+ * The `reason` string from one of the server's 409-conflict bodies (`{state, result: {reason,
+ * description, status}}` - both `ApiWeb.Idempotency` and `CardController`'s own idempotency check
+ * send this exact shape), if `value` (an `InkressApiError.result`) looks like one. `undefined` for
+ * anything else, including a 409 whose body doesn't match (treated as an ordinary conflict).
+ */
+function conflictReason(value: unknown): string | undefined {
+  if (!isRecord(value) || !isRecord(value.result)) return undefined;
+  return typeof value.result.reason === 'string' ? value.result.reason : undefined;
 }
 
 const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -212,21 +276,46 @@ export class SavedCardsResource {
    * Queue an on-demand merchant-initiated charge (INK-436). The endpoint answers 202 with a FLAT
    * body `{status, job_id, status_url}` (not the usual envelope), validated here before it is
    * returned. Retrying with the same `idempotency_key` and the same charge details never charges
-   * twice: it reports the existing charge's current status instead of enqueuing a new one.
+   * twice: it reports the existing charge's current status instead of enqueuing a new one - and,
+   * when the server includes them (a same-key-same-payload replay), `reference`/`order`/
+   * `failure_reason` are passed through too (see `SavedCardChargeAccepted`), so a caller doesn't
+   * need a second `chargeStatus` round-trip just to see them.
    *
    * Rejections propagate as `InkressApiError` (never swallowed) — notably:
    *  - `422` with a message starting `merchant_not_verified: ...` or `merchant_incomplete_profile: ...`
    *    (the merchant KYC/profile gate), or a validation error (bad `amount`/`description`/currency,
    *    or a refused `customer`/`subscription_id` field);
    *  - `409` `idempotency_key_reuse_with_different_payload` when the same key was already used for a
-   *    charge with a different account, amount, currency or description.
+   *    charge with a different account, amount, currency or description - a real conflict; only
+   *    retry with a NEW idempotency key after confirming the original charge's actual outcome;
+   *  - `409` `request_in_progress` - a genuine race: an earlier request with the SAME key is still
+   *    being processed. Thrown as `SavedCardChargeInProgressError` (a subclass of `InkressApiError`)
+   *    so callers can tell the two 409s apart without string-matching `error.result.result.reason`
+   *    themselves. Wait and poll with `chargeStatus` / `waitForCharge` using the SAME key; never
+   *    retry with a new one - the in-flight request may still complete the charge.
    */
   async charge(id: number, data: SavedCardChargeData): Promise<ApiResponse<SavedCardChargeAccepted>> {
-    const raw: unknown = await this.client.post<unknown>(`/cards/${id}/charge`, { ...data });
+    let raw: unknown;
+    try {
+      raw = await this.client.post<unknown>(`/cards/${id}/charge`, { ...data });
+    } catch (error) {
+      if (error instanceof InkressApiError && error.status === 409 && conflictReason(error.result) === 'request_in_progress') {
+        throw new SavedCardChargeInProgressError(error.result);
+      }
+      throw error;
+    }
     if (!isChargeAccepted(raw)) {
       throw new InkressApiError('Unexpected response from the saved-card charge endpoint', 0, raw);
     }
-    return { state: 'ok', result: { status: raw.status, job_id: raw.job_id, status_url: raw.status_url } };
+    const result: SavedCardChargeAccepted = {
+      status: raw.status,
+      job_id: raw.job_id,
+      status_url: raw.status_url,
+      ...(raw.reference !== undefined ? { reference: raw.reference } : {}),
+      ...(raw.order !== undefined ? { order: raw.order } : {}),
+      ...(raw.failure_reason !== undefined ? { failure_reason: raw.failure_reason } : {}),
+    };
+    return { state: 'ok', result };
   }
 
   /** The current outcome of the charge made with `idempotencyKey` on this card. 404 -> `InkressApiError`. */

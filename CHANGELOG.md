@@ -5,6 +5,22 @@ All notable changes to the Inkress Admin SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-09-25
+
+### ✨ Added
+
+- **`savedCards` resource (Ink Pay, INK-438).** `list` / `get` / `remove` (disconnects the card from
+  your merchant only — it stays usable by other merchants the customer connected it to), `charge`
+  (queues an on-demand merchant-initiated charge; resolves the endpoint's flat `202
+  {status, job_id, status_url}` body, validated before it's returned — never a silently-accepted
+  malformed response). Replaying the same `idempotency_key` never double-charges: it reports the
+  existing charge's status (409 `idempotency_key_reuse_with_different_payload` if the payload
+  differs). `chargeStatus` and `waitForCharge` poll the charge's outcome through `succeeded` /
+  `declined` / `failed` / `under_review` — `under_review` **resolves** rather than throwing (the
+  charge may have money held past the processor's idempotency window); callers must poll again with
+  the SAME idempotency key, never a new one.
+- Subscription status `payment_failed` (5).
+
 ## [1.1.52] - 2026-09-18
 
 ### ✨ Added

@@ -21,6 +21,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the SAME idempotency key, never a new one.
 - Subscription status `payment_failed` (5).
 
+### 🐛 Fixed (final-review fix wave)
+
+- **`charge()`'s `422` refusals are now typed.** `SavedCardChargeRefusedError` (`reason`:
+  `fee_consent_missing` | `merchant_not_verified` | `merchant_incomplete_profile` |
+  `merchant_not_found` | `invalid_request`, plus `detail` with the server's exact text) replaces
+  string-matching `error.result.result` by hand. Corrected the `chargeable` doc: it's a live
+  credential + your merchant's recorded fee consent only — it does **not** reflect your merchant's
+  KYC/profile gates, so a `chargeable: true` card can still get `merchant_not_verified`.
+- **`waitForCharge` can no longer be aborted by a transient poll blip.** A network/timeout error or
+  a `5xx` from `chargeStatus` mid-poll is now retried within the budget instead of throwing
+  immediately, and budget exhaustion throws the new `SavedCardChargePendingError` (carrying the
+  `idempotencyKey` and the last outcome seen) — every message says to reuse the SAME idempotency
+  key, never a new one, while the outcome is unknown.
+- **`remove()`'s own retry no longer turns a successful disconnect into a 404.** If the SDK retries
+  a `DELETE` after the first attempt's response was lost (network/timeout or `5xx`) and the retry
+  then sees `404`, it throws `SavedCardAlreadyRemovedError` instead — the card was already
+  disconnected. A first-attempt `404` is unaffected.
+- **`SavedCardChargeFailureReason` is forward-compatible.** An unrecognised value no longer makes
+  `chargeStatus`/`waitForCharge` throw on an otherwise-valid, resolved outcome (`status` itself
+  stays a strict union — money-safety never widens).
+- `idempotency_key` is validated client-side (8-200 printable-ASCII bytes after trimming, matching
+  the server exactly) before any network call, and `waitForCharge`'s options (`attempts`,
+  `initialDelayMs`, `maxDelayMs`) are validated up front instead of silently polling zero times.
+- `SavedCardChargeOrder.currency` is `string | null` — the server's own currency resolution can be
+  `nil` in rare cases, and a charge that may have succeeded must never be thrown away over it.
+- Fixed two test fixtures that modelled a `(status, failure_reason)` pairing the server can't
+  actually produce, and a `chargeStatus` test key containing a space (the server rejects it).
+
 ## [1.1.52] - 2026-09-18
 
 ### ✨ Added

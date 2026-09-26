@@ -1064,6 +1064,60 @@ const fees = await inkress.public.getMerchantFees('merchant-name', {
 // Returns: PublicMerchantFees
 ```
 
+### Saved Cards (Ink Pay)
+
+Cards customers saved with your merchant. `list` / `get` / `remove` manage them; `charge` /
+`chargeStatus` / `waitForCharge` run an on-demand merchant-initiated charge on one.
+
+```typescript
+// List cards connected to your merchant
+const { result } = await inkress.savedCards.list({ page: 1, page_size: 25 });
+result?.entries.forEach((card) => console.log(card.display, card.chargeable));
+
+// Disconnect a card from your merchant (it stays usable by other merchants the
+// customer connected it to, and revokes YOUR merchant's fee consent for it)
+await inkress.savedCards.remove(cardId);
+```
+
+Charge a card and wait for the outcome — `waitForCharge` polls with doubling backoff and resolves
+on `succeeded` / `declined` / `failed` / `under_review` (never on `queued` / `processing`):
+
+```typescript
+import {
+  SavedCardChargeInProgressError,
+  SavedCardChargeRefusedError,
+  SavedCardChargePendingError,
+} from '@inkress/admin-sdk';
+
+try {
+  await inkress.savedCards.charge(cardId, {
+    amount: 25.0,
+    currency: 'USD',
+    idempotency_key: `order-${orderId}`, // 8-200 printable-ASCII bytes; reuse on retry
+    description: 'Monthly service fee',
+  });
+
+  const outcome = await inkress.savedCards.waitForCharge(cardId, `order-${orderId}`);
+  console.log(outcome.status); // 'succeeded' | 'declined' | 'failed' | 'under_review'
+} catch (error) {
+  if (error instanceof SavedCardChargeRefusedError) {
+    // fee_consent_missing | merchant_not_verified | merchant_incomplete_profile |
+    // merchant_not_found | invalid_request - error.reason / error.detail
+    console.error(error.reason, error.detail);
+  } else if (error instanceof SavedCardChargeInProgressError) {
+    // an earlier request with the SAME key is still in flight - poll, don't retry with a new key
+  } else if (error instanceof SavedCardChargePendingError) {
+    // budget exhausted while still unresolved - poll again with error.idempotencyKey, never a new key
+  } else {
+    throw error;
+  }
+}
+```
+
+`chargeable` on a `SavedCard` is a display hint only (live credential + your merchant's recorded
+fee consent) — it does not reflect your merchant's own KYC/profile status, so `charge()` can still
+answer `merchant_not_verified` / `merchant_incomplete_profile` for a `chargeable: true` card.
+
 ---
 
 ## KYC (Know Your Customer) Module

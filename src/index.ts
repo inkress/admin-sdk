@@ -168,9 +168,12 @@ export type {
   CardUpdateLinkResponse,
 } from './resources/subscriptions';
 
-// Export saved-card (Ink Pay) types + the charge-conflict error class
+// Export saved-card (Ink Pay) types + the typed error classes
 export {
   SavedCardChargeInProgressError,
+  SavedCardChargeRefusedError,
+  SavedCardChargePendingError,
+  SavedCardAlreadyRemovedError,
   type SavedCard,
   type SavedCardListParams,
   type SavedCardListResponse,
@@ -179,6 +182,7 @@ export {
   type SavedCardChargeData,
   type SavedCardChargeStatus,
   type SavedCardChargeFailureReason,
+  type SavedCardChargeRefusalReason,
   type SavedCardChargeOrder,
   type SavedCardChargeAccepted,
   type SavedCardChargeOutcome,

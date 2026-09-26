@@ -8,6 +8,7 @@ import { OrdersResource } from './resources/orders';
 import { ProductsResource } from './resources/products';
 import { BillingPlansResource } from './resources/billing-plans';
 import { SubscriptionsResource } from './resources/subscriptions';
+import { SavedCardsResource } from './resources/saved-cards';
 import { UsersResource } from './resources/users';
 import { PublicResource } from './resources/public';
 import { KycResource } from './resources/kyc';
@@ -78,6 +79,7 @@ export class InkressSDK {
   public readonly products: ProductsResource;
   public readonly billingPlans: BillingPlansResource;
   public readonly subscriptions: SubscriptionsResource;
+  public readonly savedCards: SavedCardsResource;
   public readonly users: UsersResource;
   public readonly public: PublicResource;
   public readonly kyc: KycResource;
@@ -105,6 +107,7 @@ export class InkressSDK {
     this.products = new ProductsResource(this.client);
     this.billingPlans = new BillingPlansResource(this.client);
     this.subscriptions = new SubscriptionsResource(this.client);
+    this.savedCards = new SavedCardsResource(this.client);
     this.users = new UsersResource(this.client);
     this.public = new PublicResource(this.client);
     this.kyc = new KycResource(this.client);
@@ -164,6 +167,27 @@ export type {
   CreateCardUpdateLinkData,
   CardUpdateLinkResponse,
 } from './resources/subscriptions';
+
+// Export saved-card (Ink Pay) types + the typed error classes
+export {
+  SavedCardChargeInProgressError,
+  SavedCardChargeRefusedError,
+  SavedCardChargePendingError,
+  SavedCardAlreadyRemovedError,
+  type SavedCard,
+  type SavedCardListParams,
+  type SavedCardListResponse,
+  type SavedCardRemovalAction,
+  type SavedCardRemovalResult,
+  type SavedCardChargeData,
+  type SavedCardChargeStatus,
+  type SavedCardChargeFailureReason,
+  type SavedCardChargeRefusalReason,
+  type SavedCardChargeOrder,
+  type SavedCardChargeAccepted,
+  type SavedCardChargeOutcome,
+  type SavedCardWaitOptions,
+} from './resources/saved-cards';
 
 // Export checkout session types
 export type {

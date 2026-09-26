@@ -50,7 +50,7 @@ export type AccountStatus = 'pending' | 'approved' | 'suspended' | 'rejected' | 
 export type UserKind = 'address' | 'preset' | 'organisation' | 'store';
 
 // Subscription-specific contextual types  
-export type SubscriptionStatus = 'pending' | 'active' | 'cancelled' | 'adhoc_charged';
+export type SubscriptionStatus = 'pending' | 'active' | 'cancelled' | 'adhoc_charged' | 'payment_failed';
 
 // Transaction-specific contextual types
 export type TransactionStatus = 'pending' | 'authorized' | 'hold' | 'captured' | 'voided' | 'refunded' | 'processed';

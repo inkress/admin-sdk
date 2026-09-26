@@ -163,6 +163,8 @@ export class WebhookUtils {
       'subscription.created',
       'subscription.updated',
       'subscription.cancelled',
+      'subscriptions.payment_attempt_failed',
+      'subscriptions.payment_failed',
       'customer.created',
       'customer.updated',
       'merchant.updated',

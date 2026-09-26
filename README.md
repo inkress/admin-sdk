@@ -1102,7 +1102,7 @@ try {
 } catch (error) {
   if (error instanceof SavedCardChargeRefusedError) {
     // fee_consent_missing | merchant_not_verified | merchant_incomplete_profile |
-    // merchant_not_found | invalid_request - error.reason / error.detail
+    // merchant_not_found | unknown - error.reason / error.detail (detail keeps the server's text)
     console.error(error.reason, error.detail);
   } else if (error instanceof SavedCardChargeInProgressError) {
     // an earlier request with the SAME key is still in flight - poll, don't retry with a new key

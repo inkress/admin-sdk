@@ -200,21 +200,25 @@ export class SavedCardChargeInProgressError extends InkressApiError {
  * | `merchant_not_verified` | Your merchant isn't identity-verified. | Finish KYC. |
  * | `merchant_incomplete_profile` | Your merchant has processed before but is missing phone/logo. | Complete the merchant profile. |
  * | `merchant_not_found` | The authorized merchant no longer exists. | Not caller-fixable; contact support. |
- * | `invalid_request` | A validation error — bad `amount`/`description`/currency, or a refused field. | Fix the request; `detail` has the server's exact message. |
+ * | `unknown` | A validation error (bad `amount`/`description`/currency, a refused field) OR a refusal this SDK doesn't have a specific reason for yet. | `detail` still carries the server's exact message — inspect it, or fix the request if it looks like a validation error. |
  *
  * `reason` is derived from the server's message text (exact match for `fee_consent_missing` and
  * `merchant_not_found`, prefix match for the two `merchant_*` gates — their text continues with a
- * human-readable detail after a colon — and `invalid_request` for every other validation
- * message). This is never left for a caller to parse out of `error.message`: the HTTP layer
- * always sets that to the generic `"HTTP 422"`; the real text lives only at
- * `error.result.result`, and `detail` on this class is that same text already extracted.
+ * human-readable detail after a colon). Round 2 (final-review re-review, shared forward-compat
+ * stance): anything that doesn't match one of those four is `unknown`, never silently mislabelled
+ * `invalid_request` — a future merchant gate this SDK doesn't recognize yet is not the same thing
+ * as a caller mistake, and `detail` keeps the exact text either way so nothing is lost. Mirrors
+ * storefront-sdk's `CardConnectRefusalReason`, which has the same `'unknown'` catch-all. This is
+ * never left for a caller to parse out of `error.message`: the HTTP layer always sets that to the
+ * generic `"HTTP 422"`; the real text lives only at `error.result.result`, and `detail` on this
+ * class is that same text already extracted.
  */
 export type SavedCardChargeRefusalReason =
   | 'fee_consent_missing'
   | 'merchant_not_verified'
   | 'merchant_incomplete_profile'
   | 'merchant_not_found'
-  | 'invalid_request';
+  | 'unknown';
 
 export class SavedCardChargeRefusedError extends InkressApiError {
   readonly reason: SavedCardChargeRefusalReason;
@@ -383,14 +387,17 @@ function refusalMessage(value: unknown): string | undefined {
  * Maps a `charge()` 422's message text to a `SavedCardChargeRefusalReason` - exact match for the
  * two reasons the server sends verbatim, prefix match for the two merchant-gate messages (each
  * continues with a human-readable detail after a colon - `Service.Order.Processor.validate_merchant_status/1`
- * and `validate_processing_allowed/1`), `invalid_request` for every other validation message.
+ * and `validate_processing_allowed/1`). Round 2 (final-review re-review): everything else -
+ * a `ChargeRequest` field-validation message included - is `'unknown'`, never silently mislabelled
+ * `invalid_request`; `detail` on `SavedCardChargeRefusedError` keeps the exact text regardless, so
+ * a caller who wants to recognise a validation message for themselves still can.
  */
 function chargeRefusalReason(message: string): SavedCardChargeRefusalReason {
   if (message === 'fee_consent_missing') return 'fee_consent_missing';
   if (message.startsWith('merchant_not_verified')) return 'merchant_not_verified';
   if (message.startsWith('merchant_incomplete_profile')) return 'merchant_incomplete_profile';
   if (message === 'Merchant not found') return 'merchant_not_found';
-  return 'invalid_request';
+  return 'unknown';
 }
 
 /**
@@ -526,9 +533,10 @@ export class SavedCardsResource {
    *  - `422` `SavedCardChargeRefusedError`, one of `fee_consent_missing` (the card is live but
    *    your merchant has no recorded fee consent for it — the shopper must re-connect and accept
    *    the disclosure), `merchant_not_verified` (finish KYC), `merchant_incomplete_profile`
-   *    (complete the merchant profile), `merchant_not_found`, or `invalid_request` (a validation
-   *    error — bad `amount`/`description`/currency, or a refused `customer`/`subscription_id`
-   *    field; `error.detail` has the server's exact message). The reason is read from the server
+   *    (complete the merchant profile), `merchant_not_found`, or `unknown` (a validation error —
+   *    bad `amount`/`description`/currency, a refused `customer`/`subscription_id` field, or a
+   *    refusal this SDK doesn't have a specific reason for yet; `error.detail` always has the
+   *    server's exact message either way). The reason is read from the server
    *    body (`error.result.result`), never from `error.message`, which the HTTP layer always sets
    *    to the generic `"HTTP 422"`;
    *  - `409` `idempotency_key_reuse_with_different_payload` when the same key was already used for a

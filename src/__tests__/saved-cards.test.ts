@@ -295,14 +295,30 @@ describe('SavedCardsResource', () => {
       await expect(promise).rejects.toMatchObject({ reason: 'merchant_not_found' });
     });
 
-    test('a plain validation message falls back to invalid_request', async () => {
+    test('a plain validation message falls back to unknown (never invalid_request)', async () => {
       const sdk = new InkressSDK(config);
       client(sdk).post = jest.fn().mockRejectedValue(new InkressApiError('HTTP 422', 422, body422('amount must be greater than 0')));
 
       const promise = sdk.savedCards.charge(7, { amount: 100, currency: 'USD', idempotency_key: 'order-981' });
 
       await expect(promise).rejects.toBeInstanceOf(SavedCardChargeRefusedError);
-      await expect(promise).rejects.toMatchObject({ reason: 'invalid_request', detail: 'amount must be greater than 0' });
+      await expect(promise).rejects.toMatchObject({ reason: 'unknown', detail: 'amount must be greater than 0' });
+    });
+
+    // Round 2 (final-review re-review, Minor #1): an unrecognised 422 - e.g. a FUTURE merchant
+    // gate this SDK doesn't know about yet, not just a validation message - must map to the
+    // explicit 'unknown' reason, never be mislabelled 'invalid_request' (which would wrongly tell
+    // the caller "fix your request" for something that might not be their fault at all). The
+    // server's exact text still survives on `detail` either way.
+    test('an unrecognised future merchant-gate message maps to unknown, keeping the server text on detail', async () => {
+      const sdk = new InkressSDK(config);
+      const message = 'merchant_suspended: a brand-new gate this SDK does not recognise yet';
+      client(sdk).post = jest.fn().mockRejectedValue(new InkressApiError('HTTP 422', 422, body422(message)));
+
+      const promise = sdk.savedCards.charge(7, { amount: 100, currency: 'USD', idempotency_key: 'order-981' });
+
+      await expect(promise).rejects.toBeInstanceOf(SavedCardChargeRefusedError);
+      await expect(promise).rejects.toMatchObject({ reason: 'unknown', detail: message });
     });
 
     test('an unrecognised 422 body shape is left as a plain InkressApiError, never fabricated', async () => {
@@ -438,6 +454,18 @@ describe('SavedCardsResource', () => {
     expect(final.status).toBe('succeeded');
     expect(get).toHaveBeenCalledTimes(3);
     expect(sleeps).toEqual([500, 1000]);
+  });
+
+  // Round 2 (final-review re-review, Minor #2): only 'succeeded' and 'under_review' were pinned
+  // resolving waitForCharge end-to-end; 'declined' and 'failed' share the exact same
+  // RESOLVED_STATUSES-inclusion check, but were never actually exercised through the wait loop.
+  test.each(['declined', 'failed'] as const)('waitForCharge resolves directly on %s', async (status) => {
+    const sdk = new InkressSDK(config);
+    client(sdk).get = jest.fn().mockResolvedValue({ state: 'ok', result: outcome(status) });
+
+    const final = await sdk.savedCards.waitForCharge(7, 'order-981', { sleep: async () => undefined });
+
+    expect(final.status).toBe(status);
   });
 
   // I-A2 (Important, final-review fix): budget exhaustion now throws the TYPED pending error, not

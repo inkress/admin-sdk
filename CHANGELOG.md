@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`charge()`'s `422` refusals are now typed.** `SavedCardChargeRefusedError` (`reason`:
   `fee_consent_missing` | `merchant_not_verified` | `merchant_incomplete_profile` |
-  `merchant_not_found` | `invalid_request`, plus `detail` with the server's exact text) replaces
+  `merchant_not_found` | `unknown`, plus `detail` with the server's exact text) replaces
   string-matching `error.result.result` by hand. Corrected the `chargeable` doc: it's a live
   credential + your merchant's recorded fee consent only — it does **not** reflect your merchant's
   KYC/profile gates, so a `chargeable: true` card can still get `merchant_not_verified`.

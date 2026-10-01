@@ -141,6 +141,70 @@ function requireReference(reference: string): string {
   return trimmed;
 }
 
+/** INK-694: plan-change types (`POST/DELETE /billing_subscriptions/:uid/plan-change`). */
+export type PlanChangeOutcome = 'created' | 'unchanged' | 'replaced';
+export type PlanChangeResolution = 'applied' | 'cancelled' | 'rejected';
+export type PlanChangeErrorCode =
+  | 'not_found'
+  | 'subscription_not_active'
+  | 'subscription_cancelled'
+  | 'trial_active'
+  | 'dunning_in_progress'
+  | 'renewal_in_progress'
+  | 'already_on_plan'
+  | 'target_plan_not_found'
+  | 'target_plan_inactive'
+  | 'currency_mismatch'
+  | 'charge_mode_mismatch'
+  | 'billing_model_mismatch'
+  | 'no_pending_plan_change';
+
+export interface PlanChangePlanSummary {
+  uid: string;
+  name: string | null;
+  total: number | null;
+  currency: string | null;
+  billing_cycle: 'daily' | 'weekly' | 'monthly' | 'yearly' | null;
+}
+
+/** Stored on the subscription as `data.pending_plan_change` until the next renewal applies it. */
+export interface PendingPlanChange {
+  id: string;
+  from_plan_id: number;
+  from_plan_uid: string;
+  to_plan_id: number;
+  to_plan_uid: string;
+  from_plan: PlanChangePlanSummary;
+  to_plan: PlanChangePlanSummary;
+  requested_at: string;
+  requested_by: { kind: 'user' | 'oauth_app' | 'staff'; id: number | string | null };
+  /** The current period end when requested; the change applies at the renewal that ends it. */
+  effective_at: string | null;
+}
+
+/** `data.last_plan_change` once a change is applied, cancelled or rejected at renewal. */
+export interface ResolvedPlanChange extends PendingPlanChange {
+  outcome: PlanChangeResolution;
+  resolved_at: string;
+  /** Why a change was rejected at renewal (e.g. `target_plan_inactive`); null otherwise. */
+  reason: string | null;
+}
+
+export interface ChangeSubscriptionPlanData {
+  plan_uid: string;
+}
+
+export interface ChangeSubscriptionPlanResponse {
+  subscription_uid: string;
+  outcome: PlanChangeOutcome;
+  pending_plan_change: PendingPlanChange;
+}
+
+export interface CancelSubscriptionPlanChangeResponse {
+  subscription_uid: string;
+  cancelled_plan_change: PendingPlanChange;
+}
+
 export interface SubscriptionPeriodsParams extends PaginationParams {
   status?: 'pending' | 'paid' | 'failed' | 'cancelled';
   limit?: number;
@@ -417,6 +481,21 @@ export class SubscriptionsResource {
    */
   async getPeriods(uid: string, params?: SubscriptionPeriodsParams): Promise<ApiResponse<SubscriptionPeriodsResponse>> {
     return this.client.get<SubscriptionPeriodsResponse>(`/billing_subscriptions/${uid}/periods`, params);
+  }
+
+  /**
+   * Move a subscription to another plan of the same merchant at the end of its current period
+   * (no proration). The card on file stays linked. Idempotent per target plan. Refusals are
+   * `InkressApiError`s whose `result.result.code` is a `PlanChangeErrorCode` (404/409/422).
+   * Needs a credential bound to the plan-owning merchant (merchant_admin / organisation_admin).
+   */
+  async changePlan(uid: string, data: ChangeSubscriptionPlanData): Promise<ApiResponse<ChangeSubscriptionPlanResponse>> {
+    return this.client.post<ChangeSubscriptionPlanResponse>(`/billing_subscriptions/${uid}/plan-change`, data);
+  }
+
+  /** Cancel a pending plan change (404 `no_pending_plan_change` when none is pending). */
+  async cancelPlanChange(uid: string): Promise<ApiResponse<CancelSubscriptionPlanChangeResponse>> {
+    return this.client.delete<CancelSubscriptionPlanChangeResponse>(`/billing_subscriptions/${uid}/plan-change`);
   }
 
   /**

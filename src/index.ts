@@ -172,6 +172,15 @@ export {
   type SubscriptionChargeQueued,
   type SubscriptionChargeSettled,
   type SubscriptionChargeOutcome,
+  type PlanChangeOutcome,
+  type PlanChangeResolution,
+  type PlanChangeErrorCode,
+  type PlanChangePlanSummary,
+  type PendingPlanChange,
+  type ResolvedPlanChange,
+  type ChangeSubscriptionPlanData,
+  type ChangeSubscriptionPlanResponse,
+  type CancelSubscriptionPlanChangeResponse,
 } from './resources/subscriptions';
 
 // Export saved-card (Ink Pay) types + the typed error classes

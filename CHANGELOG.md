@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   your own `reference_id` (commerce-api INK-691). Same read model, statuses and budget as
   `savedCards.chargeStatus` / `waitForCharge`; a 404 (no such charge on this subscription) is thrown
   at once; budget exhausted throws `SavedCardChargePendingError` with the last outcome.
+- **`subscriptions.changePlan(uid, { plan_uid })` / `subscriptions.cancelPlanChange(uid)`
+  (INK-694).** Move a subscription to another plan of the same merchant at the end of its current
+  period, keeping the card on file; `PendingPlanChange` / `ResolvedPlanChange` types for
+  `data.pending_plan_change` / `data.last_plan_change`.
 - `isSubscriptionChargeQueued(result)` to tell the linked (202, async) charge answer from the legacy
   synchronous one.
 

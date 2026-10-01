@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (INK-694).** Move a subscription to another plan of the same merchant at the end of its current
   period, keeping the card on file; `PendingPlanChange` / `ResolvedPlanChange` types for
   `data.pending_plan_change` / `data.last_plan_change`.
+- **`orders.refund(orderRef, data, idempotencyKey)`, `orders.refundStatus`, `orders.waitForRefund`
+  (INK-692).** Full or partial refunds of captured card-on-file / subscription orders;
+  `OrderRefundPendingError` when a wait runs out (an `unknown` refund is still reconciling).
 - `isSubscriptionChargeQueued(result)` to tell the linked (202, async) charge answer from the legacy
   synchronous one.
 

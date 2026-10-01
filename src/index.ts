@@ -204,6 +204,17 @@ export {
   type SavedCardWaitOptions,
 } from './resources/saved-cards';
 
+// Export order refund (INK-692) types + error
+export {
+  OrderRefundPendingError,
+  type OrderRefund,
+  type OrderRefundStatus,
+  type OrderRefundReason,
+  type OrderRefundErrorCode,
+  type CreateOrderRefundData,
+  type WaitForRefundOptions,
+} from './resources/order-refunds';
+
 // Export checkout session types
 export type {
   CheckoutSession,

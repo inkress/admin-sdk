@@ -1,4 +1,12 @@
-import { HttpClient } from '../client';
+import { HttpClient, InkressApiError } from '../client';
+import {
+  OrderRefundPendingError,
+  RESOLVED_REFUND_STATUSES,
+  isOrderRefund,
+  type CreateOrderRefundData,
+  type OrderRefund,
+  type WaitForRefundOptions,
+} from './order-refunds';
 import {
   Order,
   ApiResponse,
@@ -267,5 +275,58 @@ export class OrdersResource {
    */
   createQueryBuilder(initialQuery?: OrderQueryParams): OrderQueryBuilder {
     return new OrderQueryBuilder(this, initialQuery);
+  }
+
+  /**
+   * INK-692: refund a captured card-on-file or subscription order, in full (no `amount`) or in
+   * part. `idempotencyKey` (8-200 printable ASCII) makes retries safe: the same key and payload
+   * return the same refund; a different payload is a 409. Resolves when the refund is ACCEPTED
+   * (`pending`); poll with `refundStatus` / `waitForRefund`. `orderRef` is the order id, its
+   * `reference_id` (e.g. the `cardchg-…` reference of a card charge) or uid.
+   */
+  async refund(orderRef: string | number, data: CreateOrderRefundData, idempotencyKey: string): Promise<ApiResponse<OrderRefund>> {
+    return this.client.post<OrderRefund>(`/orders/${encodeURIComponent(String(orderRef))}/refunds`, {
+      ...data,
+      idempotency_key: idempotencyKey,
+    });
+  }
+
+  /** Current state of a refund, by the idempotency key it was requested with. */
+  async refundStatus(orderRef: string | number, idempotencyKey: string): Promise<ApiResponse<OrderRefund>> {
+    const response = await this.client.get<unknown>(
+      `/orders/${encodeURIComponent(String(orderRef))}/refunds/${encodeURIComponent(idempotencyKey)}`,
+    );
+    const body: unknown = (response as { result?: unknown }).result;
+    if (!isOrderRefund(body)) throw new InkressApiError('Unexpected response from the refund status endpoint', 0, response);
+    return { state: 'ok', result: body };
+  }
+
+  /**
+   * Poll `refundStatus` until `succeeded` or `failed`. Transient misses (network, 5xx, unreadable
+   * body) are retried; 4xx is thrown. Throws `OrderRefundPendingError` when the budget runs out —
+   * an `unknown` refund is still being reconciled by Inkress; never re-request with a new key.
+   */
+  async waitForRefund(orderRef: string | number, idempotencyKey: string, options: WaitForRefundOptions = {}): Promise<OrderRefund> {
+    const attempts = options.attempts ?? 15;
+    const maxDelay = options.maxDelayMs ?? 15000;
+    const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+    let delay = options.initialDelayMs ?? 1000;
+    let last: OrderRefund | undefined;
+
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        const { result } = await this.refundStatus(orderRef, idempotencyKey);
+        last = result;
+        if (result && RESOLVED_REFUND_STATUSES.includes(result.status)) return result;
+      } catch (error) {
+        const transient = error instanceof InkressApiError && (error.status === 0 || error.status >= 500);
+        if (!transient) throw error;
+      }
+      if (attempt < attempts) {
+        await sleep(delay);
+        delay = Math.min(delay * 2, maxDelay);
+      }
+    }
+    throw new OrderRefundPendingError(idempotencyKey, last, attempts);
   }
 }

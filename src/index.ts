@@ -163,9 +163,15 @@ export {
 } from './resources/kyc';
 
 // Export subscription card-update types
-export type {
-  CreateCardUpdateLinkData,
-  CardUpdateLinkResponse,
+export {
+  isSubscriptionChargeQueued,
+  type CreateCardUpdateLinkData,
+  type CardUpdateLinkResponse,
+  type ChargeSubscriptionData,
+  type ChargeSubscriptionResponse,
+  type SubscriptionChargeQueued,
+  type SubscriptionChargeSettled,
+  type SubscriptionChargeOutcome,
 } from './resources/subscriptions';
 
 // Export saved-card (Ink Pay) types + the typed error classes

@@ -1,4 +1,20 @@
-import { HttpClient } from '../client';
+import { HttpClient, InkressApiError } from '../client';
+import {
+  RESOLVED_STATUSES,
+  defaultSleep,
+  isChargeOutcome,
+  isChargeStatus,
+  isJobId,
+  isRecord,
+  isTransientError,
+  validateWaitOptions,
+} from './card-charge-shared';
+import {
+  SavedCardChargePendingError,
+  type SavedCardChargeOutcome,
+  type SavedCardChargeStatus,
+  type SavedCardWaitOptions,
+} from './saved-cards';
 import {
   Subscription,
   InternalSubscription,
@@ -69,18 +85,60 @@ export interface ChargeSubscriptionData {
   title: string;
 }
 
-export interface ChargeSubscriptionResponse {
-  id: number;
-  payment_urls: {
-    short_link: string;
-  };
-  transaction: {
-    id: number;
-    amount: number;
-    status: string;
-    reference_id: string;
-    [key: string]: any;
-  };
+/**
+ * A charge on a subscription LINKED to a card on file (every subscription created through hosted
+ * checkout on current commerce-api): HTTP 202, charged asynchronously on the vaulted card. Poll
+ * with `chargeStatus` / `waitForCharge`, by `reference` or by your own `reference_id` (INK-690/691).
+ */
+export interface SubscriptionChargeQueued {
+  /** `queued` for a new charge; a same-reference replay reports the existing charge's status. */
+  status: SavedCardChargeStatus;
+  /** `null` when a replayed charge's job is no longer retained. */
+  job_id: number | null;
+  /** The durable order reference (`cardchg-…`). */
+  reference: string;
+  subscription_uid: string;
+}
+
+/**
+ * A charge on an UNLINKED (legacy) subscription: answered synchronously with the order the charge
+ * created. With no stored card that order is unpaid (`status: 'pending'`) and the customer pays it
+ * by link; `chargeStatus` does not apply (404).
+ */
+export interface SubscriptionChargeSettled {
+  total: number | null;
+  currency: string | null;
+  /** Order status key, e.g. `paid` or `pending`. */
+  status: string | null;
+  reference: string | null;
+  subscription_uid: string;
+  subscription_status: string | null;
+}
+
+/**
+ * The `charge` result. The previous single-object type (`id` / `payment_urls` / `transaction`)
+ * never matched what the API returns; narrow with `isSubscriptionChargeQueued`.
+ */
+export type ChargeSubscriptionResponse = SubscriptionChargeQueued | SubscriptionChargeSettled;
+
+/** True for the linked (asynchronous, 202) charge answer. */
+export function isSubscriptionChargeQueued(value: ChargeSubscriptionResponse): value is SubscriptionChargeQueued {
+  return isRecord(value) && 'job_id' in value && isJobId(value.job_id) && isChargeStatus(value.status);
+}
+
+/** `GET /billing_subscriptions/:uid/charges/:reference` — the same read model as saved-card charges. */
+export interface SubscriptionChargeOutcome extends SavedCardChargeOutcome {
+  subscription_uid: string;
+}
+
+function isSubscriptionChargeOutcome(value: unknown): value is SubscriptionChargeOutcome {
+  return isChargeOutcome(value) && isRecord(value) && typeof value.subscription_uid === 'string';
+}
+
+function requireReference(reference: string): string {
+  const trimmed = reference.trim();
+  if (trimmed === '') throw new Error('reference is required');
+  return trimmed;
 }
 
 export interface SubscriptionPeriodsParams extends PaginationParams {
@@ -270,11 +328,79 @@ export class SubscriptionsResource {
   }
 
   /**
-   * Charge an existing subscription
-   * Requires Client-Id header to be set in the configuration
+   * Charge an existing subscription (one-off, on the subscription's card).
+   * Requires Client-Id header to be set in the configuration; a LINKED subscription additionally
+   * needs a credential bound to the plan-owning merchant with a charging role (merchant_admin /
+   * organisation_admin) — organisation-level keys and bot keys are refused (403).
+   *
+   * `reference_id` is your idempotency key: a retry with the same value never charges twice. It is
+   * also sent as `reference`, the name older API versions read.
+   *
+   * @example
+   * const { result } = await inkress.subscriptions.charge(uid, { total: 12, title: 'Domain', reference_id: 'dom-123-2026' });
+   * if (result && isSubscriptionChargeQueued(result)) {
+   *   const outcome = await inkress.subscriptions.waitForCharge(uid, 'dom-123-2026');
+   * }
    */
   async charge(uid: string, data: ChargeSubscriptionData): Promise<ApiResponse<ChargeSubscriptionResponse>> {
-    return this.client.post<ChargeSubscriptionResponse>(`/billing_subscriptions/${uid}/charge`, data);
+    return this.client.post<ChargeSubscriptionResponse>(`/billing_subscriptions/${uid}/charge`, {
+      ...data,
+      reference: data.reference_id,
+    });
+  }
+
+  /**
+   * Current outcome of a linked subscription's charge, by the `reference` from `charge` or by
+   * your own `reference_id`. 404 (`InkressApiError`) when no such charge exists on this
+   * subscription — including any charge on an unlinked subscription.
+   */
+  async chargeStatus(uid: string, reference: string): Promise<ApiResponse<SubscriptionChargeOutcome>> {
+    const ref = requireReference(reference);
+    const response = await this.client.get<unknown>(
+      `/billing_subscriptions/${uid}/charges/${encodeURIComponent(ref)}`,
+    );
+    const body: unknown = (response as { result?: unknown }).result;
+    if (!isSubscriptionChargeOutcome(body)) {
+      throw new InkressApiError('Unexpected response from the subscription charge status endpoint', 0, response);
+    }
+    return { state: 'ok', result: body };
+  }
+
+  /**
+   * Poll `chargeStatus` until the charge resolves (`succeeded`, `declined`, `failed` or
+   * `under_review`), same budget and semantics as `savedCards.waitForCharge`. Transient misses
+   * (network, 5xx, unparseable body) are retried; any 4xx is thrown. Throws
+   * `SavedCardChargePendingError` (carrying the last outcome seen) when the budget runs out —
+   * never retry the charge with a NEW reference then; poll again with the same one.
+   */
+  async waitForCharge(
+    uid: string,
+    reference: string,
+    options: SavedCardWaitOptions = {},
+  ): Promise<SubscriptionChargeOutcome> {
+    validateWaitOptions(options);
+    const ref = requireReference(reference);
+    const attempts = options.attempts ?? 12;
+    const maxDelay = options.maxDelayMs ?? 8000;
+    const sleep = options.sleep ?? defaultSleep;
+    let delay = options.initialDelayMs ?? 500;
+    let last: SubscriptionChargeOutcome | undefined;
+
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        const { result } = await this.chargeStatus(uid, ref);
+        last = result;
+        if (result && (RESOLVED_STATUSES as readonly string[]).includes(result.status)) return result;
+      } catch (error) {
+        if (!isTransientError(error)) throw error;
+      }
+      if (attempt < attempts) {
+        await sleep(delay);
+        delay = Math.min(delay * 2, maxDelay);
+      }
+    }
+
+    throw new SavedCardChargePendingError(ref, last, attempts);
   }
 
   /**

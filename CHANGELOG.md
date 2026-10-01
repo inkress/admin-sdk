@@ -5,6 +5,27 @@ All notable changes to the Inkress Admin SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### ✨ Added
+
+- **`subscriptions.chargeStatus(uid, reference)` and `subscriptions.waitForCharge(uid, reference)`
+  (INK-690).** Poll a linked subscription's one-off charge by the `reference` from `charge` or by
+  your own `reference_id` (commerce-api INK-691). Same read model, statuses and budget as
+  `savedCards.chargeStatus` / `waitForCharge`; a 404 (no such charge on this subscription) is thrown
+  at once; budget exhausted throws `SavedCardChargePendingError` with the last outcome.
+- `isSubscriptionChargeQueued(result)` to tell the linked (202, async) charge answer from the legacy
+  synchronous one.
+
+### 🐛 Fixed
+
+- `ChargeSubscriptionResponse` now types what the API actually returns:
+  `SubscriptionChargeQueued | SubscriptionChargeSettled`. The old `id` / `payment_urls` /
+  `transaction` shape never matched the endpoint. TypeScript callers reading those fields were
+  reading `undefined`.
+- `subscriptions.charge` also sends `reference` (= `reference_id`) so API versions that read only
+  `reference` keep the caller's idempotency key.
+
 ## [1.2.0] - 2026-09-25
 
 ### ✨ Added

@@ -470,6 +470,7 @@ export class SubscriptionsResource {
   /**
    * Record usage for a usage-based subscription (INK-781). Adds `metric_count` (default 1) to the
    * metric's total for the subscription's current billing period and returns the new total.
+   * Usage settings are set on the plan's `data` and copied to each subscription.
    * At renewal Inkress bills each metric in the subscription's `data.usage_metrics`
    * (`{ metric, rate, allotment? }`): units above `allotment` times `rate`, added to the plan price
    * when `data.apply_usage_charge_to_flat_rate` is true.

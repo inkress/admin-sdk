@@ -1368,7 +1368,11 @@ export interface SubscriptionUsageResponse {
   total: number;
 }
 
-/** One entry of a usage-based subscription's `data.usage_metrics` (INK-781). */
+/**
+ * One entry of a usage-based plan's `data.usage_metrics` (INK-781), alongside
+ * `is_usage_based: true` and, to add usage to the plan price, `apply_usage_charge_to_flat_rate: true`.
+ * Subscriptions copy these from their plan when they're created and when they change plan.
+ */
 export interface SubscriptionUsageMetric {
   id?: string;
   metric: string;

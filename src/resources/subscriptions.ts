@@ -56,6 +56,15 @@ export interface CreateSubscriptionLinkData {
     last_name: string;
     email: string;
   };
+  /**
+   * Optional first billing period (INK-781). ISO 8601 date or date-time. The subscription starts on
+   * `start_date` (default: today) and its first period ends on `end_date` (default: a month later,
+   * at most a month); from there it renews every calendar month on `end_date`'s day.
+   */
+  start_date?: string;
+  end_date?: string;
+  /** Charge the plan price for the share of a month the first period covers, instead of in full. */
+  prorate?: boolean;
 }
 
 export interface CreateSubscriptionLinkResponse {

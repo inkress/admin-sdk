@@ -1380,6 +1380,11 @@ export interface SubscriptionUsageMetric {
   rate: number;
   /** Units included in the plan price; only units above it are charged. */
   allotment?: number;
+  /**
+   * Volume tiers: the period's total picks the highest tier reached (`from`), and every billable
+   * unit is charged at that tier's rate, with its allotment when set.
+   */
+  tiers?: Array<{ from: number; rate: number; allotment?: number }>;
 }
 
 export interface SubscriptionCancelResponse {

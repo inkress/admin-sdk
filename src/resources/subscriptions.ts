@@ -24,7 +24,7 @@ import {
   SubscriptionPeriod,
   CreateSubscriptionData,
   SubscriptionLinkData,
-  SubscriptionChargeData,
+  SubscriptionUsageData,
   SubscriptionUsageResponse,
   SubscriptionCancelResponse,
   ApiResponse,
@@ -56,6 +56,15 @@ export interface CreateSubscriptionLinkData {
     last_name: string;
     email: string;
   };
+  /**
+   * Optional first billing period (INK-781). ISO 8601 date or date-time. The subscription starts on
+   * `start_date` (default: today) and its first period ends on `end_date` (default: a month later,
+   * at most a month); from there it renews every calendar month on `end_date`'s day.
+   */
+  start_date?: string;
+  end_date?: string;
+  /** Charge the plan price for the share of a month the first period covers, instead of in full. */
+  prorate?: boolean;
 }
 
 export interface CreateSubscriptionLinkResponse {
@@ -468,11 +477,16 @@ export class SubscriptionsResource {
   }
 
   /**
-   * Record usage for a subscription (for usage-based billing)
+   * Record usage for a usage-based subscription (INK-781). Adds `metric_count` (default 1) to the
+   * metric's total for the subscription's current billing period and returns the new total.
+   * Usage settings are set on the plan's `data` and copied to each subscription.
+   * At renewal Inkress bills each metric in the subscription's `data.usage_metrics`
+   * (`{ metric, rate, allotment? }`): units above `allotment` times `rate`, added to the plan price
+   * when `data.apply_usage_charge_to_flat_rate` is true.
    * Requires Client-Id header to be set in the configuration
    */
-  async usage(uid: string, data: SubscriptionChargeData): Promise<ApiResponse<SubscriptionUsageResponse>> {
-    return this.client.post<SubscriptionUsageResponse>(`/billing_subscriptions/${uid}/usage`, data);
+  async usage(uid: string, data: SubscriptionUsageData): Promise<ApiResponse<SubscriptionUsageResponse>> {
+    return this.client.post<SubscriptionUsageResponse>(`/billing_subscriptions/usage/${uid}`, data);
   }
 
   /**

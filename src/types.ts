@@ -1351,12 +1351,40 @@ export interface SubscriptionPeriod {
   updated_at: string;
 }
 
+/** Usage to record against a subscription's current period (INK-781). */
+export interface SubscriptionUsageData {
+  /** Metric name, matching a `metric` in the subscription's `data.usage_metrics`. */
+  metric: string;
+  /** Units to add. Defaults to 1. */
+  metric_count?: number;
+}
+
 export interface SubscriptionUsageResponse {
-  id: number;
-  subscription_id: string;
-  usage_amount: number;
-  recorded_at: string;
-  description?: string;
+  subscription_uid: string;
+  metric: string;
+  /** End date (YYYY-MM-DD) of the billing period the usage was recorded against. */
+  period_ending: string;
+  /** The metric's total for that period after this call. */
+  total: number;
+}
+
+/**
+ * One entry of a usage-based plan's `data.usage_metrics` (INK-781), alongside
+ * `is_usage_based: true` and, to add usage to the plan price, `apply_usage_charge_to_flat_rate: true`.
+ * Subscriptions copy these from their plan when they're created and when they change plan.
+ */
+export interface SubscriptionUsageMetric {
+  id?: string;
+  metric: string;
+  /** Charge per unit above the allotment, in the plan's currency. */
+  rate: number;
+  /** Units included in the plan price; only units above it are charged. */
+  allotment?: number;
+  /**
+   * Volume tiers: the period's total picks the highest tier reached (`from`), and every billable
+   * unit is charged at that tier's rate, with its allotment when set.
+   */
+  tiers?: Array<{ from: number; rate: number; allotment?: number }>;
 }
 
 export interface SubscriptionCancelResponse {

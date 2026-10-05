@@ -24,7 +24,7 @@ import {
   SubscriptionPeriod,
   CreateSubscriptionData,
   SubscriptionLinkData,
-  SubscriptionChargeData,
+  SubscriptionUsageData,
   SubscriptionUsageResponse,
   SubscriptionCancelResponse,
   ApiResponse,
@@ -468,11 +468,15 @@ export class SubscriptionsResource {
   }
 
   /**
-   * Record usage for a subscription (for usage-based billing)
+   * Record usage for a usage-based subscription (INK-781). Adds `metric_count` (default 1) to the
+   * metric's total for the subscription's current billing period and returns the new total.
+   * At renewal Inkress bills each metric in the subscription's `data.usage_metrics`
+   * (`{ metric, rate, allotment? }`): units above `allotment` times `rate`, added to the plan price
+   * when `data.apply_usage_charge_to_flat_rate` is true.
    * Requires Client-Id header to be set in the configuration
    */
-  async usage(uid: string, data: SubscriptionChargeData): Promise<ApiResponse<SubscriptionUsageResponse>> {
-    return this.client.post<SubscriptionUsageResponse>(`/billing_subscriptions/${uid}/usage`, data);
+  async usage(uid: string, data: SubscriptionUsageData): Promise<ApiResponse<SubscriptionUsageResponse>> {
+    return this.client.post<SubscriptionUsageResponse>(`/billing_subscriptions/usage/${uid}`, data);
   }
 
   /**

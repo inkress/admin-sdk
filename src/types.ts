@@ -1351,12 +1351,31 @@ export interface SubscriptionPeriod {
   updated_at: string;
 }
 
+/** Usage to record against a subscription's current period (INK-781). */
+export interface SubscriptionUsageData {
+  /** Metric name, matching a `metric` in the subscription's `data.usage_metrics`. */
+  metric: string;
+  /** Units to add. Defaults to 1. */
+  metric_count?: number;
+}
+
 export interface SubscriptionUsageResponse {
-  id: number;
-  subscription_id: string;
-  usage_amount: number;
-  recorded_at: string;
-  description?: string;
+  subscription_uid: string;
+  metric: string;
+  /** End date (YYYY-MM-DD) of the billing period the usage was recorded against. */
+  period_ending: string;
+  /** The metric's total for that period after this call. */
+  total: number;
+}
+
+/** One entry of a usage-based subscription's `data.usage_metrics` (INK-781). */
+export interface SubscriptionUsageMetric {
+  id?: string;
+  metric: string;
+  /** Charge per unit above the allotment, in the plan's currency. */
+  rate: number;
+  /** Units included in the plan price; only units above it are charged. */
+  allotment?: number;
 }
 
 export interface SubscriptionCancelResponse {

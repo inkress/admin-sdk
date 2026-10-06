@@ -1171,6 +1171,8 @@ export interface OrderFilterParams extends BaseFilterParams {
   customer_id?: number;
   payment_link_id?: number;
   billing_plan_id?: number;
+  /** Payments towards one booking (INK-792). */
+  booking_id?: number;
   session_id?: string;
   inserted_at?: string;
   updated_at?: string;

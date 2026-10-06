@@ -86,6 +86,8 @@ export interface SavedCardChargeData {
   idempotency_key: string;
   /** At most 255 characters. */
   description?: string;
+  /** Tags the charge's order as a payment towards one of your bookings (INK-792), e.g. its balance. */
+  booking_id?: number;
 }
 
 export type SavedCardChargeStatus = 'queued' | 'processing' | 'succeeded' | 'declined' | 'under_review' | 'failed';
@@ -231,6 +233,7 @@ export type SavedCardChargeRefusalReason =
   | 'merchant_not_verified'
   | 'merchant_incomplete_profile'
   | 'merchant_not_found'
+  | 'booking_not_found'
   | 'unknown';
 
 export class SavedCardChargeRefusedError extends InkressApiError {
@@ -357,6 +360,7 @@ function chargeRefusalReason(message: string): SavedCardChargeRefusalReason {
   if (message.startsWith('merchant_not_verified')) return 'merchant_not_verified';
   if (message.startsWith('merchant_incomplete_profile')) return 'merchant_incomplete_profile';
   if (message === 'Merchant not found') return 'merchant_not_found';
+  if (message === 'Booking not found.') return 'booking_not_found';
   return 'unknown';
 }
 

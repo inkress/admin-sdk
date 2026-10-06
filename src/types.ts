@@ -531,6 +531,8 @@ export interface Order {
   payment_link_id?: number;
   billing_plan_id?: number;
   billing_subscription_id?: number;
+  /** Set when this order is a payment towards a booking (INK-792). */
+  booking_id?: number | null;
   meta_data?: Record<string, any>;
   session_id?: string;
   data?: Record<string, any>;
@@ -706,6 +708,9 @@ export interface CreateOrderData {
   
   /** Source payment link ID (if creating from existing payment link) */
   payment_link_id?: string;
+
+  /** Tags the order as a payment towards one of your bookings (INK-792). Set only at creation. */
+  booking_id?: number;
   
   /** Subscription fields (if kind = 'subscription' or OrderKind.SUBSCRIPTION) */
   plan_id?: string;

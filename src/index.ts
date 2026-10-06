@@ -18,6 +18,7 @@ import { FinancialRequestsResource } from './resources/financial-requests';
 import { WebhookUrlsResource } from './resources/webhook-urls';
 import { TokensResource } from './resources/tokens';
 import { AddressesResource } from './resources/addresses';
+import { BookingsResource } from './resources/bookings';
 import { CurrenciesResource } from './resources/currencies';
 import { ExchangeRatesResource } from './resources/exchange-rates';
 import { FeesResource } from './resources/fees';
@@ -89,6 +90,7 @@ export class InkressSDK {
   public readonly webhookUrls: WebhookUrlsResource;
   public readonly tokens: TokensResource;
   public readonly addresses: AddressesResource;
+  public readonly bookings: BookingsResource;
   public readonly currencies: CurrenciesResource;
   public readonly exchangeRates: ExchangeRatesResource;
   public readonly fees: FeesResource;
@@ -117,6 +119,7 @@ export class InkressSDK {
     this.webhookUrls = new WebhookUrlsResource(this.client);
     this.tokens = new TokensResource(this.client);
     this.addresses = new AddressesResource(this.client);
+    this.bookings = new BookingsResource(this.client);
     this.currencies = new CurrenciesResource(this.client);
     this.exchangeRates = new ExchangeRatesResource(this.client);
     this.fees = new FeesResource(this.client);
@@ -203,6 +206,15 @@ export {
   type SavedCardChargeOutcome,
   type SavedCardWaitOptions,
 } from './resources/saved-cards';
+
+// Export booking (INK-792) types
+export {
+  type Booking,
+  type CreateBookingData,
+  type UpdateBookingData,
+  type BookingFilterParams,
+  type BookingListResponse,
+} from './resources/bookings';
 
 // Export order refund (INK-692) types + error
 export {

@@ -149,6 +149,43 @@ export class HttpClient {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  /**
+   * A request relative to the API origin (not `/api/<version>`), returning the status, headers and
+   * parsed body without the `{state, result}` envelope or throwing on 4xx. Used for endpoints that
+   * speak another protocol (OFREP) or answer without the envelope (`/access`).
+   */
+  async raw<T = unknown>(
+    method: 'GET' | 'POST',
+    originPath: string,
+    options: { body?: unknown; headers?: Record<string, string> } = {}
+  ): Promise<RawResponse<T>> {
+    const url = `${this.config.endpoint}${originPath}`;
+    const init: RequestInit = { method, headers: this.getHeaders(options.headers) };
+    if (options.body !== undefined && method !== 'GET') init.body = JSON.stringify(options.body);
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Request timeout')), this.config.timeout);
+    });
+
+    let response: Response;
+    try {
+      response = await Promise.race([fetch(url, init), timeoutPromise]);
+    } catch (error) {
+      throw new InkressApiError(error instanceof Error ? error.message : 'Unknown error', 0, { error });
+    }
+
+    const text = await response.text();
+    let body: T | null = null;
+    if (text) {
+      try {
+        body = JSON.parse(text) as T;
+      } catch {
+        body = null;
+      }
+    }
+    return { status: response.status, headers: response.headers, body };
+  }
+
   async get<T>(path: string, params?: Record<string, any>): Promise<ApiResponse<T>> {
     let url = path;
     if (params) {
@@ -203,6 +240,13 @@ export class HttpClient {
     const { endpoint, ...publicConfig } = config as any;
     return publicConfig;
   }
+}
+
+/** Result of `HttpClient.raw`. */
+export interface RawResponse<T> {
+  status: number;
+  headers: Headers;
+  body: T | null;
 }
 
 export class InkressApiError extends Error {

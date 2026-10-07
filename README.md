@@ -1,20 +1,14 @@
 # @inkress/admin-sdk
 
-Official Inkress Commerce API SDK for JavaScript/TypeScript applications.
+Server-side TypeScript/JavaScript client for the Inkress Commerce API.
 
 [![npm version](https://badge.fury.io/js/@inkress%2Fadmin-sdk.svg)](https://badge.fury.io/js/@inkress%2Fadmin-sdk)
-[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Features
-
-- 🚀 **Modern TypeScript SDK** - Built with TypeScript for excellent developer experience
-- 🔒 **Secure Authentication** - JWT-based authentication with automatic token management
-- 🌐 **Public Endpoints** - Access public merchant information without authentication
-- 📦 **Comprehensive API Coverage** - Full coverage of Inkress Commerce API endpoints
-- 🛠️ **Easy Integration** - Simple setup and intuitive API design
-- 🔄 **Automatic Retries** - Built-in retry logic for resilient applications
-- 📱 **Cross-Platform** - Works in Node.js, browsers, and React Native
+> **Version.** This README describes the source on this branch, package version `1.0.0`. The `latest`
+> release on npm (1.1.x) is built from a different line of development, with a different configuration
+> (`accessToken`, `username`, `mode`) and more resources. Check `package.json` in the installed package
+> before following this README.
 
 ## Installation
 
@@ -22,434 +16,223 @@ Official Inkress Commerce API SDK for JavaScript/TypeScript applications.
 npm install @inkress/admin-sdk
 ```
 
-```bash
-yarn add @inkress/admin-sdk
-```
-
-```bash
-pnpm add @inkress/admin-sdk
-```
-
-## Quick Start
-
-### Basic Setup
+## Quick start
 
 ```typescript
 import { InkressSDK } from '@inkress/admin-sdk';
 
 const inkress = new InkressSDK({
-  bearerToken: 'your-jwt-token', // Can be an empty string for public endpoints
-  clientId: 'm-merchant-username', // Required for merchant-specific endpoints
-  endpoint: 'https://api.inkress.com', // Optional, defaults to production
-});
-```
-
-### Public Endpoints (No Authentication Required)
-
-```typescript
-// Get public merchant information
-const merchant = await inkress.public.getMerchant({ 
-  username: 'merchant-username' 
+  bearerToken: process.env.INKRESS_TOKEN!,   // JWT or API token; '' for public endpoints only
+  clientId: 'm-your-merchant-username',      // sent as the Client-Id header
+  endpoint: 'https://api.inkress.com',       // default; https://api-dev.inkress.com for development
 });
 
-// Get merchant products
-const products = await inkress.public.getMerchantProducts('merchant-username', {
-  limit: 20,
-  search: 'laptop'
-});
-
-// Get merchant fees
-const fees = await inkress.public.getMerchantFees('merchant-username', {
-    currency: 'JMD',
-    total: 1000
-});
-```
-
-### Authenticated Operations
-
-```typescript
-// List categories
-const categories = await inkress.categories.list({ kind: 1 });
-
-// Create a new category
-const category = await inkress.categories.create({
-  name: 'Electronics',
-  description: 'Electronic devices and accessories',
-  kind: 1
-});
-
-// List products
-const products = await inkress.products.list({
-  limit: 50,
-  category_id: 1
-});
-
-// Create an order
-const order = await inkress.orders.create({
+const { result } = await inkress.orders.create({
   currency_code: 'USD',
-  customer: {
-    email: 'customer@example.com',
-    first_name: 'John',
-    last_name: 'Doe'
-  },
   total: 29.99,
-  reference_id: 'order-123'
+  reference_id: 'order-123',
+  customer: { email: 'customer@example.com', first_name: 'Jane', last_name: 'Doe' },
 });
 ```
 
-## Configuration Options
+## Configuration
 
 | Option | Type | Required | Default | Description |
-|--------|------|----------|---------|-------------|
-| `bearerToken` | `string` | Yes | - | JWT token for API authentication |
-| `clientId` | `string` | No | - | Client ID for merchant-specific requests (format: `m-{username}`) |
-| `endpoint` | `string` | No | `https://api.inkress.com` | API endpoint URL |
-| `apiVersion` | `string` | No | `v1` | API version to use |
-| `timeout` | `number` | No | `30000` | Request timeout in milliseconds |
-| `retries` | `number` | No | `3` | Number of retry attempts for failed requests |
-| `headers` | `Record<string, string>` | No | `{}` | Custom headers to include with requests |
+|---|---|---|---|---|
+| `bearerToken` | `string` | Yes | — | Sent as `Authorization: Bearer <token>` |
+| `clientId` | `string` | No | `''` | Sent as `Client-Id` when set. Format `m-{merchant username}`. Required for merchant resources. |
+| `endpoint` | `string` | No | `https://api.inkress.com` | API origin |
+| `apiVersion` | `string` | No | `v1` | Requests go to `{endpoint}/api/{apiVersion}` |
+| `timeout` | `number` | No | `30000` | Request timeout in ms |
+| `retries` | `number` | No | `0` | Retries for 5xx responses and network errors/timeouts, with a 1 s, 2 s, … delay |
+| `headers` | `Record<string, string>` | No | `{}` | Extra headers on every request |
 
-## API Resources
+## Responses and errors
 
-### Public Resource (No Authentication)
+Every method resolves to the API envelope `ApiResponse<T>`: `{ state: 'ok' | 'error', result?: T, data?: T }`.
+Most endpoints put the payload in `result`.
 
-Access public merchant information without authentication:
-
-```typescript
-// Get merchant by username or domain
-await inkress.public.getMerchant({ username: 'merchant-name' });
-await inkress.public.getMerchant({ 'domain.cname': 'store.example.com' });
-
-// Get merchant products with filtering
-await inkress.public.getMerchantProducts('merchant-name', {
-  search: 'laptop',
-  category: 'electronics',
-  limit: 20
-});
-
-// Get merchant fees
-await inkress.public.getMerchantFees('merchant-name');
-```
-
-### Merchants Resource
+A non-2xx response throws `InkressApiError` with `status` (HTTP status, `0` for network errors and
+timeouts), `message` and `data` (the parsed error body):
 
 ```typescript
-// List merchants
-await inkress.merchants.list();
+import { InkressApiError } from '@inkress/admin-sdk';
 
-// Get merchant details
-await inkress.merchants.get(merchantId);
-
-// Update merchant
-await inkress.merchants.update(merchantId, { name: 'New Name' });
-```
-
-### Products Resource
-
-```typescript
-// List products with pagination and filtering
-await inkress.products.list({
-  page: 1,
-  per_page: 50,
-  category_id: 1,
-  search: 'laptop'
-});
-
-// Get product details
-await inkress.products.get(productId);
-
-// Create a new product
-await inkress.products.create({
-  name: 'Gaming Laptop',
-  description: 'High-performance gaming laptop',
-  price: 1299.99,
-  category_id: 1
-});
-
-// Update product
-await inkress.products.update(productId, { price: 1199.99 });
-
-// Delete product
-await inkress.products.delete(productId);
-```
-
-### Categories Resource
-
-```typescript
-// List categories
-await inkress.categories.list({ kind: 1 });
-
-// Get category details
-await inkress.categories.get(categoryId);
-
-// Create category
-await inkress.categories.create({
-  name: 'Electronics',
-  description: 'Electronic devices',
-  kind: 1
-});
-
-// Update category
-await inkress.categories.update(categoryId, { name: 'Updated Name' });
-
-// Delete category
-await inkress.categories.delete(categoryId);
-```
-
-### Orders Resource
-
-```typescript
-// Create an order
-await inkress.orders.create({
-  currency_code: 'USD',
-  customer: {
-    email: 'customer@example.com',
-    first_name: 'John',
-    last_name: 'Doe'
-  },
-  total: 99.99,
-  reference_id: 'order-123',
-  kind: 'online'
-});
-
-// Get order details
-await inkress.orders.get(orderId);
-
-// Update order status
-await inkress.orders.update(orderId, { status: 2 });
-
-// Get order status (public endpoint)
-await inkress.orders.getStatus(orderId);
-
-// List orders
-await inkress.orders.list();
-```
-
-### Users Resource
-
-```typescript
-// List users
-await inkress.users.list();
-
-// Get user details
-await inkress.users.get(userId);
-
-// Create user
-await inkress.users.create({
-  email: 'user@example.com',
-  first_name: 'John',
-  last_name: 'Doe',
-  role: 'customer'
-});
-
-// Update user
-await inkress.users.update(userId, { first_name: 'Jane' });
-
-// Delete user
-await inkress.users.delete(userId);
-```
-
-### Billing Plans Resource
-
-```typescript
-// List billing plans
-await inkress.billingPlans.list();
-
-// Get plan details
-await inkress.billingPlans.get(planId);
-
-// Create billing plan
-await inkress.billingPlans.create({
-  name: 'Premium Plan',
-  amount: 29.99,
-  currency: 'USD'
-});
-```
-
-### Subscriptions Resource
-
-```typescript
-// List subscriptions
-await inkress.subscriptions.list();
-
-// Get subscription details
-await inkress.subscriptions.get(subscriptionId);
-
-// Create subscription
-await inkress.subscriptions.create({
-  plan_id: 1,
-  customer: {
-    email: 'customer@example.com',
-    first_name: 'John',
-    last_name: 'Doe'
-  }
-});
-```
-
-## Error Handling
-
-The SDK provides structured error handling with detailed error information:
-
-```typescript
 try {
-  const product = await inkress.products.get(123);
-} catch (error) {
-  if (error.response?.status === 404) {
-    console.log('Product not found');
-  } else if (error.response?.status === 422) {
-    console.log('Validation errors:', error.response.data);
+  await inkress.products.get(123);
+} catch (err) {
+  if (err instanceof InkressApiError && err.status === 404) {
+    // not found
   } else {
-    console.log('Unexpected error:', error.message);
+    throw err;
   }
 }
 ```
 
-## TypeScript Support
+Some subscription endpoints answer HTTP 200 with `state: 'error'` (for example an unknown
+subscription), so check `state` as well as catching errors.
 
-The SDK is built with TypeScript and provides comprehensive type definitions:
+List methods resolve to `{ entries, pagination }` under `result`. The SDK's list response types name
+the pagination block `page_info`; the API returns it as `pagination` (`page`, `page_size`,
+`total_entries`, `total_pages`, `more`, …).
+
+## Resources
+
+Every method below maps to one API route (paths are relative to `/api/v1`).
+
+### `inkress.public` (no authentication)
+
+| Method | Route |
+|---|---|
+| `getMerchant({ username } \| { 'domain.cname': cname })` | `GET /public/m` |
+| `getMerchantFees(username, { currency, total })` | `GET /public/m/{username}/fees` |
+| `getMerchantProducts(username, params?)` | `GET /public/m/{username}/products` |
 
 ```typescript
-import { 
-  InkressSDK, 
-  Product, 
-  Category, 
-  Order, 
-  Merchant,
-  CreateProductData,
-  ApiResponse 
-} from '@inkress/admin-sdk';
-
-// All API responses are properly typed
-const response: ApiResponse<Product[]> = await inkress.products.list();
-const products: Product[] = response.result || response.data || [];
+const merchant = await inkress.public.getMerchant({ username: 'mystore' });
+const fees = await inkress.public.getMerchantFees('mystore', { currency: 'JMD', total: 1000 });
+const products = await inkress.public.getMerchantProducts('mystore', { search: 'laptop', limit: 20 });
 ```
 
-## Environment Configuration
+### `inkress.merchants`
 
-### Development
+| Method | Route |
+|---|---|
+| `list(params?)` | `GET /merchants` |
+| `get(id)` | `GET /merchants/{id}` |
+| `create({ name, email, phone?, about? })` | `POST /merchants` |
+| `update(id, data)` | `PUT /merchants/{id}` |
+
+### `inkress.products`
+
+| Method | Route |
+|---|---|
+| `list(params?)` | `GET /products` |
+| `get(id)` | `GET /products/{id}` |
+| `create(data)` | `POST /products` |
+| `update(id, data)` | `PUT /products/{id}` |
+| `delete(id)` | `DELETE /products/{id}` |
 
 ```typescript
-const inkress = new InkressSDK({
-  bearerToken: process.env.INKRESS_DEV_TOKEN,
-  endpoint: 'https://api-dev.inkress.com',
-  clientId: 'm-your-dev-merchant'
+await inkress.products.create({
+  title: 'Gaming Laptop',
+  permalink: 'gaming-laptop',
+  price: 1299.99,
+  teaser: 'High-performance gaming laptop',
+  public: true,
 });
 ```
 
-### Production
+### `inkress.categories`
+
+| Method | Route |
+|---|---|
+| `list(params?)` | `GET /categories` |
+| `get(id)` | `GET /categories/{id}` |
+| `create({ name, kind, description?, kind_id?, parent_id? })` | `POST /categories` |
+| `update(id, data)` | `PUT /categories/{id}` (`parent_id` cannot change) |
+| `delete(id)` | `DELETE /categories/{id}` |
+
+### `inkress.orders`
+
+| Method | Route |
+|---|---|
+| `create({ currency_code, total, customer, reference_id?, kind? })` | `POST /orders` |
+| `get(id)` | `GET /orders/{id}` |
+| `update(id, { status })` | `PUT /orders/{id}` |
+| `getStatus(id)` | `GET /orders/status/{id}` (public) |
+| `list()` | `GET /orders` |
+
+### `inkress.users`
+
+| Method | Route |
+|---|---|
+| `list(params?)` | `GET /users` |
+| `get(id)` | `GET /users/{id}` |
+| `create({ email, password, first_name?, last_name?, phone?, username?, role_id?, ... })` | `POST /users` |
+| `update(id, data)` | `PUT /users/{id}` |
+| `delete(id)` | `DELETE /users/{id}` |
+
+### `inkress.billingPlans`
+
+| Method | Route |
+|---|---|
+| `list(params?)` | `GET /billing_plans` |
+| `get(id)` | `GET /billing_plans/{id}` |
+| `create(data)` | `POST /billing_plans` |
+| `update(id, data)` | `PUT /billing_plans/{id}` |
+| `delete(id)` | `DELETE /billing_plans/{id}` |
 
 ```typescript
-const inkress = new InkressSDK({
-  bearerToken: process.env.INKRESS_PROD_TOKEN,
-  endpoint: 'https://api.inkress.com',
-  clientId: 'm-your-merchant'
+await inkress.billingPlans.create({
+  name: 'Courier monthly',
+  kind: 1,                 // 1 = subscription plan
+  flat_rate: 40,
+  billing_cycle: 3,        // 1 daily, 2 weekly, 3 monthly (calendar month), 4 yearly
+  duration: 12,
+  auto_charge: true,       // renewals charge the saved card
+  charge_strategy: 1,      // 1 = charge at period start, 2 = at period end
+  currency_id: 1,
+  transaction_fee: 0,
+  transaction_percentage: 0,
 });
 ```
 
-## React/Next.js Integration
+`CreateBillingPlanData` types the core plan fields. The API also accepts `billing_model`, `public`,
+`meta_data` and `data` (usage-based billing: `is_usage_based`, `apply_usage_charge_to_flat_rate`,
+`usage_metrics` with `allotment` and `tiers`); see `BillingPlan` in the API's `openapi.yaml`. The
+type declares `features` as `string[]`; the API stores any JSON object there.
 
-### Server-Side Usage (API Routes)
+### `inkress.subscriptions`
+
+| Method | Route |
+|---|---|
+| `list(params?)` | `GET /billing_subscriptions` |
+| `createLink({ plan_id, reference_id, title, customer })` | `POST /billing_subscriptions/link` |
+| `charge(uid, { total, reference_id, title })` | `POST /billing_subscriptions/{uid}/charge` |
+| `getPeriods(uid, params?)` | `GET /billing_subscriptions/{uid}/periods` |
+| `cancel(uid, code)` | `POST /billing_subscriptions/{uid}/cancel/{code}` (public cancel-by-code) |
 
 ```typescript
-// pages/api/products.ts or app/api/products/route.ts
-import { InkressSDK } from '@inkress/admin-sdk';
-
-const inkress = new InkressSDK({
-  bearerToken: process.env.INKRESS_TOKEN!,
-  clientId: process.env.INKRESS_CLIENT_ID!
+// Sign-up link for a plan (plan_id is the plan's uid)
+const link = await inkress.subscriptions.createLink({
+  plan_id: 'plan_courier_monthly',
+  reference_id: 'cp-sub-0042',
+  title: 'Courier Portal subscription',
+  customer: { first_name: 'Spanish', last_name: 'Town', email: 'billing@example.com' },
 });
+const payUrl = link.result?.payment_urls.short_link;
 
-export async function GET() {
-  const products = await inkress.products.list();
-  return Response.json(products);
-}
-```
-
-### Client-Side Usage (Public Endpoints)
-
-```typescript
-// hooks/usePublicMerchant.ts
-import { InkressSDK } from '@inkress/admin-sdk';
-
-const sdk = new InkressSDK({
-  bearerToken: '', // Empty for public endpoints
-  endpoint: 'https://api.inkress.com'
+// Ad-hoc charge
+const charge = await inkress.subscriptions.charge('sub_7f3a9c', {
+  total: 12.5,
+  reference_id: 'cp-usage-2026-10',
+  title: 'Extra packages',
 });
-
-export async function getPublicMerchant(username: string) {
-  return await sdk.public.getMerchant({ username });
-}
 ```
 
-## Best Practices
+Differences between these types and what the API returns:
 
-### 1. Environment Variables
+- `createLink` resolves to the full sign-up order (`id`, `reference_id`, `payment_urls`, `total`,
+  `plan`, …); there is no `subscription` key. The API also accepts `start_date`, `end_date`, `prorate`
+  and `meta_data`, which the type does not declare.
+- `charge` on a card-linked subscription answers `202` with `{ status: 'queued', job_id, reference,
+  subscription_uid }`; on other subscriptions `{ total, currency, status, reference, subscription_uid,
+  subscription_status }`. Neither matches the declared `ChargeSubscriptionResponse`
+  (`id`, `payment_urls`, `transaction`).
+- `getPeriods`: period `status` is an integer in the API, not the declared string values.
+- `cancel` declares `uid` as a `number`; the API route takes the subscription's string `uid`.
 
-Store sensitive configuration in environment variables:
+API routes this version does not wrap: `POST /billing_subscriptions/usage/{uid}`,
+`GET /billing_subscriptions/{uid}/charges/{reference}`, `POST /billing_subscriptions/{uid}/card-update-link`,
+`POST|DELETE /billing_subscriptions/{uid}/plan-change`, `DELETE /billing_subscriptions/{id}`, and the
+public `/subscription-card-update/*` endpoints. Call them with any HTTP client using the same headers.
 
-```env
-INKRESS_TOKEN=your-jwt-token
-INKRESS_CLIENT_ID=m-your-merchant
-INKRESS_ENDPOINT=https://api.inkress.com
-```
+## Webhooks
 
-### 2. Error Handling
-
-Always implement proper error handling:
-
-```typescript
-async function fetchProducts() {
-  try {
-    const response = await inkress.products.list();
-    return response.result || response.data || [];
-  } catch (error) {
-    console.error('Failed to fetch products:', error);
-    return [];
-  }
-}
-```
-
-### 3. Rate Limiting
-
-Be mindful of API rate limits and implement appropriate throttling in your application.
-
-### 4. Caching
-
-Cache frequently accessed data like merchant information and categories:
-
-```typescript
-const merchantCache = new Map();
-
-async function getCachedMerchant(username: string) {
-  if (merchantCache.has(username)) {
-    return merchantCache.get(username);
-  }
-  
-  const merchant = await inkress.public.getMerchant({ username });
-  merchantCache.set(username, merchant);
-  return merchant;
-}
-```
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-## Support
-
-- 📚 [API Documentation](https://docs.inkress.com)
-- 💬 [Discord Community](https://discord.gg/inkress)
-- 🐛 [Issue Tracker](https://github.com/inkress/admin-sdk/issues)
-- 📧 [Email Support](mailto:support@inkress.com)
+This SDK does not verify webhooks. Inkress signs them with an `X-Inkress-Webhook-Signature` header
+(base64 HMAC-SHA256 of the raw body); see `docs/webhooks.md` in commerce-api.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for a list of changes and version history.
-
----
-
-Made with ❤️ by the [Inkress](https://inkress.com) team.
+MIT — see [LICENSE](LICENSE).

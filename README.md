@@ -690,8 +690,11 @@ const subscriptions = await inkress.subscriptions
 
 #### Grace, pause/resume and plan changes
 
-These need a secret key bound to the plan-owning merchant. Refusals throw `InkressApiError`; the
-reason is in `error.result.result.code` (see the `*ErrorCode` types).
+These need a credential with a **charging role** at the plan-owning merchant: one that belongs to a
+`merchant_admin` or `organisation_admin` of that merchant. Any other credential gets `403` "This
+credential holds no charging role at the selected merchant." (`usage`, `access` and `flags` do not need
+it). Refusals throw `InkressApiError`; the reason is in `error.result.result.code` (see the
+`*ErrorCode` types).
 
 ```typescript
 // Dunning and grace live on the plan

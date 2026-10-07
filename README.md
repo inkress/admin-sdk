@@ -724,7 +724,7 @@ const outcome = await inkress.subscriptions.waitForCharge('sub-uid', upgrade.ref
 ```
 
 Subscription status can now also be `'paused'`. The matching signed webhook events are
-`subscription.paused` and `subscription.resumed` (see `MerchantEventType`).
+`subscription.paused` and `subscription.resumed`; `MerchantEventType` lists every signed event.
 
 ---
 

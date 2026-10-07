@@ -1927,15 +1927,22 @@ export interface InternalPayoutRequest {
 
 /** Wire names of the signed merchant events. Subscribe with the exact name or the family. */
 export type MerchantEventType =
+  | 'subscription.created'
+  | 'subscription.trial_started'
   | 'subscription.activated'
+  | 'subscription.trial_ending'
+  | 'subscription.trial_ended'
   | 'subscription.renewed'
+  | 'subscription.payment_succeeded'
+  | 'subscription.payment_attempt_failed'
   | 'subscription.payment_failed'
-  | 'subscription.cancelled'
-  | 'subscription.plan_changed'
   | 'subscription.grace_started'
   | 'subscription.grace_ended'
+  | 'subscription.adhoc_charge'
+  | 'subscription.plan_changed'
   | 'subscription.paused'
   | 'subscription.resumed'
+  | 'subscription.cancelled'
   | 'card_charge.paid'
   | 'card_charge.failed'
   | 'refund.completed';

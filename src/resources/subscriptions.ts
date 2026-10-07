@@ -201,7 +201,72 @@ export interface ResolvedPlanChange extends PendingPlanChange {
 
 export interface ChangeSubscriptionPlanData {
   plan_uid: string;
+  /** Omit to change at period end; `'now'` for an immediate, pro-rated upgrade (INK-804). */
+  effective?: 'now';
 }
+
+/** Extra refusal codes of an immediate upgrade (`effective: 'now'`), on top of `PlanChangeErrorCode`. */
+export type ImmediateUpgradeErrorCode =
+  | 'card_on_file_required'
+  | 'billing_cycle_mismatch'
+  | 'arrears_plan'
+  | 'not_an_upgrade'
+  | 'plan_change_pending'
+  | 'upgrade_in_progress'
+  | 'too_close_to_renewal'
+  | 'period_unknown';
+
+/**
+ * `202` answer of an immediate upgrade: the pro-rated charge is queued; poll `reference` with
+ * `chargeStatus` / `waitForCharge`. The plan switches only once that charge is paid.
+ */
+export interface ImmediateUpgradeResponse {
+  subscription_uid: string;
+  outcome: 'charging';
+  /** Decimal string, e.g. "26.67". */
+  amount: string;
+  currency: string | null;
+  reference: string;
+  pending_upgrade: Record<string, unknown>;
+}
+
+/** Answer of `setGrace`. */
+export interface SubscriptionGraceResponse {
+  subscription_uid: string;
+  /** The subscription's override, or null when the plan's applies. */
+  grace_days: number | null;
+  /** The grace days now in effect (the override, else the plan's). */
+  effective_grace_days: number;
+}
+
+export type SubscriptionGraceErrorCode = 'not_found' | 'invalid_grace_days';
+
+export interface PauseSubscriptionData {
+  /** ISO 8601 date-time in the future, at most 365 days ahead; Inkress resumes then. */
+  resume_at?: string;
+}
+
+/** Answer of `pause` and `resume`. */
+export interface SubscriptionPauseResponse {
+  subscription_uid: string;
+  status: 'paused' | 'active';
+  paused_at: string | null;
+  resume_at: string | null;
+  current_period_end: string | null;
+  /** Resume only: the period ended while paused, its end moved to now and the renewal was queued. */
+  renewal_due: boolean;
+}
+
+export type SubscriptionPauseErrorCode =
+  | 'not_found'
+  | 'subscription_cancelled'
+  | 'dunning_in_progress'
+  | 'subscription_not_active'
+  | 'trial_active'
+  | 'renewal_in_progress'
+  | 'already_paused'
+  | 'not_paused'
+  | 'invalid_resume_at';
 
 export interface ChangeSubscriptionPlanResponse {
   subscription_uid: string;
@@ -477,8 +542,9 @@ export class SubscriptionsResource {
   }
 
   /**
-   * Record usage for a usage-based subscription (INK-781). Adds `metric_count` (default 1) to the
-   * metric's total for the subscription's current billing period and returns the new total.
+   * Record usage for a usage-based subscription (INK-781, INK-803). `mode` decides how `metric_count`
+   * (default 1) combines with the metric's total for the current billing period: `increment` (default)
+   * adds it, `set` replaces it, `max` keeps the higher value. Returns the new total.
    * Usage settings are set on the plan's `data` and copied to each subscription.
    * At renewal Inkress bills each metric in the subscription's `data.usage_metrics`
    * (`{ metric, rate, allotment? }`): units above `allotment` times `rate`, added to the plan price
@@ -503,8 +569,46 @@ export class SubscriptionsResource {
    * `InkressApiError`s whose `result.result.code` is a `PlanChangeErrorCode` (404/409/422).
    * Needs a credential bound to the plan-owning merchant (merchant_admin / organisation_admin).
    */
-  async changePlan(uid: string, data: ChangeSubscriptionPlanData): Promise<ApiResponse<ChangeSubscriptionPlanResponse>> {
-    return this.client.post<ChangeSubscriptionPlanResponse>(`/billing_subscriptions/${uid}/plan-change`, data);
+  async changePlan(uid: string, data: ChangeSubscriptionPlanData & { effective: 'now' }): Promise<ApiResponse<ImmediateUpgradeResponse>>;
+  async changePlan(uid: string, data: ChangeSubscriptionPlanData): Promise<ApiResponse<ChangeSubscriptionPlanResponse>>;
+  async changePlan(
+    uid: string,
+    data: ChangeSubscriptionPlanData
+  ): Promise<ApiResponse<ChangeSubscriptionPlanResponse | ImmediateUpgradeResponse>> {
+    return this.client.post<ChangeSubscriptionPlanResponse | ImmediateUpgradeResponse>(
+      `/billing_subscriptions/${uid}/plan-change`,
+      data
+    );
+  }
+
+  /**
+   * Upgrade to a more expensive plan now (INK-804): charges the pro-rated difference to the linked
+   * card and answers with the charge reference. The plan switches once that charge is paid; poll with
+   * `waitForCharge(uid, reference)`. Refusals carry a `PlanChangeErrorCode` or `ImmediateUpgradeErrorCode`.
+   */
+  async upgradeNow(uid: string, planUid: string): Promise<ApiResponse<ImmediateUpgradeResponse>> {
+    return this.changePlan(uid, { plan_uid: planUid, effective: 'now' });
+  }
+
+  /**
+   * Set how many days this subscription keeps access after its unpaid period end once renewal
+   * retries are exhausted (0–90), or `null` to use the plan's `grace_days` (INK-801).
+   */
+  async setGrace(uid: string, graceDays: number | null): Promise<ApiResponse<SubscriptionGraceResponse>> {
+    return this.client.post<SubscriptionGraceResponse>(`/billing_subscriptions/${uid}/grace`, { grace_days: graceDays });
+  }
+
+  /**
+   * Pause collection (INK-802): the subscription is not charged until resumed, automatically at
+   * `resume_at` when given. Refusals carry a `SubscriptionPauseErrorCode`.
+   */
+  async pause(uid: string, data: PauseSubscriptionData = {}): Promise<ApiResponse<SubscriptionPauseResponse>> {
+    return this.client.post<SubscriptionPauseResponse>(`/billing_subscriptions/${uid}/pause`, data);
+  }
+
+  /** Resume a paused subscription (INK-802). */
+  async resume(uid: string): Promise<ApiResponse<SubscriptionPauseResponse>> {
+    return this.client.post<SubscriptionPauseResponse>(`/billing_subscriptions/${uid}/resume`);
   }
 
   /** Cancel a pending plan change (404 `no_pending_plan_change` when none is pending). */

@@ -50,7 +50,7 @@ export type AccountStatus = 'pending' | 'approved' | 'suspended' | 'rejected' | 
 export type UserKind = 'address' | 'preset' | 'organisation' | 'store';
 
 // Subscription-specific contextual types  
-export type SubscriptionStatus = 'pending' | 'active' | 'cancelled' | 'adhoc_charged' | 'payment_failed';
+export type SubscriptionStatus = 'pending' | 'active' | 'cancelled' | 'adhoc_charged' | 'payment_failed' | 'paused';
 
 // Transaction-specific contextual types
 export type TransactionStatus = 'pending' | 'authorized' | 'hold' | 'captured' | 'voided' | 'refunded' | 'processed';
@@ -1228,6 +1228,12 @@ export interface BillingPlan {
   billing_cycle?: number;
   trial_period: number;
   charge_strategy: number;
+  /** Renewal attempts before a subscription becomes payment_failed (1–10, default 3). */
+  dunning_max_attempts: number;
+  /** Hours between failed renewal attempts (1–168, default 24). */
+  dunning_interval_hours: number;
+  /** Days a payment_failed subscription keeps access after its unpaid period end (0–90, default 0). */
+  grace_days: number;
   kind: BillingPlanKind; // Contextual kind (e.g., 'subscription' instead of 'billing_plan_subscription')
   auto_charge: boolean;
   public: boolean;
@@ -1259,6 +1265,12 @@ export interface CreateBillingPlanData {
   billing_cycle?: number;
   trial_period?: number;
   charge_strategy?: number;
+  /** Renewal attempts before a subscription becomes payment_failed (1–10, default 3). */
+  dunning_max_attempts?: number;
+  /** Hours between failed renewal attempts (1–168, default 24). */
+  dunning_interval_hours?: number;
+  /** Days a payment_failed subscription keeps access after its unpaid period end (0–90, default 0). */
+  grace_days?: number;
   kind?: BillingPlanKind | KindKey | number; // Contextual kind
   auto_charge?: boolean;
   public?: boolean;
@@ -1286,6 +1298,12 @@ export interface UpdateBillingPlanData {
   billing_cycle?: number;
   trial_period?: number;
   charge_strategy?: number;
+  /** Renewal attempts before a subscription becomes payment_failed (1–10, default 3). */
+  dunning_max_attempts?: number;
+  /** Hours between failed renewal attempts (1–168, default 24). */
+  dunning_interval_hours?: number;
+  /** Days a payment_failed subscription keeps access after its unpaid period end (0–90, default 0). */
+  grace_days?: number;
   kind?: BillingPlanKind | KindKey | number; // Contextual kind
   auto_charge?: boolean;
   public?: boolean;
@@ -1312,6 +1330,11 @@ export interface Subscription {
   current_period_end?: string;
   trial_end?: string;
   canceled_at?: string;
+  /** Overrides the plan's grace_days when set (setGrace). */
+  grace_days?: number | null;
+  /** Set while paused (pause / resume). */
+  paused_at?: string | null;
+  resume_at?: string | null;
   uid: string;
   token?: string;
   billing_plan_id: number;
@@ -1360,9 +1383,17 @@ export interface SubscriptionPeriod {
 export interface SubscriptionUsageData {
   /** Metric name, matching a `metric` in the subscription's `data.usage_metrics`. */
   metric: string;
-  /** Units to add. Defaults to 1. */
+  /** Units to record. Defaults to 1. With `increment`, a negative count takes units back. */
   metric_count?: number;
+  /**
+   * How `metric_count` combines with the period's total (INK-803): `increment` adds it (default),
+   * `set` replaces it, `max` keeps the higher value (for seats billed at their peak).
+   */
+  mode?: SubscriptionUsageMode;
 }
+
+/** INK-803 usage modes. */
+export type SubscriptionUsageMode = 'increment' | 'set' | 'max';
 
 export interface SubscriptionUsageResponse {
   subscription_uid: string;
@@ -1806,6 +1837,12 @@ export interface InternalBillingPlan {
   billing_cycle?: number;
   trial_period: number;
   charge_strategy: number;
+  /** Renewal attempts before a subscription becomes payment_failed (1–10, default 3). */
+  dunning_max_attempts: number;
+  /** Hours between failed renewal attempts (1–168, default 24). */
+  dunning_interval_hours: number;
+  /** Days a payment_failed subscription keeps access after its unpaid period end (0–90, default 0). */
+  grace_days: number;
   auto_charge: boolean;
   public: boolean;
   payout_period: number;
@@ -1831,6 +1868,11 @@ export interface InternalSubscription {
   current_period_end: string;
   trial_end?: string;
   canceled_at?: string;
+  /** Overrides the plan's grace_days when set (setGrace). */
+  grace_days?: number | null;
+  /** Set while paused (pause / resume). */
+  paused_at?: string | null;
+  resume_at?: string | null;
   start_date: string;
   end_date?: string;
   record: string;
@@ -1878,3 +1920,39 @@ export interface InternalPayoutRequest {
 // ============================================================================
 // USER-FACING TYPES (String-based for better UX)
 // ============================================================================
+
+// ============================================================================
+// Signed merchant webhook events (subscription.*, card_charge.*, refund.completed)
+// ============================================================================
+
+/** Wire names of the signed merchant events. Subscribe with the exact name or the family. */
+export type MerchantEventType =
+  | 'subscription.activated'
+  | 'subscription.renewed'
+  | 'subscription.payment_failed'
+  | 'subscription.cancelled'
+  | 'subscription.plan_changed'
+  | 'subscription.grace_started'
+  | 'subscription.grace_ended'
+  | 'subscription.paused'
+  | 'subscription.resumed'
+  | 'card_charge.paid'
+  | 'card_charge.failed'
+  | 'refund.completed';
+
+/** Body of a signed merchant event. `id` equals the X-Inkress-Webhook-ID header. */
+export interface MerchantEventWebhook<D = Record<string, any>> {
+  id: string;
+  type: MerchantEventType;
+  event: MerchantEventType;
+  version: 1;
+  created_at: string;
+  timestamp: number;
+  facilitator: string;
+  merchant: { id: number; username: string | null };
+  /** Your reference: the subscription's reference_id, or the charge / refund idempotency key. */
+  reference_id: string | null;
+  data: D;
+  /** HS256 JWT over the body without `jwt`, signed with the merchant client secret. */
+  jwt: string;
+}

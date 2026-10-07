@@ -149,6 +149,7 @@ export const mappings = {
     "billing_subscription_cancelled": 3,
     "billing_subscription_adhoc_charged": 4,
     "billing_subscription_payment_failed": 5,
+    "billing_subscription_paused": 6,
     "ledger_payout_pending": 1,
     "ledger_payout_processing": 2,
     "ledger_payout_processed": 3,

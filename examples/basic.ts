@@ -3,9 +3,9 @@ import { InkressSDK } from '../src';
 async function basicExample() {
   // Initialize the SDK
   const inkress = new InkressSDK({
-    bearerToken: 'your-jwt-token-here',
-    clientId: 'm-your-merchant-username',
-    endpoint: 'https://api.inkress.com',
+    accessToken: 'your-jwt-token-here',
+    username: 'your-merchant-username',
+    mode: 'live',
     apiVersion: 'v1',
   });
 

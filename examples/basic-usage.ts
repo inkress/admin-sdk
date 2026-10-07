@@ -9,9 +9,9 @@ import { InkressSDK } from '../src';
 
 // Initialize the SDK
 const inkress = new InkressSDK({
-  bearerToken: process.env.INKRESS_BEARER_TOKEN!,
-  clientId: process.env.INKRESS_CLIENT_ID,
-  endpoint: process.env.INKRESS_ENDPOINT || 'https://api.inkress.com',
+  accessToken: process.env.INKRESS_ACCESS_TOKEN!,
+  username: process.env.INKRESS_USERNAME,
+  mode: (process.env.INKRESS_MODE as 'live' | 'sandbox') || 'live',
 });
 
 async function basicExamples() {

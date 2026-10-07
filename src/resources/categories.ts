@@ -4,35 +4,97 @@ import {
   CreateCategoryData,
   UpdateCategoryData,
   ApiResponse,
-  PaginationParams,
+  InternalCategory,
+  CategoryKind,
 } from '../types';
+import {
+  KindTranslator,
+  KindKey,
+} from '../utils/translators';
+import { processQuery } from '../utils/query-transformer';
+import { CategoryQueryBuilder } from '../utils/query-builders';
+import {
+  CategoryFilterParams,
+  CategoryQueryParams,
+  CategoryListResponse,
+  CATEGORY_FIELD_TYPES,
+} from '../types/resources';
 
-export interface CategoryListParams extends PaginationParams {
-  search?: string;
-  kind?: number;
-  parent_id?: number;
-  limit?: number;
-}
-
-export interface CategoryListResponse {
-  entries: Category[];
-  page_info: {
-    current_page: number;
-    total_pages: number;
-    total_entries: number;
-    page_size: number;
-  };
+/**
+ * @deprecated Use CategoryFilterParams from types/resources instead
+ */
+export interface LegacyCategoryFilterParams {
+  // Legacy interface - kept for backward compatibility
 }
 
 export class CategoriesResource {
   constructor(private client: HttpClient) {}
 
   /**
+   * Convert internal category data (integers) to user-facing data (strings)
+   */
+  private translateCategoryToUserFacing(internal: InternalCategory): Category {
+    return {
+      ...internal,
+      kind: KindTranslator.toStringWithoutContext(internal.kind, 'product') as CategoryKind,
+    };
+  }
+
+  /**
+   * Convert user-facing category data (strings) to internal data (integers)
+   */
+  private translateCategoryToInternal(userFacing: CreateCategoryData | UpdateCategoryData): any {
+    const internal: any = { ...userFacing };
+    
+    if ('kind' in userFacing && userFacing.kind) {
+      if (typeof userFacing.kind === 'string') {
+        internal.kind = KindTranslator.toIntegerWithContext(userFacing.kind as CategoryKind | KindKey, 'product');
+      } else {
+        internal.kind = userFacing.kind;
+      }
+    }
+    
+    return internal;
+  }
+
+  /**
+   * Convert filter parameters (strings to integers where needed)
+   */
+  private translateFilters(params?: CategoryFilterParams): any {
+    if (!params) return params;
+    
+    const translated: any = { ...params };
+    
+    if (params.kind && typeof params.kind === 'string') {
+      translated.kind = KindTranslator.toIntegerWithContext(params.kind as CategoryKind | KindKey, 'product');
+    }
+    
+    return translated;
+  }
+
+  /**
    * List categories with pagination and filtering
    * Requires Client-Id header to be set in the configuration
    */
-  async list(params?: CategoryListParams): Promise<ApiResponse<CategoryListResponse>> {
-    return this.client.get<CategoryListResponse>('/categories', params);
+  async list(params?: CategoryFilterParams): Promise<ApiResponse<CategoryListResponse>> {
+    const translatedParams = this.translateFilters(params);
+    const response = await this.client.get<{ entries: InternalCategory[]; pagination: any }>('/categories', translatedParams);
+    
+    if (response.result?.entries) {
+      const translatedEntries = response.result.entries.map(category => this.translateCategoryToUserFacing(category));
+      return {
+        state: response.state,
+        result: {
+          entries: translatedEntries,
+          page_info: response.result.pagination
+        }
+      };
+    }
+    
+    return {
+      state: response.state,
+      result: response.result as any
+    };
   }
 
   /**
@@ -40,7 +102,20 @@ export class CategoriesResource {
    * Requires Client-Id header to be set in the configuration
    */
   async get(id: number): Promise<ApiResponse<Category>> {
-    return this.client.get<Category>(`/categories/${id}`);
+    const response = await this.client.get<InternalCategory>(`/categories/${id}`);
+    
+    if (response.result) {
+      const translatedCategory = this.translateCategoryToUserFacing(response.result);
+      return {
+        state: response.state,
+        result: translatedCategory
+      };
+    }
+    
+    return {
+      state: response.state,
+      result: response.result as any
+    };
   }
 
   /**
@@ -48,7 +123,21 @@ export class CategoriesResource {
    * Requires Client-Id header to be set in the configuration
    */
   async create(data: CreateCategoryData): Promise<ApiResponse<Category>> {
-    return this.client.post<Category>('/categories', data);
+    const internalData = this.translateCategoryToInternal(data);
+    const response = await this.client.post<InternalCategory>('/categories', internalData);
+    
+    if (response.result) {
+      const translatedCategory = this.translateCategoryToUserFacing(response.result);
+      return {
+        state: response.state,
+        result: translatedCategory
+      };
+    }
+    
+    return {
+      state: response.state,
+      result: response.result as any
+    };
   }
 
   /**
@@ -57,15 +146,50 @@ export class CategoriesResource {
    * Note: parent_id is immutable and cannot be changed after creation
    */
   async update(id: number, data: UpdateCategoryData): Promise<ApiResponse<Category>> {
-    return this.client.put<Category>(`/categories/${id}`, data);
+    const internalData = this.translateCategoryToInternal(data);
+    const response = await this.client.put<InternalCategory>(`/categories/${id}`, internalData);
+    
+    if (response.result) {
+      const translatedCategory = this.translateCategoryToUserFacing(response.result);
+      return {
+        state: response.state,
+        result: translatedCategory
+      };
+    }
+    
+    return {
+      state: response.state,
+      result: response.result as any
+    };
   }
 
   /**
-   * Delete a category
-   * Requires Client-Id header to be set in the configuration
-   * Note: Categories with assigned products or child categories cannot be deleted
+   * Query categories with enhanced query support
+   * @example
+   * await categories.query({ kind: 'published', parent_id: null })
    */
-  async delete(id: number): Promise<ApiResponse<void>> {
-    return this.client.delete<void>(`/categories/${id}`);
+  async query(params?: CategoryQueryParams): Promise<ApiResponse<CategoryListResponse>> {
+    const processedQuery = processQuery(params || {}, CATEGORY_FIELD_TYPES, { validate: true });
+    const translatedQuery = this.translateFilters(processedQuery);
+    const response = await this.client.get<{ entries: InternalCategory[]; pagination: any }>('/categories', translatedQuery);
+    
+    if (response.result?.entries) {
+      const translatedEntries = response.result.entries.map(c => this.translateCategoryToUserFacing(c));
+      return {
+        state: response.state,
+        result: { entries: translatedEntries, page_info: response.result.pagination }
+      };
+    }
+    
+    return { state: response.state, result: response.result as any };
+  }
+
+  /**
+   * Create a query builder for categories
+   * @example
+   * await sdk.categories.createQueryBuilder().whereKind('published').execute()
+   */
+  createQueryBuilder(initialQuery?: CategoryQueryParams): CategoryQueryBuilder {
+    return new CategoryQueryBuilder(this, initialQuery);
   }
 }

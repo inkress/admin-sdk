@@ -1,13 +1,105 @@
+// filepath: /Users/romario/projects/inkress/admin-sdk/src/types.ts
+// Configuration and base types
+
+// Import translator types for string-to-integer conversion
+import type { 
+  FeeStructureKey, 
+  KindKey, 
+  StatusKey,
+  AccessKey 
+} from './utils/translators';
+
+// Import query system types
+import type {
+  QueryParams,
+  RangeQuery,
+  StringQuery,
+  DateQuery,
+  JsonQueryParams
+} from './utils/query-transformer';
+
+/**
+ * IMPORTANT: Types have been updated to match the database schema:
+ * 
+ * 1. Field naming: Uses `inserted_at` and `updated_at` (not `created_at`)
+ * 2. Filtering: All list operations support filtering on any database field
+ * 3. Immutable fields: `id`, `uid`, `inserted_at`, and `updated_at` are never included in Create/Update types
+ * 4. Status/Kind values: Use contextual string codes (e.g., 'confirmed' instead of 'order_confirmed')
+ * 5. Fee structures: Use string codes that are automatically translated to integers
+ * 6. Translation: All status, kind, and fee structure fields accept contextual strings and return contextual strings
+ */
+
+// ============================================================================
+// CONTEXTUAL TYPES (Clean, context-aware string values)
+// ============================================================================
+
+// Order-specific contextual types
+export type OrderStatus = 'pending' | 'error' | 'paid' | 'partial' | 'confirmed' | 'cancelled' | 
+  'prepared' | 'shipped' | 'delivered' | 'completed' | 'returned' | 'refunded' | 'verifying' | 'stale' | 'archived';
+
+export type OrderKind = 'online' | 'payment_link' | 'cart' | 'subscription' | 'invoice' | 'offline';
+
+// Product-specific contextual types  
+export type ProductStatus = 'draft' | 'published' | 'archived';
+export type ProductKind = 'draft' | 'published' | 'archived';
+
+// Account/Merchant-specific contextual types
+export type AccountStatus = 'pending' | 'approved' | 'suspended' | 'rejected' | 'disabled';
+
+// User-specific contextual types
+export type UserKind = 'address' | 'preset' | 'organisation' | 'store';
+
+// Subscription-specific contextual types  
+export type SubscriptionStatus = 'pending' | 'active' | 'cancelled' | 'adhoc_charged' | 'payment_failed';
+
+// Transaction-specific contextual types
+export type TransactionStatus = 'pending' | 'authorized' | 'hold' | 'captured' | 'voided' | 'refunded' | 'processed';
+
+// Billing-specific contextual types
+export type BillingPlanKind = 'subscription' | 'payout';
+export type BillingStatus = 'active' | 'inactive';
+
+// Category-specific contextual types (using product kinds for now)
+export type CategoryKind = ProductKind;
+
+// KYC/Legal Request contextual types
+export type KycKind = 'document_submission' | 'bank_info_update' | 'limit_increase';
+export type KycStatus = 'pending' | 'in_review' | 'approved' | 'rejected';
+
+// ============================================================================
+// ENHANCED QUERY SYSTEM TYPES
+// ============================================================================
+
+// Re-export query system types for easy access
+export type { 
+  QueryParams, 
+  RangeQuery, 
+  StringQuery, 
+  DateQuery, 
+  JsonQueryParams 
+} from './utils/query-transformer';
+
+// Re-export resource-specific query types from centralized location
+export type {
+  OrderQueryParams,
+  ProductQueryParams,
+  CategoryQueryParams,
+  UserQueryParams,
+  MerchantQueryParams,
+  BillingPlanQueryParams,
+  SubscriptionQueryParams,
+} from './types/resources';
+
 // Configuration and base types
 export interface InkressConfig {
-  /** Bearer token for authentication */
-  bearerToken: string;
-  /** API endpoint URL */
-  endpoint?: string;
+  /** Access token for authentication */
+  accessToken: string;
+  /** API mode - 'live' (https://api.inkress.com) or 'sandbox' (https://api-dev.inkress.com) */
+  mode?: 'live' | 'sandbox';
   /** API version */
   apiVersion?: string;
-  /** Client ID for request identification (format: m-{merchant.username}) */
-  clientId?: string;
+  /** Merchant username (will be prepended with 'm-' for client ID) */
+  username?: string;
   /** Request timeout in milliseconds */
   timeout?: number;
   /** Number of retry attempts */
@@ -19,8 +111,26 @@ export interface InkressConfig {
 export interface PaginationParams {
   page?: number;
   per_page?: number;
+  page_size?: number;  // Alternative to per_page
   sort?: string;
   order?: 'asc' | 'desc';
+  order_by?: string;   // Alternative to sort + order
+  limit?: number;      // Alternative pagination
+}
+
+// Base filtering interface that allows filtering on any field
+export interface BaseFilterParams extends PaginationParams {
+  /** General search query - searches across multiple fields automatically */
+  q?: string;
+  /** Legacy search field - use 'q' instead for new implementations */
+  search?: string;
+  /** Exclude specific records */
+  exclude?: string | number;
+  /** Return distinct values */
+  distinct?: string;
+  /** Override page behavior */
+  override_page?: string | boolean;
+  [key: string]: any;
 }
 
 export interface PaginatedResponse<T> {
@@ -36,13 +146,12 @@ export interface PaginatedResponse<T> {
 // Standard API response types
 export interface ApiResponse<T = any> {
   state: 'ok' | 'error';
-  data?: T;
   result?: T;
 }
 
 export interface ErrorResponse {
   state: 'error';
-  data: 
+  result: 
     | { result: string }
     | { reason: string }
     | string
@@ -51,7 +160,7 @@ export interface ErrorResponse {
 
 export interface ValidationError {
   state: 'error';
-  data: Record<string, string[]>;
+  result: Record<string, string[]>;
 }
 
 // Currency type
@@ -60,23 +169,91 @@ export interface Currency {
   code: string;
   symbol: string;
   name: string;
+  flag?: string;
+  is_float: boolean;
+  inserted_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateCurrencyData {
+  code: string;
+  symbol: string;
+  name: string;
+  flag?: string;
+  is_float: boolean;
+}
+
+export interface UpdateCurrencyData {
+  code?: string;
+  symbol?: string;
+  name?: string;
+  flag?: string;
+  is_float?: boolean;
 }
 
 // Organisation type
 export interface Organisation {
   id: number;
+  uid: string;
   name: string;
-  description: string;
+  email?: string;
+  phone?: string;
+  about?: string;
+  logo?: string;
+  business_type?: string;
+  status: AccountStatus;
+  timezone?: string;
+  data?: Record<string, any>;
+  domain_id?: number;
+  owner_id?: number;
+  default_merchant_id?: number;
+  inserted_at: string;
+  updated_at: string;
 }
 
-// Address type
+// Address type (full schema from OpenAPI)
 export interface Address {
-  address: string;
-  address2?: string;
+  id?: number;
+  hash?: string;
+  kind: number;
+  kind_id: number;
+  lang?: number; // Longitude
+  lat?: number; // Latitude
+  street: string;
+  street_optional?: string;
   city: string;
-  state?: string;
-  postal_code: string;
+  state: string;
   country: string;
+  region: string;
+  town: string;
+  inserted_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateAddressData {
+  kind: number;
+  kind_id: number;
+  lang?: number;
+  lat?: number;
+  street: string;
+  street_optional?: string;
+  city: string;
+  state: string;
+  country: string;
+  region: string;
+  town: string;
+}
+
+export interface UpdateAddressData {
+  lang?: number;
+  lat?: number;
+  street?: string;
+  street_optional?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  region?: string;
+  town?: string;
 }
 
 // Merchant types
@@ -88,52 +265,26 @@ export interface Merchant {
   about?: string;
   logo?: string;
   sector?: string;
-  status: number;
+  status: AccountStatus; // Contextual status (e.g., 'approved' instead of 'account_approved')
   phone?: string;
   business_type?: string;
   theme_colour?: string;
   uid: string;
-  is_pre_verified: boolean;
-  webhook_url?: string;
-  plan_id?: number;
-  payment_provider_plan_id?: number;
-  platform_fee_structure: 'customer_pay' | 'merchant_absorb';
-  provider_fee_structure: 'customer_pay' | 'merchant_absorb';
-  address?: {
-    street?: string;
-    street_optional?: string;
-    town?: string;
-    city?: string;
-    province?: string;
-    region?: string;
-  };
-  data?: {
-    pickup_locations?: Array<{
-      name: string;
-      address: string;
-    }>;
-    support_phone?: string;
-    support_email?: string;
-    business_setup?: string;
-    bank_info?: {
-      account_holder_name?: string;
-      account_holder_type?: 'Business' | 'Individual';
-      account_number?: string;
-      account_type?: 'Checking' | 'Savings';
-      bank_name?: string;
-      branch_name?: string;
-      branch_code?: string;
-      routing_number?: string;
-      swift_code?: string;
-    };
-    registration_webhook?: string;
-  };
-  organisation?: Organisation;
-  domain?: {
-    cname?: string;
-  };
-  created_at: string;
+  address_id?: number;
+  owner_id?: number;
+  domain_id?: number;
+  organisation_id?: number;
+  platform_fee_structure: FeeStructureKey; // Translated from integer to string
+  provider_fee_structure: FeeStructureKey; // Translated from integer to string
+  parent_merchant_id?: number;
+  data?: Record<string, any>;
+  inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  address?: Address;
+  owner?: User;
+  organisation?: Organisation;
+  parent_merchant?: Merchant;
 }
 
 export interface CreateMerchantData {
@@ -141,6 +292,19 @@ export interface CreateMerchantData {
   email: string;
   phone?: string;
   about?: string;
+  username?: string;
+  logo?: string;
+  sector?: string;
+  business_type?: string;
+  theme_colour?: string;
+  address_id?: number;
+  owner_id?: number;
+  domain_id?: number;
+  organisation_id?: number;
+  platform_fee_structure?: FeeStructureKey;
+  provider_fee_structure?: FeeStructureKey;
+  parent_merchant_id?: number;
+  data?: Record<string, any>;
 }
 
 export interface UpdateMerchantData {
@@ -148,6 +312,97 @@ export interface UpdateMerchantData {
   email?: string;
   phone?: string;
   about?: string;
+  username?: string;
+  logo?: string;
+  sector?: string;
+  status?: AccountStatus; // Contextual status
+  business_type?: string;
+  theme_colour?: string;
+  address_id?: number;
+  owner_id?: number;
+  domain_id?: number;
+  organisation_id?: number;
+  platform_fee_structure?: FeeStructureKey;
+  provider_fee_structure?: FeeStructureKey;
+  parent_merchant_id?: number;
+  data?: Record<string, any>;
+}
+
+/**
+ * @deprecated These interfaces may not align with current API - endpoints not found in OpenAPI spec
+ */
+export interface MerchantBalance {
+  available: number;
+  pending: number;
+  currency: string;
+}
+
+/**
+ * @deprecated These interfaces may not align with current API - endpoints not found in OpenAPI spec
+ */
+export interface MerchantLimits {
+  transaction_limit: number;
+  daily_limit: number;
+  monthly_limit: number;
+  currency: string;
+}
+
+/**
+ * @deprecated These interfaces may not align with current API - endpoints not found in OpenAPI spec
+ */
+export interface MerchantSubscription {
+  plan_name: string;
+  status: string;
+  billing_cycle: string;
+  price: number;
+  currency: string;
+  features: string[];
+  next_billing_date?: string;
+}
+
+/**
+ * @deprecated These interfaces may not align with current API - endpoints not found in OpenAPI spec
+ */
+export interface MerchantInvoice {
+  id: string;
+  invoice_number: string;
+  amount: number;
+  currency: string;
+  status: string;
+  due_date: string;
+  issued_date: string;
+  paid_date?: string;
+}
+
+export interface AppRevenue {
+  oauth_client_id: number | null;
+  app_name: string;
+  app_logo_url: string | null;
+  connected_at: string | null;
+  status: 'active' | 'revoked' | '—';
+  revenue: number;
+  currency_code: string | null;
+  order_count: number;
+  average_order_value: number;
+  payouts: { pending: number; completed: number };
+  last_activity_at: string | null;
+}
+
+export interface RevenueByAppResponse {
+  window: '7d' | '30d' | '90d' | 'all_time';
+  currency_code: string | null;
+  start_date: string;
+  end_date: string;
+  apps: AppRevenue[];
+}
+
+export interface AppContributionResponse {
+  oauth_client_id: number;
+  merchant_id: number;
+  currency_code: string | null;
+  net_contribution: number;
+  entry_count: number;
+  last_activity_at: string | null;
 }
 
 export interface PublicMerchant {
@@ -167,31 +422,30 @@ export interface Category {
   id: number;
   name: string;
   description?: string | null;
-  kind: number;
+  kind: CategoryKind; // Contextual kind (e.g., 'published' instead of 'product_published')
   kind_id?: number | null;
   parent_id?: number | null;
-  parent?: {
-    id: number;
-    name: string;
-  } | null;
-  children?: {
-    id: number;
-    name: string;
-  }[];
-  created_at: string;
+  uid: string;
+  inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  parent?: Category;
 }
 
 export interface CreateCategoryData {
   name: string;
   description?: string;
-  kind: number;
+  kind: CategoryKind; // Contextual kind
   kind_id?: number;
   parent_id?: number;
 }
 
-export interface UpdateCategoryData extends Partial<Omit<CreateCategoryData, 'parent_id'>> {
-  // parent_id is immutable after creation
+export interface UpdateCategoryData {
+  name?: string;
+  description?: string;
+  kind?: KindKey;
+  kind_id?: number;
+  // parent_id is typically immutable after creation for data integrity
 }
 
 // Product types
@@ -202,7 +456,7 @@ export interface Product {
   price: number;
   permalink: string;
   image?: string | null;
-  status: number;
+  status: ProductStatus; // Contextual status (e.g., 'published' instead of 'product_published')
   public: boolean;
   unlimited: boolean;
   units_remaining?: number | null;
@@ -212,12 +466,16 @@ export interface Product {
   tag_ids: number[];
   data?: Record<string, any>;
   meta?: Record<string, any>;
-  currency: Currency;
-  category?: Category;
-  merchant: Merchant;
-  organisation: Organisation;
-  created_at: string;
+  uid: string;
+  category_id?: number;
+  currency_code: string;
+  user_id?: number;
+  inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  category?: Category;
+  currency?: Currency;
+  user?: User;
 }
 
 export interface CreateProductData {
@@ -232,10 +490,27 @@ export interface CreateProductData {
   tag_ids?: number[];
   data?: Record<string, any>;
   meta?: Record<string, any>;
+  category_id?: number;
+  currency_code: string;
+  user_id?: number;
 }
 
-export interface UpdateProductData extends Partial<CreateProductData> {
-  status?: number;
+export interface UpdateProductData {
+  title?: string;
+  teaser?: string;
+  price?: number;
+  permalink?: string;
+  image?: string;
+  status?: StatusKey;
+  public?: boolean;
+  unlimited?: boolean;
+  units_remaining?: number;
+  tag_ids?: number[];
+  data?: Record<string, any>;
+  meta?: Record<string, any>;
+  category_id?: number;
+  currency_code?: string;
+  user_id?: number;
 }
 
 // Order types
@@ -243,44 +518,304 @@ export interface Order {
   id: number;
   reference_id?: string;
   total: number;
-  kind: number; // 1=offline, 2=online, 3=subscription
-  status: number;
+  /** Discount applied to the order (amount + code), frozen at creation */
+  discount_total?: number;
+  discount_code?: string;
+  kind: OrderKind; // Contextual kind (e.g., 'online' instead of 'order_online')
+  status: OrderStatus; // Contextual status (e.g., 'confirmed' instead of 'order_confirmed')
   status_on: number;
   uid: string;
   cart_id?: number | null;
-  customer?: Customer;
-  currency: Currency;
-  billing_plan?: any | null;
-  order_detail?: Record<string, any>;
-  transactions?: any[];
-  payment_methods?: PaymentMethod[];
-  order_lines: OrderLine[];
-  merchant: Merchant;
-  organisation: Organisation;
-  payment_urls?: {
-    short_link: string;
-  };
+  currency_code: string;
+  customer_id?: number;
+  payment_link_id?: number;
+  billing_plan_id?: number;
+  billing_subscription_id?: number;
+  /** Set when this order is a payment towards a booking (INK-792). */
+  booking_id?: number | null;
   meta_data?: Record<string, any>;
-  created_at: string;
+  session_id?: string;
+  data?: Record<string, any>;
+  inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  currency?: Currency;
+  customer?: Customer;
+  payment_link?: PaymentLink;
+  billing_plan?: BillingPlan;
+  billing_subscription?: Subscription;
+  merchant?: Merchant;
+  organisation?: Organisation;
 }
 
+/**
+ * @deprecated OrderLine interface - not found in current OpenAPI spec
+ * Only used in internal order representations
+ */
 export interface OrderLine {
   product_id: number;
   quantity: number;
   price: number;
 }
 
+// ============================================================================
+// Order Creation Types
+// ============================================================================
+
+/**
+ * Fulfillment type for order delivery
+ */
+export type FulfillmentType = 'shipping' | 'pickup' | 'digital';
+
+/**
+ * OrderAddress information for shipping/billing
+ */
+export interface OrderAddress {
+  street?: string;
+  street_optional?: string;
+  town?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  postal_code?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+/**
+ * Pickup location information
+ */
+export interface PickupLocation {
+  name?: string;
+  OrderAddress?: string;
+  contact?: string;
+  instructions?: string;
+}
+
+export interface OrderDetailData {
+  /** Lynk payment system ID */
+  lynk_id?: string;
+  
+  /** Customer information override */
+  customer?: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    phone?: string;
+  };
+  
+  /** Subscription plan ID */
+  plan_id?: number;
+  
+  /** Shipping OrderAddress details */
+  shipping_OrderAddress?: OrderAddress;
+  
+  /** Type of fulfillment */
+  fulfillment_type?: FulfillmentType;
+  
+  /** Cost of fulfillment/shipping */
+  fulfillment_total?: number;
+  
+  /** Pickup location details */
+  pickup_location?: PickupLocation;
+}
+
+/**
+ * Product item for order creation
+ */
+export interface ProductItem {
+  /** Product variant ID */
+  id: number;
+  
+  /** Quantity to order */
+  quantity: number;
+}
+
+/**
+ * Payment URLs returned after order creation
+ */
+export interface PaymentUrls {
+  cancel_url?: string;
+  return_url?: string;
+  approval_url?: string;
+  payment_url: string;
+  short_link: string;
+  qr_url: string;
+  embed_url?: string;
+}
+
+/**
+ * Customer information for order creation
+ */
+export interface CustomerInfo {
+  /** Required */
+  email: string;
+  
+  /** Optional */
+  first_name: string;
+  last_name: string;
+  phone?: string;
+  dob?: string;
+  
+  /** Customer type/classification */
+  kind?: 'merchants' | 'users' | string;
+  kind_id?: number;
+}
+
+export interface CreateOrderMetaData {
+  return_url?: string;
+  [key: string]: any;
+}
+
+export interface RecordOrderMetaData {
+  [key: string]: any;
+}
+
+/**
+ * Parameters for Service.Order.Processor.record/1
+ * 
+ * Creates a complete order with customer, products, transactions, and payment URLs
+ */
 export interface CreateOrderData {
-  reference_id?: string;
+  reference_id: string;
   total: number;
-  kind?: number;
-  order_lines: OrderLine[];
-  meta_data?: Record<string, any>;
+
+  /** Order classification */
+  kind: 'online' | 'cart' | 'subscription' | 'invoice' | 'offline';
+  /** Customer information */
+  customer: CustomerInfo;
+
+  /** Currency code */
+  currency_code?: string;
+
+  /** Products to order */
+  title?: string;
+
+  products?: ProductItem[];
+
+  /** Required order identification */
+  
+  /** Optional fields */
+  fulfillment_total?: number;
+
+  /** Discount code to apply. The server re-validates and re-prices it against the
+   * authoritative subtotal; a client-sent discount amount is never trusted. */
+  discount_code?: string;
+
+  /** Payment method */
+  method_id?: number;
+  
+  
+  /** Source payment link ID (if creating from existing payment link) */
+  payment_link_id?: string;
+
+  /** Tags the order as a payment towards one of your bookings (INK-792). Set only at creation. */
+  booking_id?: number;
+  
+  /** Subscription fields (if kind = 'subscription' or OrderKind.SUBSCRIPTION) */
+  plan_id?: string;
+  subscription_token?: string;
+
+  /** Additional data */
+  data?: OrderDetailData;
+  meta_data?: CreateOrderMetaData;
+}
+
+/**
+ * Response from record function
+ * Returns formatted order with all associations
+ */
+export interface CreateOrderResponseData {
+  /** Order identification */
+  id: number;
+  reference_id: string;
+  title: string;
+
+  /** Status */
+  status: number;
+  status_on?: number;
+  
+  /** Financial */
+  total: number;
+  /** Discount applied to the order (amount + code) */
+  discount_total?: number;
+  discount_code?: string;
+
+  /** Timestamps */
+  created_at: string;
+  inserted_at: string;
+  updated_at: string;
+  
+  /** Customer information */
+  customer: {
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+  
+  /** Currency code */
+  currency: string;
+  
+  /** Merchant information */
+  merchant: {
+    name: string;
+    email: string;
+    phone?: string;
+    logo?: string;
+    username: string;
+    theme_colour?: string;
+  };
+  
+  /** Order details */
+  details: {
+    title?: string;
+    data?: OrderDetailData;
+    updated_at: string;
+  };
+  
+  /** Order line items */
+  lines: Array<{
+    product_variant_name_frozen: string;
+    product_variant_total_frozen: number;
+    quantity: number;
+  }>;
+  
+  /** Transactions */
+  transactions: Array<{
+    total?: number;
+    provider_fee?: number;
+    platform_fee?: number;
+    payment_method_order_id?: string;
+    updated_at: string;
+  }>;
+  
+  /** Transaction logs */
+  transaction_logs: Array<{
+    id: number;
+    message: string;
+  }>;
+  
+  /** Payment provider info */
+  provider: { 
+    id: number;
+    name: string;
+    logo: string;
+  };
+  
+  /** Payment URLs */
+  payment_urls?: PaymentUrls;
+  return_url?: string;
+  invoice_url: string;
+  
+  /** Additional metadata */
+  meta_data?: RecordOrderMetaData;
 }
 
 export interface UpdateOrderData {
-  status?: number;
+  status?: string;
+  total?: number;
+  fulfillment_total?: number;
+  data?: Record<string, any>;
   meta_data?: Record<string, any>;
 }
 
@@ -293,21 +828,388 @@ export interface OrderStats {
 export interface PaymentMethod {
   id: number;
   name: string;
-  code: string;
-  provider: string;
+  code?: string;
+  provider?: string;
   active: boolean;
+  payment_provider_id: number;
+  financial_account_id?: number;
+  inserted_at: string;
+  updated_at: string;
+  // Associations (preloaded)
+  financial_account?: FinancialAccount;
+}
+
+export interface CreatePaymentMethodData {
+  name: string;
+  payment_provider_id: number;
+  financial_account_id?: number;
+  active?: boolean;
+}
+
+export interface UpdatePaymentMethodData {
+  name?: string;
+  payment_provider_id?: number;
+  financial_account_id?: number;
+  active?: boolean;
 }
 
 // Customer types
 export interface Customer {
   id: number;
+  uid?: string;
   email: string;
+  username?: string;
   first_name?: string;
   last_name?: string;
-  name?: string;
   phone?: string;
-  created_at: string;
-  metadata?: Record<string, any>;
+  image?: string;
+  dob?: number;
+  sex?: number;
+  status?: number;
+  inserted_at: string;
+  updated_at: string;
+  // Associations (preloaded)
+  merchant?: Merchant;
+  organisation?: Organisation;
+}
+
+// Payment Link types
+export interface PaymentLink {
+  id: number;
+  uid: string;
+  title: string;
+  description?: string;
+  total: number;
+  usage_limit: number;
+  expires_at?: string;
+  status: StatusKey; // Translated from integer to string
+  kind: KindKey; // Translated from integer to string
+  data?: Record<string, any>;
+  customer_id?: number;
+  currency_code: string;
+  order_id?: number;
+  inserted_at: string;
+  updated_at: string;
+  // Associations (preloaded)
+  customer?: Customer;
+  currency?: Currency;
+  order?: Order;
+}
+
+export interface CreatePaymentLinkData {
+  title: string;
+  description?: string;
+  total?: number;
+  usage_limit?: number;
+  expires_at?: string;
+  status?: number;
+  kind?: number;
+  data?: Record<string, any>;
+  customer_id?: number;
+  currency_code: string;
+  order_id?: number;
+}
+
+export interface UpdatePaymentLinkData {
+  title?: string;
+  description?: string;
+  total?: number;
+  usage_limit?: number;
+  expires_at?: string;
+  status?: number;
+  kind?: number;
+  data?: Record<string, any>;
+  customer_id?: number;
+  currency_code?: string;
+  order_id?: number;
+}
+
+// Financial Account types
+export interface FinancialAccount {
+  id: number;
+  name: string;
+  type: string;
+  provider: string;
+  is_external: boolean;
+  fingerprint?: string;
+  data?: Record<string, any>;
+  record: string;
+  record_id: number;
+  active: boolean;
+  code?: string;
+  adapter?: string;
+  logo?: string;
+  website?: string;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface CreateFinancialAccountData {
+  name: string;
+  type: string;
+  provider: string;
+  is_external?: boolean;
+  fingerprint?: string;
+  data?: Record<string, any>;
+  record: string;
+  record_id: number;
+  active?: boolean;
+  code?: string;
+  adapter?: string;
+  logo?: string;
+  website?: string;
+}
+
+export interface UpdateFinancialAccountData {
+  name?: string;
+  type?: string;
+  provider?: string;
+  is_external?: boolean;
+  fingerprint?: string;
+  data?: Record<string, any>;
+  active?: boolean;
+  code?: string;
+  adapter?: string;
+  logo?: string;
+  website?: string;
+}
+
+// Financial Request types (Payouts and other financial requests)
+export interface FinancialRequest {
+  id: number;
+  total: number;
+  status: number;
+  type: number;
+  sub_type?: number;
+  fee_total: number;
+  reference_id?: string;
+  reviewed_at?: string;
+  due_at?: string;
+  balance_on_request: number;
+  data?: Record<string, any>;
+  source_id?: number;
+  destination_id?: number;
+  merchant_id: number;
+  requester_id: number;
+  reviewer_id?: number;
+  currency_code: string;
+  evidence_file_id?: number;
+  inserted_at: string;
+  updated_at: string;
+  // Associations (preloaded)
+  source?: FinancialAccount;
+  destination?: FinancialAccount;
+  merchant?: Merchant;
+  requester?: User;
+  reviewer?: User;
+  currency?: Currency;
+}
+
+export interface CreateFinancialRequestData {
+  total: number;
+  type: number;
+  sub_type?: number;
+  reference_id?: string;
+  due_at?: string;
+  data?: Record<string, any>;
+  source_id?: number;
+  destination_id?: number;
+  currency_code: string;
+  evidence_file_id?: number;
+}
+
+export interface UpdateFinancialRequestData {
+  total?: number;
+  status?: number;
+  type?: number;
+  sub_type?: number;
+  fee_total?: number;
+  reference_id?: string;
+  reviewed_at?: string;
+  due_at?: string;
+  data?: Record<string, any>;
+  source_id?: number;
+  destination_id?: number;
+  reviewer_id?: number;
+  currency_code?: string;
+  evidence_file_id?: number;
+}
+
+// Webhook URL types
+export interface WebhookUrl {
+  id: number;
+  url: string;
+  event: string;
+  uid: string;
+  merchant_id?: number;
+  org_id?: number;
+  inserted_at: string;
+  updated_at: string;
+  // Associations (preloaded)
+  merchant?: Merchant;
+  organisation?: Organisation;
+}
+
+export interface CreateWebhookUrlData {
+  url: string;
+  event: string;
+  merchant_id?: number;
+  org_id?: number;
+}
+
+export interface UpdateWebhookUrlData {
+  url?: string;
+  event?: string;
+  merchant_id?: number;
+  org_id?: number;
+}
+
+// Token types
+export interface Token {
+  id: number;
+  public_key: string;
+  title?: string;
+  provider: string;
+  kind: number;
+  enabled: boolean;
+  expires?: number;
+  user_id: number;
+  role_id?: number;
+  inserted_at: string;
+  updated_at: string;
+  // Associations (preloaded)
+  user?: User;
+}
+
+export interface CreateTokenData {
+  title?: string;
+  provider: string;
+  kind: number;
+  enabled?: boolean;
+  expires?: number;
+  user_id: number;
+  role_id?: number;
+}
+
+export interface UpdateTokenData {
+  title?: string;
+  enabled?: boolean;
+  expires?: number;
+  role_id?: number;
+}
+
+// Exchange Rate types
+export interface ExchangeRate {
+  id: number;
+  source_id: number;
+  destination_id: number;
+  rate: number;
+  expires?: number;
+  source?: string;
+  user_id?: number;
+  inserted_at: string;
+  updated_at: string;
+  // Associations (preloaded)
+  source_currency?: Currency;
+  destination_currency?: Currency;
+  user?: User;
+}
+
+export interface CreateExchangeRateData {
+  source_id: number;
+  destination_id: number;
+  rate: number;
+  expires?: number;
+  source?: string;
+  user_id?: number;
+}
+
+export interface UpdateExchangeRateData {
+  rate?: number;
+  expires?: number;
+  source?: string;
+}
+
+// Fee types
+export interface Fee {
+  id: number;
+  title?: string;
+  total: number;
+  unit: number; // 1 = fixed, 2 = percentage
+  kind: number; // 1 - payment_provider, 2 - platform, 3 - tax, 4 - custom
+  priority: number;
+  compound: boolean;
+  fee_payer: number; // 1 = customer, 2 = merchant
+  currency_code?: string;
+  hash?: string;
+  fee_set_id?: number;
+  user_id?: number;
+  inserted_at: string;
+  updated_at: string;
+  // Associations (preloaded)
+  currency?: Currency;
+  user?: User;
+}
+
+export interface CreateFeeData {
+  title?: string;
+  total: number;
+  unit: number;
+  kind: number;
+  priority?: number;
+  compound?: boolean;
+  fee_payer?: number;
+  currency_code?: string;
+  fee_set_id?: number;
+  user_id?: number;
+}
+
+export interface UpdateFeeData {
+  title?: string;
+  total?: number;
+  unit?: number;
+  kind?: number;
+  priority?: number;
+  compound?: boolean;
+  fee_payer?: number;
+  currency_code?: string;
+  fee_set_id?: number;
+  user_id?: number;
+}
+
+// Transaction Entry types
+export interface TransactionEntry {
+  id: number;
+  amount: number;
+  type: number;
+  transaction_id: number;
+  financial_account_id: number;
+  inserted_at: string;
+  updated_at: string;
+  // Associations (preloaded)
+  financial_account?: FinancialAccount;
+}
+
+export interface CreateTransactionEntryData {
+  amount: number;
+  type: number;
+  transaction_id: number;
+  financial_account_id: number;
+}
+
+export interface UpdateTransactionEntryData {
+  amount?: number;
+  type?: number;
+  transaction_id?: number;
+  financial_account_id?: number;
+}
+
+// Generic Resource type for dynamic endpoints
+export interface GenericResource {
+  id: number;
+  [key: string]: any;
+  inserted_at?: string;
+  updated_at?: string;
 }
 
 // Billing Plan types
@@ -322,14 +1224,26 @@ export interface BillingPlan {
   transaction_minimum_fee: number;
   minimum_fee: number;
   duration: number;
-  status: number; // 1=active, 2=inactive
-  billing_cycle: number; // 1=daily, 2=weekly, 3=monthly, 4=yearly
+  status: StatusKey; // Translated from integer to string
+  billing_cycle?: number;
   trial_period: number;
-  charge_strategy: number; // 1=immediate, 2=delayed
-  kind: number; // 1=payments, 2=subscription
+  charge_strategy: number;
+  kind: BillingPlanKind; // Contextual kind (e.g., 'subscription' instead of 'billing_plan_subscription')
   auto_charge: boolean;
-  currency: Currency;
-  features?: string[];
+  public: boolean;
+  payout_period: number;
+  payout_value_limit: number;
+  payout_percentage_limit: number;
+  features?: Record<string, any>;
+  data?: Record<string, any>;
+  meta_data?: Record<string, any>;
+  uid: string;
+  currency_code: string;
+  payment_provider_id?: number;
+  inserted_at: string;
+  updated_at: string;
+  // Associations (preloaded)
+  currency?: Currency;
 }
 
 export interface CreateBillingPlanData {
@@ -342,38 +1256,75 @@ export interface CreateBillingPlanData {
   transaction_minimum_fee?: number;
   minimum_fee?: number;
   duration: number;
-  billing_cycle: number;
+  billing_cycle?: number;
   trial_period?: number;
   charge_strategy?: number;
-  kind?: number;
+  kind?: BillingPlanKind | KindKey | number; // Contextual kind
   auto_charge?: boolean;
-  currency_id: number;
-  features?: string[];
+  public?: boolean;
+  payout_period?: number;
+  payout_value_limit?: number;
+  payout_percentage_limit?: number;
+  features?: Record<string, any>;
+  data?: Record<string, any>;
+  meta_data?: Record<string, any>;
+  currency_code: string;
+  payment_provider_id?: number;
 }
 
-export interface UpdateBillingPlanData extends Partial<CreateBillingPlanData> {
-  status?: number;
+export interface UpdateBillingPlanData {
+  name?: string;
+  description?: string;
+  flat_rate?: number;
+  transaction_fee?: number;
+  transaction_percentage?: number;
+  transaction_percentage_additional?: number;
+  transaction_minimum_fee?: number;
+  minimum_fee?: number;
+  duration?: number;
+  status?: StatusKey;
+  billing_cycle?: number;
+  trial_period?: number;
+  charge_strategy?: number;
+  kind?: BillingPlanKind | KindKey | number; // Contextual kind
+  auto_charge?: boolean;
+  public?: boolean;
+  payout_period?: number;
+  payout_value_limit?: number;
+  payout_percentage_limit?: number;
+  features?: Record<string, any>;
+  data?: Record<string, any>;
+  meta_data?: Record<string, any>;
+  currency_code?: string;
+  payment_provider_id?: number;
 }
 
 // Subscription types
 export interface Subscription {
   id: number;
-  status: number; // 1=pending, 2=active, 3=cancelled
-  kind: number; // 1=invoice, 2=subscription
-  current_period_start: string;
-  current_period_end: string;
-  trial_end?: string;
-  canceled_at?: string;
+  status: StatusKey; // Translated from integer to string
+  kind: KindKey; // Translated from integer to string
+  record_id: number;
+  record: string;
   start_date: string;
   end_date?: string;
-  record: string; // e.g., "merchants", "users"
-  record_id: number;
-  customer_id?: number;
+  current_period_start?: string;
+  current_period_end?: string;
+  trial_end?: string;
+  canceled_at?: string;
   uid: string;
   token?: string;
   billing_plan_id: number;
-  has_token: boolean;
-  billing_plan: BillingPlan;
+  customer_id?: number;
+  order_id?: number;
+  data?: Record<string, any>;
+  meta_data?: Record<string, any>;
+  inserted_at: string;
+  updated_at: string;
+  // Associations (preloaded)
+  billing_plan?: BillingPlan;
+  customer?: Customer;
+  order?: Order;
   subscription_periods?: SubscriptionPeriod[];
 }
 
@@ -383,7 +1334,16 @@ export interface CreateSubscriptionData {
   record_id: number;
   start_date: string;
   end_date?: string;
-  status: number;
+  status?: StatusKey;
+  kind?: KindKey;
+  current_period_start?: string;
+  current_period_end?: string;
+  trial_end?: string;
+  token?: string;
+  customer_id?: number;
+  order_id?: number;
+  data?: Record<string, any>;
+  meta_data?: Record<string, any>;
 }
 
 export interface SubscriptionPeriod {
@@ -391,12 +1351,53 @@ export interface SubscriptionPeriod {
   subscription_id: string;
   start_date: string;
   end_date: string;
-  amount: number;
-  currency: Currency;
-  status: 'pending' | 'paid' | 'failed' | 'cancelled';
-  charged_at?: string;
-  created_at: string;
-  metadata?: Record<string, any>;
+  status: string;
+  inserted_at: string;
+  updated_at: string;
+}
+
+/** Usage to record against a subscription's current period (INK-781). */
+export interface SubscriptionUsageData {
+  /** Metric name, matching a `metric` in the subscription's `data.usage_metrics`. */
+  metric: string;
+  /** Units to add. Defaults to 1. */
+  metric_count?: number;
+}
+
+export interface SubscriptionUsageResponse {
+  subscription_uid: string;
+  metric: string;
+  /** End date (YYYY-MM-DD) of the billing period the usage was recorded against. */
+  period_ending: string;
+  /** The metric's total for that period after this call. */
+  total: number;
+}
+
+/**
+ * One entry of a usage-based plan's `data.usage_metrics` (INK-781), alongside
+ * `is_usage_based: true` and, to add usage to the plan price, `apply_usage_charge_to_flat_rate: true`.
+ * Subscriptions copy these from their plan when they're created and when they change plan.
+ */
+export interface SubscriptionUsageMetric {
+  id?: string;
+  metric: string;
+  /** Charge per unit above the allotment, in the plan's currency. */
+  rate: number;
+  /** Units included in the plan price; only units above it are charged. */
+  allotment?: number;
+  /**
+   * Volume tiers: the period's total picks the highest tier reached (`from`), and every billable
+   * unit is charged at that tier's rate, with its allotment when set.
+   */
+  tiers?: Array<{ from: number; rate: number; allotment?: number }>;
+}
+
+export interface SubscriptionCancelResponse {
+  id: number;
+  uid: string;
+  status: string;
+  canceled_at: string;
+  cancellation_reason?: string;
 }
 
 export interface SubscriptionLinkData {
@@ -414,32 +1415,38 @@ export interface User {
   id: number;
   email: string;
   phone?: string;
-  first_name?: string;
-  last_name?: string;
+  first_name: string;
+  last_name: string;
   username?: string;
-  status: number;
+  status: AccountStatus; // Contextual status (e.g., 'approved' instead of 'account_approved')
   level: number;
   dob?: number | null;
   sex?: number | null; // 1=male, 2=female, 3=other
   image?: string | null;
   uid: string;
-  role?: {
-    id: number;
-    name: string;
-  };
-  organisation?: Organisation;
-  merchant?: Merchant;
-  created_at: string;
+  kind?: UserKind; // Contextual kind (e.g., 'address' instead of 'user_address')
+  organisation_id?: number;
+  role_id?: number;
+  inserted_at: string;
   updated_at: string;
+  // Associations (preloaded)
+  organisation?: Organisation;
 }
 
 export interface CreateUserData {
   email: string;
   phone?: string;
-  first_name?: string;
-  last_name?: string;
+  first_name: string;
+  last_name: string;
   username?: string;
   password: string;
+  status?: AccountStatus | StatusKey | number; // Contextual status
+  level?: number;
+  dob?: number;
+  sex?: number;
+  image?: string;
+  kind?: UserKind | KindKey | number; // Contextual kind
+  organisation_id?: number;
   role_id?: number;
 }
 
@@ -449,8 +1456,13 @@ export interface UpdateUserData {
   first_name?: string;
   last_name?: string;
   username?: string;
-  status?: number;
+  status?: AccountStatus | StatusKey | number; // Contextual status
   level?: number;
+  dob?: number;
+  sex?: number;
+  image?: string;
+  kind?: UserKind | KindKey | number; // Contextual kind
+  organisation_id?: number;
   role_id?: number;
 }
 
@@ -497,7 +1509,38 @@ export interface APIToken {
 // Public merchant data types (for public endpoints)
 export interface PublicMerchantFees {
   // Structure would depend on actual API response
-  [key: string]: any;
+  /** New detailed fee breakdown (Oct 2, 2025) */
+  sub_total: number;
+  discount_total: number;
+  discount_code?: string;
+  shipping_total: number;
+  pre_tax_fee_total: number;
+  tax_total: number;
+  post_tax_fee_total: number;
+  
+  /** Party totals */
+  customer_total: number;
+  platform_total: number;
+  provider_total: number;
+  merchant_total: number;
+  
+  /** Legacy fields for compatibility */
+  total: number;
+  provider_fee: number;
+  platform_fee: number;
+  
+  /** Merchant information */
+  merchant: {
+    username: string;
+    name: string;
+    email: string;
+    phone?: string;
+    logo?: string;
+    theme_colour?: string;
+  };
+  
+  /** Currency code */
+  currency: string;
 }
 
 export interface PublicMerchantProducts {
@@ -505,3 +1548,333 @@ export interface PublicMerchantProducts {
   // Additional pagination or metadata
   [key: string]: any;
 }
+
+// KYC/Legal Request types
+export interface KycRequest {
+  id: number;
+  kind: KycKind | KindKey; // Contextual or full key
+  status: KycStatus | StatusKey; // Contextual or full key
+  user_id?: number;
+  subject_id?: number;
+  data?: Record<string, any>;
+  inserted_at: string;
+  updated_at: string;
+  // Associations (preloaded)
+  user?: User;
+}
+
+export interface CreateKycRequestData {
+  kind: KycKind | KindKey;
+  status?: KycStatus | StatusKey;
+  user_id?: number;
+  subject_id?: number;
+  data?: Record<string, any>;
+}
+
+export interface UpdateKycRequestData {
+  kind?: KycKind | KindKey;
+  status?: KycStatus | StatusKey;
+  user_id?: number;
+  subject_id?: number;
+  data?: Record<string, any>;
+}
+
+// Payout types
+export interface PayoutRequest {
+  id: number;
+  total: number;
+  status: StatusKey; // Translated from integer to string
+  balance_on_request: number;
+  reference_id?: string;
+  evidence_file_id?: number;
+  source_id: number;
+  destination_id: number;
+  merchant_id: number;
+  requester_id: number;
+  type: KindKey; // Translated from integer to string
+  sub_type: KindKey; // Translated from integer to string
+  reviewer_id?: number;
+  reviewed_at?: string;
+  due_at: string;
+  fee_total: number;
+  source: FinancialAccount;
+  destination: FinancialAccount;
+  currency_code: string;
+  inserted_at: string;
+  updated_at: string;
+  // Associations (preloaded)
+  merchant?: Merchant;
+  requester?: User;
+  reviewer?: User;
+  currency?: Currency;
+}
+
+export interface CreatePayoutRequestData {
+  total: number;
+  type?: KindKey;
+  sub_type?: KindKey;
+  reference_id?: string;
+  evidence_file_id?: number;
+  source_id: number;
+  destination_id: number;
+  due_at?: string;
+  currency_code: string;
+}
+
+export interface UpdatePayoutRequestData {
+  total?: number;
+  status?: StatusKey;
+  type?: KindKey;
+  sub_type?: KindKey;
+  reference_id?: string;
+  evidence_file_id?: number;
+  reviewer_id?: number;
+  reviewed_at?: string;
+  due_at?: string;
+  fee_total?: number;
+  currency_code?: string;
+}
+
+// ============================================================================
+// INTERNAL API TYPES (Integer-based for actual API communication)
+// ============================================================================
+
+export interface InternalMerchant {
+  id: number;
+  name: string;
+  email: string;
+  username: string;
+  about?: string;
+  logo?: string;
+  sector?: string;
+  status: number; // Integer for API
+  phone?: string;
+  business_type?: string;
+  theme_colour?: string;
+  uid: string;
+  address_id?: number;
+  owner_id?: number;
+  domain_id?: number;
+  organisation_id?: number;
+  platform_fee_structure: number; // Integer for API
+  provider_fee_structure: number; // Integer for API
+  parent_merchant_id?: number;
+  data?: Record<string, any>;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface InternalCreateMerchantData {
+  name: string;
+  email: string;
+  phone?: string;
+  about?: string;
+  status?: number;
+  platform_fee_structure?: number;
+  provider_fee_structure?: number;
+  // ...existing fields without id, uid, inserted_at, updated_at
+}
+
+export interface InternalUpdateMerchantData {
+  name?: string;
+  email?: string;
+  phone?: string;
+  about?: string;
+  status?: number;
+  platform_fee_structure?: number;
+  provider_fee_structure?: number;
+  // ...existing fields without id, uid, inserted_at, updated_at
+}
+
+export interface InternalCategory {
+  id: number;
+  name: string;
+  description?: string | null;
+  kind: number; // Integer for API
+  kind_id?: number | null;
+  parent_id?: number | null;
+  uid: string;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface InternalProduct {
+  id: number;
+  title: string;
+  teaser?: string;
+  price: number;
+  permalink: string;
+  image?: string | null;
+  status: number; // Integer for API
+  public: boolean;
+  unlimited: boolean;
+  units_remaining?: number | null;
+  units_sold?: number | null;
+  rating_sum?: number | null;
+  rating_count?: number | null;
+  tag_ids: number[];
+  data?: Record<string, any>;
+  meta?: Record<string, any>;
+  uid: string;
+  category_id?: number;
+  currency_code: string;
+  user_id?: number;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface InternalOrder {
+  id: number;
+  reference_id?: string;
+  total: number;
+  discount_total?: number;
+  discount_code?: string;
+  kind: number; // Integer for API
+  status: number; // Integer for API
+  status_on: number;
+  uid: string;
+  cart_id?: number | null;
+  customer?: Customer;
+  currency: Currency;
+  billing_plan?: any | null;
+  billing_subscription_id?: number;
+  order_detail?: Record<string, any>;
+  transactions?: any[];
+  payment_methods?: PaymentMethod[];
+  order_lines: OrderLine[];
+  merchant: InternalMerchant;
+  organisation: Organisation;
+  payment_urls?: {
+    short_link: string;
+  };
+  meta_data?: Record<string, any>;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface InternalUser {
+  id: number;
+  email: string;
+  phone?: string;
+  first_name: string;
+  last_name: string;
+  username?: string;
+  status: number; // Integer for API
+  kind: number; // Integer for API
+  level: number;
+  dob?: number | null;
+  sex?: number | null;
+  image?: string | null;
+  uid: string;
+  organisation_id?: number;
+  role_id?: number;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface InternalPaymentLink {
+  id: number;
+  uid: string;
+  title: string;
+  description?: string;
+  total: number;
+  usage_limit: number;
+  expires_at?: string;
+  status: number; // Integer for API
+  kind: number; // Integer for API
+  data?: Record<string, any>;
+  customer_id?: number;
+  currency_code: string;
+  order_id?: number;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface InternalBillingPlan {
+  id: number;
+  name: string;
+  description?: string;
+  flat_rate: number;
+  transaction_fee: number;
+  transaction_percentage: number;
+  transaction_percentage_additional: number;
+  transaction_minimum_fee: number;
+  minimum_fee: number;
+  duration: number;
+  status: number; // Integer for API
+  kind: number; // Integer for API
+  billing_cycle?: number;
+  trial_period: number;
+  charge_strategy: number;
+  auto_charge: boolean;
+  public: boolean;
+  payout_period: number;
+  payout_value_limit: number;
+  payout_percentage_limit: number;
+  features?: Record<string, any>;
+  data?: Record<string, any>;
+  meta_data?: Record<string, any>;
+  uid: string;
+  currency_code: string;
+  payment_provider_id?: number;
+  inserted_at: string;
+  updated_at: string;
+  // Associations (preloaded)
+  currency?: Currency;
+}
+
+export interface InternalSubscription {
+  id: number;
+  status: number; // Integer for API
+  kind: number; // Integer for API
+  current_period_start: string;
+  current_period_end: string;
+  trial_end?: string;
+  canceled_at?: string;
+  start_date: string;
+  end_date?: string;
+  record: string;
+  record_id: number;
+  customer_id?: number;
+  order_id?: number;
+  uid: string;
+  token?: string;
+  billing_plan_id: number;
+  has_token: boolean;
+  billing_plan: InternalBillingPlan;
+  subscription_periods?: SubscriptionPeriod[];
+  data?: Record<string, any>;
+  meta_data?: Record<string, any>;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface InternalKycRequest {
+  id: number;
+  kind: number; // Integer for API
+  status: number; // Integer for API
+  data?: Record<string, any>;
+  user_id: number;
+  merchant_id?: number;
+  uid: string;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface InternalPayoutRequest {
+  id: number;
+  amount: number;
+  currency_code: string;
+  status: number; // Integer for API
+  type: number; // Integer for API
+  sub_type: number; // Integer for API
+  data?: Record<string, any>;
+  merchant_id: number;
+  uid: string;
+  inserted_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
+// USER-FACING TYPES (String-based for better UX)
+// ============================================================================

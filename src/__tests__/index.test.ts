@@ -3,9 +3,9 @@ import { InkressSDK } from '../index';
 describe('InkressSDK', () => {
   it('should initialize with config', () => {
     const sdk = new InkressSDK({
-      bearerToken: 'test-token',
-      clientId: 'm-test-merchant',
-      endpoint: 'https://test.api.inkress.com',
+      accessToken: 'test-token',
+      username: 'test-merchant',
+      mode: 'live',
       apiVersion: 'v1',
     });
 
@@ -19,20 +19,20 @@ describe('InkressSDK', () => {
     expect(sdk.public).toBeDefined();
   });
 
-  it('should allow config updates', () => {
+  it('should allow updating configuration', () => {
     const sdk = new InkressSDK({
-      bearerToken: 'test-token',
+      accessToken: 'test-token',
     });
 
     sdk.updateConfig({
-      clientId: 'm-new-merchant',
-      endpoint: 'https://new.api.inkress.com',
+      username: 'new-merchant',
+      mode: 'live',
     });
 
     const config = sdk.getConfig();
-    expect(config.clientId).toBe('m-new-merchant');
-    expect(config.endpoint).toBe('https://new.api.inkress.com');
-    // bearerToken should not be included in getConfig response
-    expect('bearerToken' in config).toBe(false);
+    expect(config.username).toBe('new-merchant');
+    expect(config.mode).toBe('live');
+    // accessToken should not be included in getConfig response
+    expect('accessToken' in config).toBe(false);
   });
 });

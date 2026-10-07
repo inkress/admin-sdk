@@ -1,12 +1,10 @@
 import { InkressSDK } from '../src';
 
 async function subscriptionExample() {
-  const inkress = new InkressSDK({
-    bearerToken: 'your-jwt-token-here',
-    clientId: 'm-your-merchant-username',
-  });
-
-  try {
+const inkress = new InkressSDK({
+    accessToken: 'your-jwt-token-here',
+    username: 'your-merchant-username',
+});  try {
     // Create a billing plan first
     console.log('Creating billing plan...');
     const plan = await inkress.billingPlans.create({

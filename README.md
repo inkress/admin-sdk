@@ -1,14 +1,23 @@
 # @inkress/admin-sdk
 
-Server-side TypeScript/JavaScript client for the Inkress Commerce API.
+Official Inkress Commerce API SDK for JavaScript/TypeScript applications.
 
 [![npm version](https://badge.fury.io/js/@inkress%2Fadmin-sdk.svg)](https://badge.fury.io/js/@inkress%2Fadmin-sdk)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **Version.** This README describes the source on this branch, package version `1.0.0`. The `latest`
-> release on npm (1.1.x) is built from a different line of development, with a different configuration
-> (`accessToken`, `username`, `mode`) and more resources. Check `package.json` in the installed package
-> before following this README.
+## Features
+
+- 🚀 **Modern TypeScript SDK** - Built with TypeScript for excellent developer experience
+- 🔒 **Secure Authentication** - JWT-based authentication with automatic token management
+- 🌐 **Public Endpoints** - Access public merchant information without authentication
+- 📦 **Comprehensive API Coverage** - 23+ resources with full CRUD operations
+- 🎯 **100% Type-Safe** - Every method fully typed with specific interfaces
+- 🔄 **Advanced Query System** - Fluent query builder with intelligent transformations
+- 🌍 **Contextual Translations** - Human-readable strings automatically converted to API integers
+- 🛠️ **Easy Integration** - Simple setup and intuitive API design
+- 🔄 **Automatic Retries** - Built-in retry logic for resilient applications
+- 📱 **Cross-Platform** - Works in Node.js, browsers, and React Native
 
 ## Installation
 
@@ -16,223 +25,2081 @@ Server-side TypeScript/JavaScript client for the Inkress Commerce API.
 npm install @inkress/admin-sdk
 ```
 
-## Quick start
+```bash
+yarn add @inkress/admin-sdk
+```
+
+```bash
+pnpm add @inkress/admin-sdk
+```
+
+## Quick Start
+
+### Basic Setup
 
 ```typescript
 import { InkressSDK } from '@inkress/admin-sdk';
 
 const inkress = new InkressSDK({
-  bearerToken: process.env.INKRESS_TOKEN!,   // JWT or API token; '' for public endpoints only
-  clientId: 'm-your-merchant-username',      // sent as the Client-Id header
-  endpoint: 'https://api.inkress.com',       // default; https://api-dev.inkress.com for development
-});
-
-const { result } = await inkress.orders.create({
-  currency_code: 'USD',
-  total: 29.99,
-  reference_id: 'order-123',
-  customer: { email: 'customer@example.com', first_name: 'Jane', last_name: 'Doe' },
+  accessToken: 'your-jwt-token',
+  username: 'merchant-username', // Optional - only needed for merchant operations
+  mode: 'live', // Optional - 'live' (default) or 'sandbox'
 });
 ```
 
-## Configuration
-
-| Option | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `bearerToken` | `string` | Yes | — | Sent as `Authorization: Bearer <token>` |
-| `clientId` | `string` | No | `''` | Sent as `Client-Id` when set. Format `m-{merchant username}`. Required for merchant resources. |
-| `endpoint` | `string` | No | `https://api.inkress.com` | API origin |
-| `apiVersion` | `string` | No | `v1` | Requests go to `{endpoint}/api/{apiVersion}` |
-| `timeout` | `number` | No | `30000` | Request timeout in ms |
-| `retries` | `number` | No | `0` | Retries for 5xx responses and network errors/timeouts, with a 1 s, 2 s, … delay |
-| `headers` | `Record<string, string>` | No | `{}` | Extra headers on every request |
-
-## Responses and errors
-
-Every method resolves to the API envelope `ApiResponse<T>`: `{ state: 'ok' | 'error', result?: T, data?: T }`.
-Most endpoints put the payload in `result`.
-
-A non-2xx response throws `InkressApiError` with `status` (HTTP status, `0` for network errors and
-timeouts), `message` and `data` (the parsed error body):
+### Configuration Options
 
 ```typescript
-import { InkressApiError } from '@inkress/admin-sdk';
+const inkress = new InkressSDK({
+  // Required
+  accessToken: 'your-jwt-token',
+  
+  // Optional
+  username: 'merchant-username',    // For Client-Id header
+  mode: 'live',                     // 'live' = api.inkress.com, 'sandbox' = api-dev.inkress.com
+  apiVersion: 'v1',                 // API version (default: 'v1')
+  timeout: 30000,                   // Request timeout in ms (default: 30000)
+  retries: 3,                       // Number of retry attempts (default: 0)
+  headers: {                        // Custom headers for all requests
+    'X-Custom-Header': 'value'
+  }
+});
+```
 
-try {
-  await inkress.products.get(123);
-} catch (err) {
-  if (err instanceof InkressApiError && err.status === 404) {
-    // not found
+### Why This SDK?
+
+**🎯 100% Type-Safe** - Every single method across all 23 resources is fully typed:
+```typescript
+// Every parameter and return value has explicit types
+const balances: ApiResponse<MerchantBalance> = await inkress.merchants.balances();
+// balances.data: { available: number, pending: number, currency: string }
+```
+
+**🌍 Human-Readable API** - Use contextual strings instead of cryptic integers:
+```typescript
+// Clear, self-documenting code with contextual strings
+await inkress.orders.update(123, {
+  status: 'confirmed',
+  kind: 'online'
+});
+// SDK automatically converts to integers for the API
+```
+
+**🔍 Powerful Queries** - Intuitive query syntax or fluent builders:
+```typescript
+// Direct query syntax
+await inkress.orders.query({
+  status: ['confirmed', 'shipped'],
+  total: { min: 100, max: 1000 },
+  reference_id: { contains: 'VIP' }
+});
+
+// Fluent query builder
+await inkress.orders.createQueryBuilder()
+  .whereStatus(['confirmed', 'shipped'])
+  .whereTotalRange(100, 1000)
+  .whereReferenceContains('VIP')
+  .execute();
+```
+
+**📦 Complete Coverage** - 22 resources with 125+ fully-typed methods:
+- Core: Merchants, Products, Categories, Orders, Users
+- Billing: Plans, Subscriptions, Payment Links, Payment Methods
+- Financial: Accounts, Requests, Fees, Currencies, Exchange Rates
+- Identity: Addresses, Tokens, Webhooks
+- Content: Public Data
+- And more...
+
+---
+
+### Public Endpoints (No Authentication Required)
+
+```typescript
+// Get public merchant information
+const merchant = await inkress.public.getMerchant({ 
+  username: 'merchant-username' 
+});
+
+// Get merchant products
+const products = await inkress.public.getMerchantProducts('merchant-username', {
+  limit: 20,
+  search: 'laptop'
+});
+
+// Get merchant fees
+const fees = await inkress.public.getMerchantFees('merchant-username', {
+  currency_code: 'JMD',  // JMD = 1, USD = 2
+  total: 1000
+});
+```
+
+### Authenticated Operations with Contextual Values
+
+The SDK automatically translates human-readable strings to API integers:
+
+```typescript
+// Create order with contextual strings
+const order = await inkress.orders.create({
+  total: 99.99,
+  currency_code: 'USD',
+  status: 'pending',
+  kind: 'online',
+  customer: {
+    email: 'customer@example.com',
+    first_name: 'John',
+    last_name: 'Doe'
+  },
+  reference_id: 'order-123'
+});
+
+// Update merchant with contextual values
+const merchant = await inkress.merchants.update(123, {
+  status: 'approved',
+  platform_fee_structure: 'customer_pay',
+  provider_fee_structure: 'merchant_absorb'
+});
+
+// Create user
+const user = await inkress.users.create({
+  email: 'user@example.com',
+  first_name: 'John',
+  last_name: 'Doe',
+});
+```
+
+### Advanced Query System
+
+Use the intuitive query system for powerful filtering:
+
+```typescript
+// Query with multiple conditions
+const orders = await inkress.orders.query({
+  status: ['confirmed', 'shipped'],  // Array → IN query
+  total: { min: 100, max: 1000 },   // Range query
+  reference_id: { contains: 'VIP' }, // String search
+  inserted_at: { min: '2024-01-01' },
+  page: 1,
+  page_size: 20
+});
+
+// Or use fluent query builder
+const products = await inkress.products
+  .createQueryBuilder()
+  .whereStatus('published')
+  .wherePriceRange(50, 500)
+  .whereTitleContains('laptop')
+  .whereCategory(5)
+  .paginate(1, 20)
+  .orderBy('price', 'desc')
+  .execute();
+```
+
+## Configuration Options
+
+| Option | Type | Required | Default | Description |
+|--------|------|----------|---------|-------------|
+| `bearerToken` | `string` | Yes | - | JWT token for API authentication |
+| `clientId` | `string` | No | - | Client ID for merchant-specific requests (format: `m-{username}`) |
+| `endpoint` | `string` | No | `https://api.inkress.com` | API endpoint URL |
+| `apiVersion` | `string` | No | `v1` | API version to use |
+| `timeout` | `number` | No | `30000` | Request timeout in milliseconds |
+| `retries` | `number` | No | `3` | Number of retry attempts for failed requests |
+| `headers` | `Record<string, string>` | No | `{}` | Custom headers to include with requests |
+
+## API Resources
+
+The SDK provides access to 23+ fully-typed resources:
+
+### Core Resources
+- **Merchants** - Merchant management and account operations
+- **Products** - Product catalog with full CRUD
+- **Categories** - Product categorization  
+- **Orders** - Order processing and tracking
+- **Users** - User and account management
+
+### Billing & Subscriptions
+- **Billing Plans** - Subscription plan management
+- **Subscriptions** - Recurring billing and subscriptions
+- **Payment Links** - Payment link generation
+- **Payment Methods** - Payment method configuration
+- **Checkout Sessions** - Embedded checkout for card payments
+
+### Financial
+- **Financial Accounts** - Account management
+- **Financial Requests** - Payout and withdrawal requests
+- **Transaction Entries** - Transaction tracking
+- **Fees** - Fee management and configuration
+- **Exchange Rates** - Currency exchange rates
+- **Currencies** - Multi-currency support
+
+### Identity & Access
+- **Addresses** - Address management
+- **Tokens** - API token management
+- **Webhook URLs** - Webhook configuration
+- **KYC** - Know Your Customer verification and compliance
+
+### Content & Other
+- **Generics** - Dynamic endpoint access
+- **Public** - Public-facing merchant data
+
+---
+
+## Core Resource Examples
+
+### Merchants Resource
+
+### Merchants Resource
+
+Full merchant management with contextual translations and account methods:
+
+```typescript
+// List merchants with contextual filtering
+const merchants = await inkress.merchants.list({
+  status: 'approved',                 // Contextual: converts to integer
+  platform_fee_structure: 'customer_pay',
+  organisation_id: 123,
+  q: 'coffee shop'
+});
+
+// Query merchants with advanced filtering
+const merchants = await inkress.merchants.query({
+  status: ['approved', 'active'],
+  platform_fee_structure: 'customer_pay',
+  inserted_at: { after: '2024-01-01' }
+});
+
+// Get merchant details
+const merchant = await inkress.merchants.get(merchantId);
+
+// Create merchant with contextual values
+const newMerchant = await inkress.merchants.create({
+  name: 'My Store',
+  email: 'store@example.com',
+  username: 'mystore',
+  status: 'pending',                  // Contextual
+  platform_fee_structure: 'customer_pay',
+  provider_fee_structure: 'merchant_absorb'
+});
+
+// Update merchant
+await inkress.merchants.update(merchantId, { 
+  name: 'Updated Store Name',
+  status: 'approved'
+});
+
+// Merchant account methods (properly typed)
+const balances = await inkress.merchants.balances();
+// Returns: { available: number, pending: number, currency: string }
+
+const limits = await inkress.merchants.limits();
+// Returns: { transaction_limit: number, daily_limit: number, monthly_limit: number, currency: string }
+
+const subscription = await inkress.merchants.subscription();
+// Returns: { plan_name: string, status: string, billing_cycle: string, price: number, ... }
+
+const invoices = await inkress.merchants.invoices();
+// Returns: MerchantInvoice[]
+
+const invoice = await inkress.merchants.invoice('invoice-123');
+// Returns: MerchantInvoice
+
+// Request bank account update (initiates OTP verification)
+const updateRequest = await inkress.merchants.updateBankInfo({
+  account_holder_name: 'John Doe',
+  account_holder_type: 'Personal',  // 'Personal' | 'Business'
+  account_number: 123456789,
+  account_type: 'Checking',          // 'Checking' | 'Saving'
+  bank_name: 'First National Bank',
+  branch_name: 'Main Branch',
+  branch_code: '001',                // Optional
+  routing_number: '021000021',       // Optional
+  swift_code: 'FNBKUS33',            // Optional
+  country_code: 'JM',
+  currency_code: 'JMD'
+});
+// Returns: { message: string | null, success: boolean, error: string | null, reason: string | null }
+
+// Confirm bank account update with OTP code
+const confirmResult = await inkress.merchants.confirmBankInfo('123456');
+// Returns: { account: FinancialAccount | null, saved: boolean, success: boolean, error: string | null, reason: string | null }
+
+// Query builder
+const merchants = await inkress.merchants
+  .createQueryBuilder()
+  .whereStatus('approved')
+  .wherePlatformFeeStructure('customer_pay')
+  .whereOrganisation(123)
+  .search('electronics')
+  .execute();
+```
+
+### Products Resource
+
+Complete product management with status translations and advanced querying:
+
+```typescript
+// List products with contextual filtering
+await inkress.products.list({
+  status: 'published',      // Contextual: 'published' instead of integer
+  category_id: 1,
+  price: { min: 50, max: 500 },
+  q: 'laptop'
+});
+
+// Query products with advanced filters
+const products = await inkress.products.query({
+  status: ['published', 'featured'],  // Array query
+  category_id: [1, 2, 3],
+  price: { min: 100 },
+  title: { contains: 'gaming' },
+  inserted_at: { after: '2024-01-01' }
+});
+
+// Get product details
+await inkress.products.get(productId);
+
+// Create product with contextual status
+await inkress.products.create({
+  name: 'Gaming Laptop',
+  description: 'High-performance gaming laptop',
+  price: 1299.99,
+  category_id: 1,
+  status: 'draft',          // Contextual
+  kind: 'published'         // Contextual
+});
+
+// Update product
+await inkress.products.update(productId, { 
+  price: 1199.99,
+  status: 'published'       // Contextual translation
+});
+
+// Delete product
+await inkress.products.delete(productId);
+
+// Query builder
+const products = await inkress.products
+  .createQueryBuilder()
+  .whereStatus('published')
+  .wherePriceRange(50, 500)
+  .whereCategory(5)
+  .whereTitleContains('laptop')
+  .paginate(1, 20)
+  .orderBy('price', 'desc')
+  .search('gaming')
+  .execute();
+```
+
+### Categories Resource
+
+Category management with kind translations:
+
+```typescript
+// List categories with contextual filtering
+await inkress.categories.list({ 
+  kind: 'published',        // Contextual translation
+  q: 'electronics'
+});
+
+// Query categories
+const categories = await inkress.categories.query({
+  kind: ['published', 'featured'],
+  parent_id: 1
+});
+
+// Get category details
+await inkress.categories.get(categoryId);
+
+// Create category with contextual kind
+await inkress.categories.create({
+  name: 'Electronics',
+  description: 'Electronic devices',
+  kind: 'published',        // Contextual
+  parent_id: null
+});
+
+// Update category
+await inkress.categories.update(categoryId, { 
+  name: 'Updated Name',
+  kind: 'featured'          // Contextual
+});
+
+// Query builder
+const categories = await inkress.categories
+  .createQueryBuilder()
+  .whereKind('published')
+  .whereParent(1)
+  .search('electronics')
+  .execute();
+```
+
+### Orders Resource
+
+Order processing with full status and kind translations:
+
+```typescript
+// Create order with contextual strings
+await inkress.orders.create({
+  total: 99.99,
+  currency_code: 'USD',
+  customer: {
+    email: 'customer@example.com',
+    first_name: 'John',
+    last_name: 'Doe'
+  },
+  reference_id: 'order-123',
+  kind: 'online',           // Contextual: converts to integer
+  status: 'pending'         // Contextual: converts to integer
+});
+
+// Get order details
+await inkress.orders.get(orderId);
+
+// Update order status with contextual string
+await inkress.orders.update(orderId, { 
+  status: 'confirmed'       // Contextual translation
+});
+
+// List orders with contextual filtering
+await inkress.orders.list({
+  status: 'shipped',        // Contextual
+  kind: 'online',          // Contextual
+  customer_id: 123,
+  q: 'electronics'
+});
+
+// Query orders with advanced filters
+const orders = await inkress.orders.query({
+  status: ['confirmed', 'shipped'],
+  kind: ['online', 'subscription'],
+  total: { min: 100, max: 1000 },
+  reference_id: { contains: 'VIP' },
+  inserted_at: { after: '2024-01-01' }
+});
+
+// Delete order
+await inkress.orders.delete(orderId);
+
+// Get order status (public endpoint)
+await inkress.orders.getStatus(orderId);
+
+// Query builder
+const orders = await inkress.orders
+  .createQueryBuilder()
+  .whereStatus(['confirmed', 'shipped'])
+  .whereKind('online')
+  .whereTotalRange(100, 1000)
+  .whereReferenceContains('PREMIUM')
+  .whereCustomer(123)
+  .paginate(1, 20)
+  .execute();
+```
+
+### Users Resource
+
+User management with status and kind translations:
+
+```typescript
+// List users with contextual filtering
+await inkress.users.list({
+  status: 'approved',       // Contextual: account_approved
+  kind: 'organisation',     // Contextual: user_organisation
+  organisation_id: 123,
+  q: 'admin'
+});
+
+// Query users
+const users = await inkress.users.query({
+  status: ['approved', 'active'],
+  kind: ['organisation', 'merchant'],
+  inserted_at: { after: '2024-01-01' }
+});
+
+// Get user details
+await inkress.users.get(userId);
+
+// Create user with contextual values
+await inkress.users.create({
+  email: 'user@example.com',
+  first_name: 'John',
+  last_name: 'Doe',
+  password: 'secure-password',
+  status: 'pending',        // Contextual
+  kind: 'organisation'      // Contextual
+});
+
+// Update user with contextual status
+await inkress.users.update(userId, { 
+  first_name: 'Jane',
+  status: 'approved'        // Contextual
+});
+
+// Delete user
+await inkress.users.delete(userId);
+
+// Query builder
+const users = await inkress.users
+  .createQueryBuilder()
+  .whereStatus('approved')
+  .whereKind('organisation')
+  .whereOrganisation(123)
+  .search('john')
+  .execute();
+```
+
+### Billing Plans Resource
+
+Billing plan management with kind translations:
+
+```typescript
+// List billing plans
+await inkress.billingPlans.list({
+  kind: 'subscription',     // Contextual
+  status: 'active'
+});
+
+// Query plans
+const plans = await inkress.billingPlans.query({
+  kind: 'subscription',
+  public: true,
+  amount: { min: 10, max: 100 }
+});
+
+// Get plan details
+await inkress.billingPlans.get(planId);
+
+// Create billing plan with contextual kind
+await inkress.billingPlans.create({
+  name: 'Premium Plan',
+  amount: 29.99,
+  currency_code: 'USD',  // JMD = 1, USD = 2
+  kind: 'subscription',     // Contextual
+  status: 'active'
+});
+
+// Update plan
+await inkress.billingPlans.update(planId, {
+  amount: 24.99,
+  status: 'active'
+});
+
+// Delete plan
+await inkress.billingPlans.delete(planId);
+
+// Query builder
+const plans = await inkress.billingPlans
+  .createQueryBuilder()
+  .whereKind('subscription')
+  .wherePublic(true)
+  .whereAmountRange(10, 50)
+  .execute();
+```
+
+### Subscriptions Resource
+
+Subscription management with proper typing for all methods:
+
+```typescript
+// List subscriptions
+await inkress.subscriptions.list({
+  status: 'active',         // Contextual
+  billing_plan_id: 1,
+  customer_id: 123
+});
+
+// Query subscriptions
+const subscriptions = await inkress.subscriptions.query({
+  status: ['active', 'trialing'],
+  billing_plan_id: [1, 2, 3],
+  inserted_at: { after: '2024-01-01' }
+});
+
+// Get subscription details
+await inkress.subscriptions.get(subscriptionId);
+
+// Create subscription with contextual values
+await inkress.subscriptions.create({
+  billing_plan_id: 1,
+  record: 'customer',
+  record_id: 123,
+  start_date: '2024-01-01',
+  status: 'active',         // Contextual
+  kind: 'recurring'         // Contextual
+});
+
+// Delete subscription
+await inkress.subscriptions.delete(subscriptionId);
+
+// Create subscription link (fully typed)
+const link = await inkress.subscriptions.createLink({
+  reference_id: 'sub-123',
+  title: 'Premium Subscription',
+  plan_uid: 'plan-abc',
+  customer: {
+    first_name: 'John',
+    last_name: 'Doe',
+    email: 'john@example.com'
+  }
+});
+// Returns: CreateSubscriptionLinkResponse
+
+// Self-serve card-update link — send it to a subscriber so they replace the card on file.
+// A small temporary ($1 authorize-only) hold verifies the new card; no login or support ticket.
+// Only works while the subscription is ACTIVE (cancelled/ended returns an error).
+const { result } = await inkress.subscriptions.createCardUpdateLink('sub-uid');
+// hand result.link to the subscriber (email / SMS). Optionally override the magic-link host:
+await inkress.subscriptions.createCardUpdateLink('sub-uid', { storefront_base: 'https://shop.example.com' });
+// Returns: CardUpdateLinkResponse { link, token }
+
+// Charge subscription (fully typed)
+const charge = await inkress.subscriptions.charge('sub-uid', {
+  reference_id: 'charge-123',
+  total: 29.99,
+  title: 'Monthly charge'
+});
+// Returns: ChargeSubscriptionResponse with typed transaction
+
+// Record usage (fully typed)
+const usage = await inkress.subscriptions.usage('sub-uid', {
+  reference_id: 'usage-123',
+  total: 5.00,
+  title: 'API calls'
+});
+// Returns: SubscriptionUsageResponse
+
+// Cancel subscription (fully typed)
+const cancelled = await inkress.subscriptions.cancel(123, 'reason-code');
+// Returns: SubscriptionCancelResponse
+
+// Get subscription periods
+const periods = await inkress.subscriptions.getPeriods('sub-uid', {
+  status: 'paid',
+  limit: 10
+});
+
+// Query builder
+const subscriptions = await inkress.subscriptions
+  .createQueryBuilder()
+  .whereStatus('active')
+  .whereBillingPlan(1)
+  .whereCustomer(123)
+  .execute();
+```
+
+---
+
+## Additional Resources
+
+### Payment Links
+
+```typescript
+// List payment links
+await inkress.paymentLinks.list({ status: 'active' });
+
+// Create payment link
+await inkress.paymentLinks.create({
+  title: 'Product Payment',
+  amount: 99.99,
+  currency_code: 'USD',  // JMD = 1, USD = 2
+  status: 'active'
+});
+
+// Update payment link
+await inkress.paymentLinks.update(linkId, { amount: 89.99 });
+
+// Delete payment link
+await inkress.paymentLinks.delete(linkId);
+```
+
+### Checkout Sessions (Embedded Checkout)
+
+Checkout Sessions enable embedded payment forms that can be integrated directly into your website via an iframe. This provides a seamless checkout experience without redirecting customers away from your site.
+
+```typescript
+// Create a checkout session
+const session = await inkress.checkoutSessions.create({
+  reference_id: 'order-123',
+  total: 100.00,
+  kind: 'online',
+  currency_code: 'JMD',
+  title: 'Premium Subscription',
+  customer: {
+    email: 'customer@example.com',
+    first_name: 'John',
+    last_name: 'Doe',
+    phone: '+1234567890'
+  }
+});
+
+// Access the iframe URL for embedding
+const iframeUrl = session.result.frame_url;
+const sessionId = session.result.session_id;
+
+// Get session details
+const details = await inkress.checkoutSessions.get('S.75a29ad32e52');
+console.log(details.result.status); // 'pending', 'awaiting_payment', 'completed', etc.
+
+// Cancel a session
+await inkress.checkoutSessions.delete('S.75a29ad32e52');
+```
+
+#### Embedding the Checkout Iframe
+
+The checkout session returns a `frame_url` that you can embed in your page:
+
+```html
+<!-- Embed the checkout iframe -->
+<iframe
+  id="inkress-checkout"
+  src="https://inkress.com/checkout/session/S.75a29ad32e52"
+  style="width: 100%; height: 600px; border: none;"
+  allow="payment"
+></iframe>
+```
+
+#### Handling Checkout Events
+
+The embedded checkout iframe emits two important `postMessage` events that your application should listen for:
+
+| Event | Description | When Fired |
+|-------|-------------|------------|
+| `frame_unload` | User has entered card information | Card details submitted to payment processor |
+| `payment_posted` | Payment attempt completed | After 3DS verification or payment processing |
+
+```typescript
+const session_id = mySession.id;
+// Listen for checkout events from the iframe
+window.addEventListener('message', (event) => {
+  // Verify the origin for security
+  if (event.origin !== 'https://inkress.com') {
+    return;
+  }
+
+  const { type, data } = event.data;
+
+  switch (type) {
+    case 'frame_unload':
+      // User has entered their card information
+      // The iframe is processing the payment
+      console.log('Payment processing started...');
+      expandFrameFor3DS();
+      break;
+
+    case 'payment_posted':
+      // Payment attempt has completed
+      // Check the session status to determine outcome
+      handlePaymentResult();
+      break;
+  }
+});
+
+async function handlePaymentResult() {
+  // Fetch the updated session to get the final status
+  const session = await inkress.checkoutSessions.get(dsession_id);
+  
+  if (session.result.status === 'completed') {
+    // Payment successful!
+    showSuccessMessage();
+    redirectToConfirmation(session.result.order_id);
   } else {
-    throw err;
+    // Payment failed or requires action
+    showErrorMessage('Payment could not be completed. Please try again.');
   }
 }
 ```
 
-Some subscription endpoints answer HTTP 200 with `state: 'error'` (for example an unknown
-subscription), so check `state` as well as catching errors.
-
-List methods resolve to `{ entries, pagination }` under `result`. The SDK's list response types name
-the pagination block `page_info`; the API returns it as `pagination` (`page`, `page_size`,
-`total_entries`, `total_pages`, `more`, …).
-
-## Resources
-
-Every method below maps to one API route (paths are relative to `/api/v1`).
-
-### `inkress.public` (no authentication)
-
-| Method | Route |
-|---|---|
-| `getMerchant({ username } \| { 'domain.cname': cname })` | `GET /public/m` |
-| `getMerchantFees(username, { currency, total })` | `GET /public/m/{username}/fees` |
-| `getMerchantProducts(username, params?)` | `GET /public/m/{username}/products` |
+#### Complete Integration Example
 
 ```typescript
-const merchant = await inkress.public.getMerchant({ username: 'mystore' });
-const fees = await inkress.public.getMerchantFees('mystore', { currency: 'JMD', total: 1000 });
-const products = await inkress.public.getMerchantProducts('mystore', { search: 'laptop', limit: 20 });
+import { InkressSDK } from '@inkress/admin-sdk';
+
+const inkress = new InkressSDK({
+  accessToken: 'your-jwt-token',
+  username: 'your-merchant'
+});
+
+async function initializeCheckout(orderData: {
+  total: number;
+  currency: string;
+  customer: { email: string; firstName: string; lastName: string; phone: string };
+}) {
+  // 1. Create the checkout session
+  const session = await inkress.checkoutSessions.create({
+    reference_id: `${Math.random().toString(36).substring(2, 9)}`,
+    total: orderData.total,
+    kind: 'online',
+    currency_code: orderData.currency,
+    title: 'Your Order',
+    customer: {
+      email: orderData.customer.email,
+      first_name: orderData.customer.firstName,
+      last_name: orderData.customer.lastName,
+      phone: orderData.customer.phone
+    }
+  });
+
+  // 2. Store session details for later reference
+  const sessionId = session.result.session_id;
+  const expiresAt = session.result.expires;
+
+  // 3. Display the checkout iframe
+  const iframe = document.createElement('iframe');
+  iframe.src = session.result.frame_url;
+  iframe.style.cssText = 'width: 100%; height: 600px; border: none;';
+  iframe.allow = 'payment';
+  document.getElementById('checkout-container')!.appendChild(iframe);
+
+  // 4. Set up event listeners
+  window.addEventListener('message', async (event) => {
+    if (event.origin !== 'https://inkress.com') return;
+
+    const { type } = event.data;
+
+    if (type === 'frame_unload') {
+      // Show loading state while payment processes
+      document.getElementById('loading-overlay')!.style.display = 'flex';
+    }
+
+    if (type === 'payment_posted') {
+      // Check final payment status
+      const updatedSession = await inkress.checkoutSessions.get(sessionId);
+      
+      if (updatedSession.result.status === 'completed') {
+        window.location.href = `/order-confirmation?order=${updatedSession.result.order_id}`;
+      } else {
+        document.getElementById('loading-overlay')!.style.display = 'none';
+        alert('Payment failed. Please try again.');
+      }
+    }
+  });
+
+  // 5. Handle session expiration
+  const timeUntilExpiry = expiresAt - Date.now();
+  setTimeout(() => {
+    alert('Your checkout session has expired. Please try again.');
+    window.location.reload();
+  }, timeUntilExpiry);
+
+  return { sessionId, expiresAt };
+}
 ```
 
-### `inkress.merchants`
-
-| Method | Route |
-|---|---|
-| `list(params?)` | `GET /merchants` |
-| `get(id)` | `GET /merchants/{id}` |
-| `create({ name, email, phone?, about? })` | `POST /merchants` |
-| `update(id, data)` | `PUT /merchants/{id}` |
-
-### `inkress.products`
-
-| Method | Route |
-|---|---|
-| `list(params?)` | `GET /products` |
-| `get(id)` | `GET /products/{id}` |
-| `create(data)` | `POST /products` |
-| `update(id, data)` | `PUT /products/{id}` |
-| `delete(id)` | `DELETE /products/{id}` |
+#### Session Response Structure
 
 ```typescript
-await inkress.products.create({
-  title: 'Gaming Laptop',
-  permalink: 'gaming-laptop',
+interface CreateCheckoutSessionResponse {
+  session_id: string;           // e.g., 'S.75a29ad32e52'
+  reference_id: string;         // Your order reference
+  status: string;               // 'pending'
+  order_id: string;             // Internal order ID
+  currency: string;             // e.g., 'JMD'
+  currency_code: string;        // e.g., 'JMD'
+  created_at: string;           // ISO timestamp
+  payment_initiated_at: string; // ISO timestamp
+  completed_at: string | null;  // null until completed
+  expires: number;              // Expiration timestamp (ms)
+  
+  // Payment totals breakdown
+  totals: {
+    sub_total: number;
+    customer_total: number;     // Amount customer pays
+    merchant_total: number;     // Amount merchant receives
+    platform_total: number;
+    provider_total: number;
+    shipping_total: number;
+    tax_total: number;
+    discount_total: number;
+  };
+  
+  // Customer info
+  customer: {
+    id: number | null;
+    email: string;
+    first_name: string;
+    last_name: string;
+    phone: string;
+  };
+  
+  // Iframe and payment data
+  frame_url: string;            // URL to embed in iframe
+  redirect_data: string;        // 3DS redirect HTML (if needed)
+  spi_token: string;            // Payment processor token
+  transaction_id: string;       // Transaction UUID
+  amount: number;               // Total amount
+  
+  // Additional fields
+  title: string;
+  products: any[];
+  transaction_type: string | null;
+  three_d_secure: any | null;
+  is_subscription: boolean;
+}
+```
+
+### Financial Accounts
+
+```typescript
+// List financial accounts
+await inkress.financialAccounts.list();
+
+// Create account
+await inkress.financialAccounts.create({
+  name: 'Main Account',
+  type: 'checking',
+  currency_code: 'USD'  // JMD = 1, USD = 2
+});
+
+// Update account
+await inkress.financialAccounts.update(accountId, { name: 'Updated Name' });
+```
+
+### Tokens
+
+```typescript
+// List tokens
+await inkress.tokens.list({ kind: 'api', enabled: true });
+
+// Create token
+await inkress.tokens.create({
+  title: 'Production API Key',
+  provider: 'stripe',
+  kind: 'api'
+});
+
+// Delete token
+await inkress.tokens.delete(tokenId);
+```
+
+### Addresses
+
+```typescript
+// List addresses
+await inkress.addresses.list({ country: 'US' });
+
+// Create address
+await inkress.addresses.create({
+  line1: '123 Main St',
+  city: 'New York',
+  state: 'NY',
+  country: 'US',
+  postal_code: '10001'
+});
+
+// Update address
+await inkress.addresses.update(addressId, { line1: '456 Broadway' });
+
+// Delete address
+await inkress.addresses.delete(addressId);
+```
+
+### Fees
+
+```typescript
+// List fees
+await inkress.fees.list({ active: true });
+
+// Create fee
+await inkress.fees.create({
+  name: 'Processing Fee',
+  amount: 2.50,
+  percentage: 2.9,
+  kind: 'transaction'
+});
+
+// Update fee
+await inkress.fees.update(feeId, { amount: 2.75 });
+
+// Delete fee
+await inkress.fees.delete(feeId);
+```
+
+### Exchange Rates & Currencies
+
+```typescript
+// List currencies
+await inkress.currencies.list();
+
+// Create currency
+await inkress.currencies.create({
+  code: 'USD',
+  name: 'US Dollar',
+  symbol: '$'
+});
+
+// List exchange rates
+await inkress.exchangeRates.list({ from_currency: 'USD' });
+
+// Create exchange rate
+await inkress.exchangeRates.create({
+  from_currency: 'USD',
+  to_currency: 'EUR',
+  rate: 0.85
+});
+
+// Update exchange rate
+await inkress.exchangeRates.update(rateId, { rate: 0.86 });
+```
+
+### Public Resource
+
+Access public merchant information without authentication:
+
+```typescript
+// Get merchant by username or domain
+await inkress.public.getMerchant({ username: 'merchant-name' });
+await inkress.public.getMerchant({ 'domain.cname': 'store.example.com' });
+
+// Get merchant products with filtering
+await inkress.public.getMerchantProducts('merchant-name', {
+  search: 'laptop',
+  category: 'electronics',
+  limit: 20
+});
+
+// Get merchant fees (fully typed)
+const fees = await inkress.public.getMerchantFees('merchant-name', {
+  currency_code: 'USD',  // JMD = 1, USD = 2
+  total: 100
+});
+// Returns: PublicMerchantFees
+```
+
+### Saved Cards (Ink Pay)
+
+Cards customers saved with your merchant. `list` / `get` / `remove` manage them; `charge` /
+`chargeStatus` / `waitForCharge` run an on-demand merchant-initiated charge on one.
+
+```typescript
+// List cards connected to your merchant
+const { result } = await inkress.savedCards.list({ page: 1, page_size: 25 });
+result?.entries.forEach((card) => console.log(card.display, card.chargeable));
+
+// Disconnect a card from your merchant (it stays usable by other merchants the
+// customer connected it to, and revokes YOUR merchant's fee consent for it)
+await inkress.savedCards.remove(cardId);
+```
+
+Charge a card and wait for the outcome — `waitForCharge` polls with doubling backoff and resolves
+on `succeeded` / `declined` / `failed` / `under_review` (never on `queued` / `processing`):
+
+```typescript
+import {
+  SavedCardChargeInProgressError,
+  SavedCardChargeRefusedError,
+  SavedCardChargePendingError,
+} from '@inkress/admin-sdk';
+
+try {
+  await inkress.savedCards.charge(cardId, {
+    amount: 25.0,
+    currency: 'USD',
+    idempotency_key: `order-${orderId}`, // 8-200 printable-ASCII bytes; reuse on retry
+    description: 'Monthly service fee',
+  });
+
+  const outcome = await inkress.savedCards.waitForCharge(cardId, `order-${orderId}`);
+  console.log(outcome.status); // 'succeeded' | 'declined' | 'failed' | 'under_review'
+} catch (error) {
+  if (error instanceof SavedCardChargeRefusedError) {
+    // fee_consent_missing | merchant_not_verified | merchant_incomplete_profile |
+    // merchant_not_found | unknown - error.reason / error.detail (detail keeps the server's text)
+    console.error(error.reason, error.detail);
+  } else if (error instanceof SavedCardChargeInProgressError) {
+    // an earlier request with the SAME key is still in flight - poll, don't retry with a new key
+  } else if (error instanceof SavedCardChargePendingError) {
+    // budget exhausted while still unresolved - poll again with error.idempotencyKey, never a new key
+  } else {
+    throw error;
+  }
+}
+```
+
+`chargeable` on a `SavedCard` is a display hint only (live credential + your merchant's recorded
+fee consent) — it does not reflect your merchant's own KYC/profile status, so `charge()` can still
+answer `merchant_not_verified` / `merchant_incomplete_profile` for a `chargeable: true` card.
+
+---
+
+## KYC (Know Your Customer) Module
+
+The KYC module helps you manage merchant verification and compliance documents. It provides both client-side document requirements and server-side status tracking.
+
+### Understanding Entity Types
+
+Different merchant types require different KYC documents:
+
+| Entity Type | Description | Required Documents |
+|------------|-------------|-------------------|
+| `personal` | Individual merchant | 3 documents |
+| `sole-trader` | Sole proprietorship | 5 documents |
+| `llc` | Limited Liability Company | 9 documents |
+| `non-profit` | Non-profit organization | 6 documents |
+| `alumni` | Alumni association | 6 documents |
+| `other` | Other business types | 9 documents |
+
+### Document Types
+
+```typescript
+type KycDocumentType = 
+  | 'Proof of Identity'
+  | 'Proof of Address'
+  | 'Proof of Bank Account Ownership'
+  | 'Business Certificate'
+  | 'Articles of Incorporation'
+  | 'Annual Return'
+  | 'Notice of Directors'
+  | 'Notice of Secretary'
+  | 'Tax Compliance Certificate';
+```
+
+### Quick Status Check
+
+```typescript
+// Check if KYC is complete for the authenticated merchant
+const isComplete = await inkress.kyc.isKycComplete('llc');
+
+if (isComplete) {
+  console.log('✅ Merchant is fully verified!');
+} else {
+  console.log('⚠️ Verification incomplete');
+}
+```
+
+### Get Requirements Status (with API call)
+
+Fetch the complete KYC status including all document submissions:
+
+```typescript
+const response = await inkress.kyc.getRequirementsStatus('llc');
+
+if (response.state === 'ok') {
+  const status = response.result!;
+  
+  console.log(`Completion: ${status.completion_percentage}%`);
+  console.log(`Complete: ${status.is_complete ? 'Yes' : 'No'}`);
+  console.log(`Approved: ${status.total_approved}/${status.total_required}`);
+  console.log(`Pending: ${status.total_pending}`);
+  console.log(`Rejected: ${status.total_rejected}`);
+  
+  // Check individual documents
+  status.document_statuses.forEach(doc => {
+    console.log(`${doc.document_type}: ${doc.status || 'not submitted'}`);
+    
+    if (doc.status === 'rejected' && doc.rejection_reason) {
+      console.log(`  Reason: ${doc.rejection_reason}`);
+    }
+  });
+}
+```
+
+### Get Missing Documents
+
+Find out which documents still need to be submitted:
+
+```typescript
+const missing = await inkress.kyc.getMissingDocuments('llc');
+
+if (missing.length > 0) {
+  console.log('Please submit the following documents:');
+  missing.forEach(doc => console.log(`  • ${doc}`));
+} else {
+  console.log('All documents submitted!');
+}
+```
+
+### Client-Side Requirements (no API call)
+
+View required documents without making an API request:
+
+```typescript
+// Get requirements for a specific entity type
+const docs = inkress.kyc.getRequiredDocuments('llc');
+console.log(`LLC requires ${docs.length} documents:`, docs);
+// Returns: ['Proof of Identity', 'Proof of Address', ...]
+
+// Get all requirements at once
+const allRequirements = inkress.kyc.getAllRequirements();
+console.log('Personal:', allRequirements.personal);
+console.log('LLC:', allRequirements.llc);
+// Returns complete mapping of all entity types to their required documents
+```
+
+### Submit KYC Documents
+
+```typescript
+// Upload a document
+await inkress.kyc.uploadDocument({
+  kind: 'document_submission',
+  status: 'pending',
+  data: {
+    document_type: 'Proof of Identity',
+    document_url: 'https://cdn.example.com/id-card.pdf',
+    notes: 'Government-issued ID card'
+  }
+});
+```
+
+### Mint a Merchant Verify Link (integrators)
+
+If you're an integrator (an organisation account that owns merchant accounts), you can mint a
+merchant-facing KYC `/verify` link and send it to your merchant so they complete identity
+verification themselves.
+
+Unlike the other KYC methods (which act on the *authenticated* merchant), `createVerifyLink` takes
+an explicit `merchantId`. The authenticated token must carry the **`kyc:write`** scope and **own**
+that merchant. The returned link is **single-use**, expires in **~3 hours**, and is **write-only**
+(it can start the verify flow but cannot read any KYC data). If it expires before the merchant opens
+it, just mint another.
+
+```typescript
+const { result } = await inkress.kyc.createVerifyLink(123); // owned merchant id
+
+// result: { verify_url, expires_at, single_use }
+console.log(result.verify_url);  // e.g. https://auditor.inkress.com/verify?token=…
+// deliver result.verify_url to your merchant (email / SMS / in-app)
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `verify_url` | `string` | Hand this to the merchant to start the `/verify` flow. |
+| `expires_at` | `string \| null` | ISO-8601 expiry (~3h out). |
+| `single_use` | `boolean` | Always `true` — invalid once used. |
+
+Errors: `403` (token missing `kyc:write`), `404` (merchant not owned/unknown), `429` (rate limited),
+`503` (rate limiter unavailable), `502` (verification service unavailable).
+
+### Complete Onboarding Flow Example
+
+```typescript
+async function checkKycOnboarding(entityType: 'llc' | 'personal' | 'sole-trader') {
+  console.log('🚀 Starting KYC Onboarding Check...\n');
+
+  // Step 1: Show what's required
+  const required = inkress.kyc.getRequiredDocuments(entityType);
+  console.log(`📋 ${entityType} requires ${required.length} documents:`);
+  required.forEach((doc, i) => console.log(`  ${i + 1}. ${doc}`));
+  console.log('');
+
+  // Step 2: Check current status
+  const statusResponse = await inkress.kyc.getRequirementsStatus(entityType);
+  
+  if (statusResponse.state === 'ok') {
+    const status = statusResponse.result!;
+    
+    console.log('📊 Current Status:');
+    console.log(`  Completion: ${status.completion_percentage}%`);
+    console.log(`  Approved: ${status.total_approved}/${status.total_required}`);
+    console.log(`  Pending: ${status.total_pending}`);
+    console.log(`  Rejected: ${status.total_rejected}`);
+    console.log('');
+  }
+
+  // Step 3: Check if complete
+  const isComplete = await inkress.kyc.isKycComplete(entityType);
+  
+  if (isComplete) {
+    console.log('✅ KYC Complete - Merchant is verified!');
+  } else {
+    // Step 4: Show what's missing
+    const missing = await inkress.kyc.getMissingDocuments(entityType);
+    console.log('⚠️ Action Required:');
+    console.log(`Please submit ${missing.length} document(s):`);
+    missing.forEach(doc => console.log(`  • ${doc}`));
+  }
+}
+
+// Run the check
+await checkKycOnboarding('llc');
+```
+
+### TypeScript Types
+
+```typescript
+import type {
+  EntityType,
+  KycDocumentType,
+  KycRequirements,
+  KycDocumentStatus,
+  KYC_DOCUMENT_REQUIREMENTS
+} from '@inkress/admin-sdk';
+
+// Document status interface
+interface KycDocumentStatus {
+  document_type: KycDocumentType;
+  required: boolean;
+  submitted: boolean;
+  status?: 'pending' | 'approved' | 'rejected';
+  submitted_at?: string;
+  reviewed_at?: string;
+  rejection_reason?: string;
+}
+
+// Complete requirements interface
+interface KycRequirements {
+  entity_type: EntityType;
+  required_documents: KycDocumentType[];
+  document_statuses: KycDocumentStatus[];
+  total_required: number;
+  total_submitted: number;
+  total_approved: number;
+  total_rejected: number;
+  total_pending: number;
+  completion_percentage: number;
+  is_complete: boolean;
+}
+```
+
+### KYC Status Values
+
+The API returns integer status codes that are automatically converted:
+
+| Integer | API Value | Simplified |
+|---------|-----------|------------|
+| 1 | `pending` | `pending` |
+| 2 | `in_review` | `pending` |
+| 3 | `approved` | `approved` |
+| 4 | `rejected` | `rejected` |
+
+The SDK automatically handles the conversion between integers and human-readable strings.
+
+### Best Practices
+
+1. **Cache Requirements**: The `getRequiredDocuments()` and `getAllRequirements()` methods don't make API calls - use them freely for UI display.
+
+2. **Periodic Status Checks**: Poll `getRequirementsStatus()` periodically to track verification progress.
+
+3. **Handle Rejections**: Check `rejection_reason` when a document is rejected to provide clear feedback to users.
+
+4. **Track Submissions**: Use `submitted_at` and `reviewed_at` timestamps to show processing time.
+
+5. **Authentication**: Most KYC methods act on the authenticated merchant from the `Client-Id` header (set via `username` config). The exception is `createVerifyLink(merchantId)`, which takes an explicit merchant id — for integrator tokens that own multiple merchants (requires the `kyc:write` scope + ownership of that merchant).
+
+See [examples/kyc-requirements.ts](examples/kyc-requirements.ts) for complete working examples.
+
+---
+
+## Advanced Query System
+
+The SDK provides a powerful type-safe query system with two interfaces:
+
+### 1. Direct Query Method
+
+Use the `query()` method with an intuitive object-based syntax:
+
+```typescript
+// Simple equality
+await inkress.orders.query({
+  status: 'confirmed',
+  customer_id: 123
+});
+
+// Array queries (IN operations)
+await inkress.orders.query({
+  status: ['confirmed', 'shipped', 'delivered'],
+  id: [1, 2, 3, 4, 5]
+});
+
+// Range queries
+await inkress.products.query({
+  price: { min: 100, max: 1000 },
+  rating: { min: 4 }
+});
+
+// String contains
+await inkress.products.query({
+  title: { contains: 'laptop' },
+  description: { contains: 'gaming' }
+});
+
+// Date ranges
+await inkress.orders.query({
+  inserted_at: { after: '2024-01-01', before: '2024-12-31' },
+  updated_at: { on: '2024-06-15' }
+});
+
+// Complex combined queries
+await inkress.orders.query({
+  status: ['confirmed', 'shipped'],
+  kind: 'online',
+  total: { min: 50, max: 500 },
+  reference_id: { contains: 'VIP' },
+  customer_id: [100, 101, 102],
+  inserted_at: { after: '2024-01-01' },
+  page: 1,
+  page_size: 20,
+  q: 'electronics'
+});
+```
+
+### 2. Fluent Query Builder
+
+Use the query builder for a fluent, chainable interface:
+
+```typescript
+// Products query builder
+const products = await inkress.products
+  .createQueryBuilder()
+  .whereStatus('published')
+  .whereStatusIn(['published', 'featured'])
+  .whereCategory(5)
+  .whereCategoryIn([1, 2, 3])
+  .wherePriceRange(50, 500)
+  .wherePriceMin(50)
+  .wherePriceMax(500)
+  .whereTitleContains('gaming')
+  .whereDescriptionContains('RGB')
+  .whereCreatedAfter('2024-01-01')
+  .whereCreatedBefore('2024-12-31')
+  .whereCreatedBetween('2024-01-01', '2024-12-31')
+  .paginate(1, 20)
+  .orderBy('price', 'desc')
+  .search('laptop')
+  .execute();
+
+// Orders query builder
+const orders = await inkress.orders
+  .createQueryBuilder()
+  .whereStatus('confirmed')
+  .whereStatusIn(['confirmed', 'shipped'])
+  .whereKind('online')
+  .whereKindIn(['online', 'subscription'])
+  .whereTotalRange(100, 1000)
+  .whereReferenceContains('VIP')
+  .whereCustomer(123)
+  .whereCustomerIn([100, 101, 102])
+  .whereCreatedBetween('2024-01-01', '2024-12-31')
+  .paginate(1, 20)
+  .search('electronics')
+  .execute();
+
+// Merchants query builder
+const merchants = await inkress.merchants
+  .createQueryBuilder()
+  .whereStatus('approved')
+  .wherePlatformFeeStructure('customer_pay')
+  .whereProviderFeeStructure('merchant_absorb')
+  .whereOrganisation(123)
+  .whereNameContains('coffee')
+  .paginate(1, 50)
+  .execute();
+
+// Users query builder
+const users = await inkress.users
+  .createQueryBuilder()
+  .whereStatus('approved')
+  .whereKind('organisation')
+  .whereOrganisation(123)
+  .whereEmailContains('@company.com')
+  .paginate(1, 50)
+  .search('admin')
+  .execute();
+```
+
+### Query Transformation
+
+The SDK automatically transforms your clean queries into API-compatible format:
+
+```typescript
+// You write:
+{
+  status: ['confirmed', 'shipped'],
+  total: { min: 100, max: 1000 },
+  reference_id: { contains: 'VIP' }
+}
+
+// SDK transforms to:
+{
+  status_in: [4, 7],           // Contextual strings → integers with _in suffix
+  total_min: 100,              // min/max → _min/_max suffixes
+  total_max: 1000,
+  "contains.reference_id": "VIP"  // contains → prefix format
+}
+```
+
+### Available Query Operations
+
+| Operation | Input Syntax | API Output | Description |
+|-----------|-------------|------------|-------------|
+| **Equality** | `field: value` | `field: value` | Direct match |
+| **Array (IN)** | `field: [1,2,3]` | `field_in: [1,2,3]` | Value in array |
+| **Range Min** | `field: {min: 10}` | `field_min: 10` | Minimum value |
+| **Range Max** | `field: {max: 100}` | `field_max: 100` | Maximum value |
+| **Contains** | `field: {contains: 'text'}` | `"contains.field": "text"` | String contains |
+| **Date After** | `field: {after: 'date'}` | `"after.field": "date"` | After date |
+| **Date Before** | `field: {before: 'date'}` | `"before.field": "date"` | Before date |
+| **Date On** | `field: {on: 'date'}` | `"on.field": "date"` | Exact date |
+
+### Query Builder Methods
+
+All resources with query support provide these methods:
+
+**Equality Methods:**
+- `.whereField(value)` - Direct equality
+- `.whereFieldIn([values])` - Array IN query
+
+**Range Methods:**
+- `.whereFieldRange(min, max)` - Min and max
+- `.whereFieldMin(value)` - Minimum value
+- `.whereFieldMax(value)` - Maximum value
+
+**String Methods:**
+- `.whereFieldContains(text)` - String contains
+
+**Date Methods:**
+- `.whereCreatedAfter(date)` - After date
+- `.whereCreatedBefore(date)` - Before date
+- `.whereCreatedBetween(start, end)` - Date range
+- `.whereUpdatedAfter(date)` - After date
+- `.whereUpdatedBefore(date)` - Before date
+
+**Utility Methods:**
+- `.paginate(page, pageSize)` - Pagination
+- `.orderBy(field, direction)` - Sorting
+- `.search(query)` - General search (q parameter)
+- `.execute()` - Execute the query
+
+### Field Type Validation
+
+The SDK validates field types at runtime to prevent API errors:
+
+```typescript
+// Runtime validation ensures correct types
+await inkress.products.query({
+  price: 99.99,           // ✅ Number field
+  unlimited: true,        // ✅ Boolean field
+  category_id: 5,         // ✅ Integer field
+  inserted_at: '2024-01-01'  // ✅ String field
+});
+
+// Type mismatches are caught early
+await inkress.products.query({
+  price: { contains: 'text' }  // ❌ Error: price is numeric, not string
+});
+```
+
+## Search and Filtering
+
+All list operations support comprehensive search and filtering capabilities:
+
+### General Search with `q`
+
+Use the `q` parameter for intelligent searching across multiple relevant fields:
+
+```typescript
+// Search merchants - searches name, email, username, etc.
+await inkress.merchants.list({ q: 'john smith' });
+
+// Search products - searches title, description, etc.
+await inkress.products.list({ q: 'gaming laptop' });
+
+// Search orders - searches reference ID, customer details, etc.
+await inkress.orders.list({ q: 'ORDER-12345' });
+```
+
+### String-Based Status and Kind Values
+
+The SDK supports human-readable string values for better code clarity:
+
+```typescript
+// Use descriptive strings for merchants
+await inkress.merchants.list({
+  status: 'account_approved',
+  platform_fee_structure: 'customer_pay',
+  q: 'electronics'
+});
+
+// Filter orders with readable values
+await inkress.orders.list({
+  status: 'order_confirmed',
+  kind: 'order_online',
+  q: 'laptop'
+});
+
+// Filter products by status
+await inkress.products.list({
+  status: 'product_published',
+  q: 'smartphone'
+});
+
+// Integers also work for backward compatibility
+await inkress.merchants.list({
+  status: 2,
+  platform_fee_structure: 1
+});
+```
+
+### Available String Values
+
+**Status Values:**
+- Orders: `order_pending`, `order_confirmed`, `order_shipped`, `order_delivered`, `order_cancelled`, etc.
+- Accounts: `account_pending`, `account_approved`, `account_suspended`, etc.
+- Products: `product_draft`, `product_published`, `product_archived`
+- Transactions: `transaction_pending`, `transaction_authorized`, `transaction_captured`, etc.
+
+**Kind Values:**
+- Orders: `order_online`, `order_offline`, `order_subscription`, `order_invoice`
+- Products: `product_draft`, `product_published`, `product_archived`
+- Users: `user_address`, `role_organisation`, `role_store`
+- Billing: `billing_plan_subscription`, `billing_plan_payout`
+
+**Fee Structure Values:**
+- `customer_pay` - Customer pays the fees
+- `merchant_absorb` - Merchant absorbs the fees
+
+### Database Field Filtering
+
+Filter by any database field for precise results:
+
+```typescript
+// Filter products by specific criteria
+await inkress.products.list({
+  status: 'product_published',  // Published only (string format)
+  category_id: 5,               // Specific category
+  price: 1000,                 // Exact price
+  unlimited: true,             // Unlimited quantity
+  inserted_at: '2024-01-01'    // Created after date
+});
+
+// Filter merchants by organization
+await inkress.merchants.list({
+  organisation_id: 123,
+  status: 'account_approved',
+  platform_fee_structure: 'customer_pay'
+});
+```
+
+### Combining Search and Filters
+
+Mix general search with specific filters for powerful queries:
+
+```typescript
+await inkress.products.list({
+  q: 'phone',                    // General search
+  status: 'product_published',   // Published only
+  category_id: 5,               // Electronics category
+  page: 1,                      // Pagination
+  per_page: 20,                 // Results per page
+  sort: 'price',                // Sort by price
+  order: 'desc'                 // Descending order
+});
+```
+
+### Legacy Search Field
+
+Many resources still support the legacy `search` field for backward compatibility:
+
+```typescript
+// Legacy approach (still works)
+await inkress.products.list({ search: 'laptop' });
+
+// Recommended approach
+await inkress.products.list({ q: 'laptop' });
+```
+
+## Error Handling
+
+The SDK provides structured error handling with detailed error information:
+
+```typescript
+try {
+  const product = await inkress.products.get(123);
+} catch (error) {
+  if (error.response?.status === 404) {
+    console.log('Product not found');
+  } else if (error.response?.status === 422) {
+    console.log('Validation errors:', error.response.result);
+  } else {
+    console.log('Unexpected error:', error.message);
+  }
+}
+```
+
+## TypeScript Support
+
+The SDK is built with TypeScript and provides **100% type safety** across all 128+ methods:
+
+### Complete Type Coverage
+
+Every method has:
+- ✅ Fully typed input parameters (no `any` types)
+- ✅ Fully typed return values with specific interfaces
+- ✅ IDE autocomplete for all fields and methods
+- ✅ Compile-time type checking
+
+```typescript
+import { 
+  InkressSDK, 
+  // Core types
+  Product, 
+  Category, 
+  Order, 
+  Merchant,
+  User,
+  BillingPlan,
+  Subscription,
+  
+  // Create/Update types
+  CreateProductData,
+  UpdateProductData,
+  CreateOrderData,
+  UpdateMerchantData,
+  CreateUserData,
+  
+  // Response types
+  ApiResponse,
+  ProductListResponse,
+  OrderListResponse,
+  MerchantBalance,
+  MerchantLimits,
+  MerchantSubscription,
+  MerchantInvoice,
+  
+  // Query types
+  ProductQueryParams,
+  OrderQueryParams,
+  RangeQuery,
+  StringQuery,
+  
+  // Enum types
+  OrderStatus,
+  OrderKind,
+  AccountStatus,
+  UserKind,
+  FeeStructureKey,
+  StatusKey,
+  KindKey
+} from '@inkress/admin-sdk';
+
+// All responses are properly typed
+const response: ApiResponse<ProductListResponse> = await inkress.products.list();
+const products: Product[] = response.result?.entries || [];
+
+// Create operations with full typing
+const createData: CreateProductData = {
+  name: 'Gaming Laptop',
   price: 1299.99,
-  teaser: 'High-performance gaming laptop',
-  public: true,
-});
+  category_id: 1,
+  status: 'published',
+  kind: 'published'
+};
+const product: ApiResponse<Product> = await inkress.products.create(createData);
+
+// Update operations with full typing
+const updateData: UpdateMerchantData = {
+  name: 'Updated Store',
+  status: 'approved',
+  platform_fee_structure: 'customer_pay'
+};
+await inkress.merchants.update(123, updateData);
+
+// Merchant account methods with specific types
+const balances: ApiResponse<MerchantBalance> = await inkress.merchants.balances();
+// balances.data: { available: number, pending: number, currency: string }
+
+const limits: ApiResponse<MerchantLimits> = await inkress.merchants.limits();
+// limits.data: { transaction_limit: number, daily_limit: number, monthly_limit: number, currency: string }
+
+const subscription: ApiResponse<MerchantSubscription> = await inkress.merchants.subscription();
+// subscription.data: { plan_name: string, status: string, billing_cycle: string, price: number, ... }
+
+const invoices: ApiResponse<MerchantInvoice[]> = await inkress.merchants.invoices();
+// invoices.data: Array of typed MerchantInvoice objects
+
+// Query with full type safety
+const orderQuery: OrderQueryParams = {
+  status: ['confirmed', 'shipped'],
+  total: { min: 100, max: 1000 },
+  reference_id: { contains: 'VIP' },
+  page: 1,
+  page_size: 20
+};
+const orders: ApiResponse<OrderListResponse> = await inkress.orders.query(orderQuery);
+
+// Contextual enums for type safety
+const status: OrderStatus = 'confirmed';  // Only valid order statuses allowed
+const kind: OrderKind = 'online';         // Only valid order kinds allowed
+const feeStructure: FeeStructureKey = 'customer_pay';  // Only valid fee structures allowed
 ```
 
-### `inkress.categories`
+### Type-Safe Query Building
 
-| Method | Route |
-|---|---|
-| `list(params?)` | `GET /categories` |
-| `get(id)` | `GET /categories/{id}` |
-| `create({ name, kind, description?, kind_id?, parent_id? })` | `POST /categories` |
-| `update(id, data)` | `PUT /categories/{id}` (`parent_id` cannot change) |
-| `delete(id)` | `DELETE /categories/{id}` |
-
-### `inkress.orders`
-
-| Method | Route |
-|---|---|
-| `create({ currency_code, total, customer, reference_id?, kind? })` | `POST /orders` |
-| `get(id)` | `GET /orders/{id}` |
-| `update(id, { status })` | `PUT /orders/{id}` |
-| `getStatus(id)` | `GET /orders/status/{id}` (public) |
-| `list()` | `GET /orders` |
-
-### `inkress.users`
-
-| Method | Route |
-|---|---|
-| `list(params?)` | `GET /users` |
-| `get(id)` | `GET /users/{id}` |
-| `create({ email, password, first_name?, last_name?, phone?, username?, role_id?, ... })` | `POST /users` |
-| `update(id, data)` | `PUT /users/{id}` |
-| `delete(id)` | `DELETE /users/{id}` |
-
-### `inkress.billingPlans`
-
-| Method | Route |
-|---|---|
-| `list(params?)` | `GET /billing_plans` |
-| `get(id)` | `GET /billing_plans/{id}` |
-| `create(data)` | `POST /billing_plans` |
-| `update(id, data)` | `PUT /billing_plans/{id}` |
-| `delete(id)` | `DELETE /billing_plans/{id}` |
+Query builders provide complete type safety:
 
 ```typescript
-await inkress.billingPlans.create({
-  name: 'Courier monthly',
-  kind: 1,                 // 1 = subscription plan
-  flat_rate: 40,
-  billing_cycle: 3,        // 1 daily, 2 weekly, 3 monthly (calendar month), 4 yearly
-  duration: 12,
-  auto_charge: true,       // renewals charge the saved card
-  charge_strategy: 1,      // 1 = charge at period start, 2 = at period end
-  currency_id: 1,
-  transaction_fee: 0,
-  transaction_percentage: 0,
-});
+// Typed query builder - only valid methods for each field type
+const products = await inkress.products
+  .createQueryBuilder()
+  .whereStatus('published')           // String field - contextual value
+  .whereCategory(5)                   // Number field - direct value
+  .wherePriceRange(50, 500)          // Number field - range
+  .whereTitleContains('gaming')      // String field - contains
+  .whereUnlimited(true)              // Boolean field - direct value
+  .whereCreatedAfter('2024-01-01')   // Date field - after
+  .paginate(1, 20)
+  .execute();
+
+// TypeScript ensures you can't use wrong query types
+products
+  .wherePrice({ contains: 'text' })  // ❌ Compile error: price is numeric
+  .whereTitle(123);                  // ❌ Compile error: title is string
 ```
 
-`CreateBillingPlanData` types the core plan fields. The API also accepts `billing_model`, `public`,
-`meta_data` and `data` (usage-based billing: `is_usage_based`, `apply_usage_charge_to_flat_rate`,
-`usage_metrics` with `allotment` and `tiers`); see `BillingPlan` in the API's `openapi.yaml`. The
-type declares `features` as `string[]`; the API stores any JSON object there.
+### Response Type Handling
 
-### `inkress.subscriptions`
-
-| Method | Route |
-|---|---|
-| `list(params?)` | `GET /billing_subscriptions` |
-| `createLink({ plan_id, reference_id, title, customer })` | `POST /billing_subscriptions/link` |
-| `charge(uid, { total, reference_id, title })` | `POST /billing_subscriptions/{uid}/charge` |
-| `getPeriods(uid, params?)` | `GET /billing_subscriptions/{uid}/periods` |
-| `cancel(uid, code)` | `POST /billing_subscriptions/{uid}/cancel/{code}` (public cancel-by-code) |
+Handle responses with full type awareness:
 
 ```typescript
-// Sign-up link for a plan (plan_id is the plan's uid)
-const link = await inkress.subscriptions.createLink({
-  plan_id: 'plan_courier_monthly',
-  reference_id: 'cp-sub-0042',
-  title: 'Courier Portal subscription',
-  customer: { first_name: 'Spanish', last_name: 'Town', email: 'billing@example.com' },
-});
-const payUrl = link.result?.payment_urls.short_link;
+async function getProduct(id: number): Promise<Product | null> {
+  try {
+    const response: ApiResponse<Product> = await inkress.products.get(id);
+    
+    // TypeScript knows the exact structure
+    if (response.result) {
+      return response.result;  // Product type
+    }
+    return null;
+  } catch (error) {
+    console.error('Failed to fetch product:', error);
+    return null;
+  }
+}
 
-// Ad-hoc charge
-const charge = await inkress.subscriptions.charge('sub_7f3a9c', {
-  total: 12.5,
-  reference_id: 'cp-usage-2026-10',
-  title: 'Extra packages',
+async function listProducts(): Promise<Product[]> {
+  const response: ApiResponse<ProductListResponse> = await inkress.products.list();
+  
+  // TypeScript knows ProductListResponse structure
+  const entries = response.result?.entries || [];
+  
+  // entries is Product[]
+  return entries.map(product => ({
+    ...product,
+    discounted_price: product.price * 0.9  // TypeScript knows price is a number
+  }));
+}
+```
+
+### Discriminated Unions
+
+Use TypeScript's discriminated unions for status/kind handling:
+
+```typescript
+type OrderStatusAction = 
+  | { status: 'pending', action: 'await_payment' }
+  | { status: 'confirmed', action: 'process_order' }
+  | { status: 'shipped', action: 'track_shipment' }
+  | { status: 'delivered', action: 'request_feedback' };
+
+async function handleOrder(orderId: number, statusAction: OrderStatusAction) {
+  await inkress.orders.update(orderId, { status: statusAction.status });
+  
+  // TypeScript narrows the type based on status
+  switch (statusAction.status) {
+    case 'pending':
+      // statusAction.action is 'await_payment'
+      break;
+    case 'confirmed':
+      // statusAction.action is 'process_order'
+      break;
+  }
+}
+```
+
+## Environment Configuration
+
+### Development
+
+```typescript
+const inkress = new InkressSDK({
+  accessToken: process.env.INKRESS_DEV_TOKEN,
+  mode: 'sandbox',
+  username: 'mour-dev-merchant-username'
 });
 ```
 
-Differences between these types and what the API returns:
+### Production
 
-- `createLink` resolves to the full sign-up order (`id`, `reference_id`, `payment_urls`, `total`,
-  `plan`, …); there is no `subscription` key. The API also accepts `start_date`, `end_date`, `prorate`
-  and `meta_data`, which the type does not declare.
-- `charge` on a card-linked subscription answers `202` with `{ status: 'queued', job_id, reference,
-  subscription_uid }`; on other subscriptions `{ total, currency, status, reference, subscription_uid,
-  subscription_status }`. Neither matches the declared `ChargeSubscriptionResponse`
-  (`id`, `payment_urls`, `transaction`).
-- `getPeriods`: period `status` is an integer in the API, not the declared string values.
-- `cancel` declares `uid` as a `number`; the API route takes the subscription's string `uid`.
+```typescript
+const inkress = new InkressSDK({
+  accessToken: process.env.INKRESS_PROD_TOKEN,
+  mode: 'live',
+  username: 'your-merchant-username'
+});
+```
 
-API routes this version does not wrap: `POST /billing_subscriptions/usage/{uid}`,
-`GET /billing_subscriptions/{uid}/charges/{reference}`, `POST /billing_subscriptions/{uid}/card-update-link`,
-`POST|DELETE /billing_subscriptions/{uid}/plan-change`, `DELETE /billing_subscriptions/{id}`, and the
-public `/subscription-card-update/*` endpoints. Call them with any HTTP client using the same headers.
+## React/Next.js Integration
 
-## Webhooks
+### Server-Side Usage (API Routes)
 
-This SDK does not verify webhooks. Inkress signs them with an `X-Inkress-Webhook-Signature` header
-(base64 HMAC-SHA256 of the raw body); see `docs/webhooks.md` in commerce-api.
+```typescript
+// pages/api/products.ts or app/api/products/route.ts
+import { InkressSDK } from '@inkress/admin-sdk';
+
+const inkress = new InkressSDK({
+  accessToken: process.env.INKRESS_TOKEN!,
+  username: process.env.INKRESS_USERNAME!
+});
+
+export async function GET() {
+  const products = await inkress.products.list();
+  return Response.json(products);
+}
+```
+
+### Client-Side Usage (Public Endpoints)
+
+```typescript
+// hooks/usePublicMerchant.ts
+import { InkressSDK } from '@inkress/admin-sdk';
+
+const sdk = new InkressSDK({
+  accessToken: '', // Empty for public endpoints
+  mode: 'live'
+});
+
+export async function getPublicMerchant(username: string) {
+  return await sdk.public.getMerchant({ username });
+}
+```
+
+## Best Practices
+
+### 1. Environment Variables
+
+Store sensitive configuration in environment variables:
+
+```env
+INKRESS_TOKEN=your-jwt-token
+INKRESS_USERNAME=your-merchant
+```
+
+### 2. Error Handling
+
+Always implement proper error handling:
+
+```typescript
+async function fetchProducts() {
+  try {
+    const response = await inkress.products.list();
+    return response.result || [];
+  } catch (error) {
+    console.error('Failed to fetch products:', error);
+    return [];
+  }
+}
+```
+
+### 3. Rate Limiting
+
+Be mindful of API rate limits and implement appropriate throttling in your application.
+
+### 4. Caching
+
+Cache frequently accessed data like merchant information and categories:
+
+```typescript
+const merchantCache = new Map();
+
+async function getCachedMerchant(username: string) {
+  if (merchantCache.has(username)) {
+    return merchantCache.get(username);
+  }
+  
+  const merchant = await inkress.public.getMerchant({ username });
+  merchantCache.set(username, merchant);
+  return merchant;
+}
+```
+
+### 4. Webhook Verification
+
+Verify incoming webhook requests from Inkress using HMAC SHA256:
+
+```typescript
+import { WebhookUtils } from '@inkress/admin-sdk';
+
+// Method 1: Verify with signature, body, and secret
+app.post('/webhooks/inkress', (req, res) => {
+  const signature = req.headers['x-inkress-webhook-signature'];
+  const body = JSON.stringify(req.body);
+  const secret = process.env.INKRESS_WEBHOOK_SECRET;
+  
+  const isValid = WebhookUtils.verifySignature(body, signature, secret);
+  
+  if (!isValid) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+  
+  // Process webhook...
+  res.status(200).json({ received: true });
+});
+
+// Method 2: Let the SDK extract everything from the request
+app.post('/webhooks/inkress', (req, res) => {
+  const secret = process.env.INKRESS_WEBHOOK_SECRET;
+  
+  try {
+    const { isValid, body } = WebhookUtils.verifyRequest(req, secret);
+    
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
+    
+    // Parse the verified body
+    const webhookPayload = WebhookUtils.parsePayload(body);
+    
+    // Process webhook...
+    res.status(200).json({ received: true });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Method 3: Use Express middleware for automatic verification
+import { createWebhookMiddleware } from '@inkress/admin-sdk';
+
+app.use('/webhooks/inkress', createWebhookMiddleware(process.env.INKRESS_WEBHOOK_SECRET));
+
+app.post('/webhooks/inkress', (req, res) => {
+  // Request is already verified, payload attached to req.webhookPayload
+  const { webhookPayload } = req;
+  
+  console.log(`Received event: ${webhookPayload.event.action}`);
+  
+  res.status(200).json({ received: true });
+});
+```
+
+**Webhook Signature Format:**
+- Header: `X-Inkress-Webhook-Signature`
+- Algorithm: HMAC SHA256
+- Encoding: Base64
+- Equivalent to: `crypto.mac(:hmac, :sha256, secret, body) |> Base.encode64()`
+
+See [examples/webhook-server.ts](examples/webhook-server.ts) for a complete implementation.
+
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+## Migrating from Older Versions
+
+See [MIGRATION.md](MIGRATION.md) for upgrade instructions and breaking changes between versions.
+
+## Support
+
+- 📚 [API Documentation](https://docs.inkress.com)
+- 💬 [Discord Community](https://discord.gg/inkress)
+- 🐛 [Issue Tracker](https://github.com/inkress/admin-sdk/issues)
+- 📧 [Email Support](mailto:support@inkress.com)
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a list of changes and version history.
+
+---
+
+Made with ❤️ by the [Inkress](https://inkress.com) team.

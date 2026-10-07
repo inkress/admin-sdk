@@ -237,6 +237,8 @@ The SDK provides access to 23+ fully-typed resources:
 - **Tokens** - API token management
 - **Webhook URLs** - Webhook configuration
 - **KYC** - Know Your Customer verification and compliance
+- **Access** - "May this customer use my product?" from their subscription standing
+- **Flags** - Feature flag evaluation (OpenFeature OFREP)
 
 ### Content & Other
 - **Generics** - Dynamic endpoint access
@@ -659,13 +661,13 @@ const charge = await inkress.subscriptions.charge('sub-uid', {
 });
 // Returns: ChargeSubscriptionResponse with typed transaction
 
-// Record usage (fully typed)
+// Record usage for a usage-based subscription
 const usage = await inkress.subscriptions.usage('sub-uid', {
-  reference_id: 'usage-123',
-  total: 5.00,
-  title: 'API calls'
+  metric: 'api_calls',
+  metric_count: 120,
+  mode: 'increment'          // 'increment' (default) adds, 'set' replaces, 'max' keeps the higher value
 });
-// Returns: SubscriptionUsageResponse
+// Returns: SubscriptionUsageResponse with the period's new total
 
 // Cancel subscription (fully typed)
 const cancelled = await inkress.subscriptions.cancel(123, 'reason-code');
@@ -686,9 +688,91 @@ const subscriptions = await inkress.subscriptions
   .execute();
 ```
 
+#### Grace, pause/resume and plan changes
+
+These need a secret key bound to the plan-owning merchant. Refusals throw `InkressApiError`; the
+reason is in `error.result.result.code` (see the `*ErrorCode` types).
+
+```typescript
+// Dunning and grace live on the plan
+await inkress.billingPlans.update(planId, {
+  dunning_max_attempts: 3,     // renewal attempts before payment_failed (1–10)
+  dunning_interval_hours: 24,  // hours between attempts (1–168)
+  grace_days: 7                // days of access after the unpaid period end (0–90)
+});
+
+// Override grace for one subscription (0–90), or null to fall back to the plan's
+const { result: grace } = await inkress.subscriptions.setGrace('sub-uid', 14);
+// grace: { subscription_uid, grace_days, effective_grace_days }
+
+// Pause collection; optionally resume automatically (future date, at most 365 days ahead)
+await inkress.subscriptions.pause('sub-uid', { resume_at: '2026-12-01T00:00:00Z' });
+const { result: resumed } = await inkress.subscriptions.resume('sub-uid');
+// resumed.renewal_due is true when the period ended while paused and the renewal was queued
+// Pause refusals: SubscriptionPauseErrorCode ('already_paused', 'trial_active', 'dunning_in_progress', …)
+
+// Change plan at the end of the current period
+await inkress.subscriptions.changePlan('sub-uid', { plan_uid: 'plan-pro' });
+await inkress.subscriptions.cancelPlanChange('sub-uid');
+
+// Upgrade now: charges the pro-rated difference to the card on file (202).
+// The plan switches only once that charge is paid.
+const { result: upgrade } = await inkress.subscriptions.upgradeNow('sub-uid', 'plan-pro');
+// same as changePlan('sub-uid', { plan_uid: 'plan-pro', effective: 'now' })
+const outcome = await inkress.subscriptions.waitForCharge('sub-uid', upgrade.reference);
+// Upgrade refusals: ImmediateUpgradeErrorCode ('card_on_file_required', 'not_an_upgrade', …)
+```
+
+Subscription status can now also be `'paused'`. The matching signed webhook events are
+`subscription.paused` and `subscription.resumed` (see `MerchantEventType`).
+
 ---
 
 ## Additional Resources
+
+### Access
+
+One call answers "may this customer use my product right now, and with which features?". Needs the
+merchant's secret key (`sk_live_…` / `sk_test_…`) as `accessToken`.
+
+```typescript
+const access = await inkress.access.get('customer-uid');
+// or: await inkress.access.getByEmail('jane@example.com', { targetingKey: 'user-42' });
+
+if (access.allowed) {               // true for 'active', 'trialing' and 'grace'
+  console.log(access.access);       // 'active' | 'trialing' | 'grace' | 'paused' | 'blocked' | 'none'
+  console.log(access.subscription); // the most relevant subscription, or null
+  console.log(access.features);     // the merchant's flags evaluated for this customer
+}
+```
+
+An unknown customer reads as `access: 'none'`. Unlike most endpoints, the answer is not wrapped in
+`{ state, result }`, so `access.get` returns the `AccessResult` itself.
+
+### Feature Flags (OFREP)
+
+Flags are evaluated over [OFREP v1](https://openfeature.dev/specification/appendix-c) at
+`/api/ofrep/v1`, so any OpenFeature OFREP provider pointed at the API origin works too. Needs the
+merchant's secret key.
+
+```typescript
+const context = { targetingKey: 'user-42', inkress_customer: 'customer-uid' };
+
+// One flag: evaluation problems come back as errorCode, not exceptions
+const flag = await inkress.flags.evaluate<number>('max_projects', context);
+const maxProjects = flag.errorCode ? 3 : flag.value;
+
+// A boolean with a default
+const canExport = await inkress.flags.isEnabled('csv_export', context, false);
+
+// Every flag, with ETag caching
+const first = await inkress.flags.evaluateAll(context);
+const again = await inkress.flags.evaluateAll(context, { etag: first.etag ?? undefined });
+if (again.notModified) { /* keep using first.flags */ }
+```
+
+Passing `inkress_customer` lets flag rules target `inkress.access`, `inkress.plan` and
+`inkress.subscription_status`. A 401 (bad key) or 429 (rate limited) throws `InkressApiError`.
 
 ### Payment Links
 

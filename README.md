@@ -214,7 +214,8 @@ The SDK provides access to 23+ fully-typed resources:
 - **Merchants** - Merchant management and account operations
 - **Products** - Product catalog with full CRUD
 - **Categories** - Product categorization  
-- **Orders** - Order processing and tracking
+- **Orders** - Order processing and tracking, plus refunds of card-on-file and subscription orders
+- **Bookings** - Bookings whose orders (deposit, balance, …) are payments towards them
 - **Users** - User and account management
 
 ### Billing & Subscriptions
@@ -485,6 +486,9 @@ await inkress.orders.delete(orderId);
 // Get order status (public endpoint)
 await inkress.orders.getStatus(orderId);
 
+// Tag an order as a payment towards one of your bookings (set only at creation)
+await inkress.orders.create({ /* … */ booking_id: 42 });
+
 // Query builder
 const orders = await inkress.orders
   .createQueryBuilder()
@@ -495,6 +499,70 @@ const orders = await inkress.orders
   .whereCustomer(123)
   .paginate(1, 20)
   .execute();
+```
+
+#### Refunds
+
+Refund a captured card-on-file or subscription order, in full (omit `amount`) or in part. `orderRef`
+is the order id, its `reference_id` (for example a card charge's `cardchg-…` reference) or its uid.
+The idempotency key (8–200 printable ASCII characters) makes retries safe: the same key and payload
+return the same refund, a different payload with the same key is a `409`. `refund` resolves when the
+refund is accepted (`pending`); follow it with `refundStatus` or `waitForRefund`.
+
+```typescript
+const { result: refund } = await inkress.orders.refund(
+  'cardchg-123',
+  { amount: 500, reason: 'requested_by_customer', note: 'Late delivery' }, // currency, if sent, must match the order's
+  'refund-cardchg-123-1'
+);
+
+// One read by the same key
+const { result: current } = await inkress.orders.refundStatus('cardchg-123', 'refund-cardchg-123-1');
+
+// Or poll until succeeded / failed (doubling delay: 1 s, capped at 15 s, 15 polls by default)
+try {
+  const done = await inkress.orders.waitForRefund('cardchg-123', 'refund-cardchg-123-1');
+  console.log(done.status, done.refundable_remaining);
+} catch (error) {
+  if (error instanceof OrderRefundPendingError) {
+    // Still unresolved (an `unknown` refund is being reconciled by Inkress).
+    // Poll again later with the SAME key; never request again with a new one.
+  }
+}
+```
+
+Statuses: `pending`, `processing`, `provider_succeeded`, `succeeded`, `failed`, `unknown`. Reasons:
+`requested_by_customer`, `duplicate`, `fraudulent`, `service_not_delivered`, `other`. Refusals throw
+`InkressApiError`; `OrderRefundErrorCode` lists the codes (`order_not_refundable`, `ledger_pending`,
+`dispute_open`, `amount_exceeds_refundable`, `currency_mismatch`, `insufficient_balance`,
+`idempotency_key_reused`, …). Network errors and 5xx answers are retried by `waitForRefund`; any 4xx is thrown.
+
+### Bookings Resource
+
+A booking is something your customer reserved. Every order tagged with its `booking_id` is a
+payment towards it (a deposit, the balance, anything else) and stays a normal order. Reads include
+those orders, `amount_paid` (settled orders only) and `amount_due` (`total` minus what is paid,
+never below 0; `null` when the booking has no `total`).
+
+```typescript
+// Create (state defaults to 'pending'). reference_id is your own id, unique per merchant (422 on a repeat)
+const { result: booking } = await inkress.bookings.create({
+  reference_id: 'bookerva:bk_123',
+  start_time: '2026-11-02T14:00:00Z',
+  end_time: '2026-11-02T15:00:00Z',
+  total: 12000,
+  currency_code: 'JMD'
+});
+
+await inkress.bookings.get(booking.id);
+await inkress.bookings.list({ state: 'pending', page: 1, limit: 20 });
+await inkress.bookings.update(booking.id, { state: 'confirmed' }); // reference_id can't change
+
+// Recover after a retried create
+const existing = await inkress.bookings.findByReference('bookerva:bk_123'); // Booking | null
+
+// Take the balance on a saved card, tagged to the booking
+await inkress.savedCards.charge(cardId, { amount: 9000, currency: 'JMD', idempotency_key: 'bk_123-balance', booking_id: booking.id });
 ```
 
 ### Users Resource
@@ -641,7 +709,12 @@ const link = await inkress.subscriptions.createLink({
     first_name: 'John',
     last_name: 'Doe',
     email: 'john@example.com'
-  }
+  },
+  // Optional first billing period: starts on start_date (default today), first period ends on
+  // end_date (default a month later, at most a month), then renews monthly on end_date's day.
+  start_date: '2026-11-01',
+  end_date: '2026-11-15',
+  prorate: true              // charge the share of a month the first period covers, not the full price
 });
 // Returns: CreateSubscriptionLinkResponse
 
@@ -659,7 +732,15 @@ const charge = await inkress.subscriptions.charge('sub-uid', {
   total: 29.99,
   title: 'Monthly charge'
 });
-// Returns: ChargeSubscriptionResponse with typed transaction
+// Returns: ChargeSubscriptionResponse. reference_id is your idempotency key: a retry with the
+// same value never charges twice. On a subscription linked to a card on file the answer is
+// queued (HTTP 202) and the card is charged asynchronously; follow it by reference:
+const { result: chargeNow } = await inkress.subscriptions.chargeStatus('sub-uid', 'charge-123');
+// SubscriptionChargeOutcome: status 'queued' | 'processing' | 'succeeded' | 'declined' | 'under_review' | 'failed'
+const outcome = await inkress.subscriptions.waitForCharge('sub-uid', 'charge-123');
+// Polls until succeeded / declined / failed / under_review (500 ms doubling, capped at 8 s, 12 polls).
+// Throws SavedCardChargePendingError when it runs out: poll again with the SAME reference.
+// chargeStatus answers 404 for an unknown reference, and for any charge on an unlinked subscription.
 
 // Record usage for a usage-based subscription
 const usage = await inkress.subscriptions.usage('sub-uid', {

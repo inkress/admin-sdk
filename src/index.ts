@@ -28,6 +28,8 @@ import { PaymentMethodsResource } from './resources/payment-methods';
 import { TransactionEntriesResource } from './resources/transaction-entries';
 import { GenericsResource } from './resources/generics';
 import { CheckoutSessionsResource } from './resources/checkout-sessions';
+import { WebhookDeliveriesResource } from './resources/webhook-deliveries';
+import { PartnerActivationResource } from './resources/partner-activation';
 
 /**
  * Main Inkress Commerce API SDK class
@@ -102,6 +104,8 @@ export class InkressSDK {
   public readonly transactionEntries: TransactionEntriesResource;
   public readonly generics: GenericsResource;
   public readonly checkoutSessions: CheckoutSessionsResource;
+  public readonly webhookDeliveries: WebhookDeliveriesResource;
+  public readonly partnerActivation: PartnerActivationResource;
 
   constructor(config: InkressConfig) {
     this.client = new HttpClient(config);
@@ -133,6 +137,8 @@ export class InkressSDK {
     this.transactionEntries = new TransactionEntriesResource(this.client);
     this.generics = new GenericsResource(this.client);
     this.checkoutSessions = new CheckoutSessionsResource(this.client);
+    this.webhookDeliveries = new WebhookDeliveriesResource(this.client);
+    this.partnerActivation = new PartnerActivationResource(this.client);
   }
 
   /**
@@ -192,6 +198,10 @@ export {
   type CancelSubscriptionPlanChangeResponse,
   type ImmediateUpgradeErrorCode,
   type ImmediateUpgradeResponse,
+  type OwnerCancelTiming,
+  type OwnerCancelSubscriptionData,
+  type OwnerCancelSubscriptionResponse,
+  type OwnerCancelErrorCode,
   type SubscriptionGraceResponse,
   type SubscriptionGraceErrorCode,
   type PauseSubscriptionData,
@@ -243,6 +253,8 @@ export {
   type UpdateBookingData,
   type BookingFilterParams,
   type BookingListResponse,
+  type BookingItem,
+  type BookingItemInput,
 } from './resources/bookings';
 
 // Export order refund (INK-692) types + error
@@ -274,7 +286,62 @@ export type {
   BankInfoUpdateRequestData,
   BankAccountUpdateRequestResponse,
   BankAccountUpdateConfirmResponse,
+  MergedBusiness,
+  MergedHistoryMode,
 } from './resources/merchants';
+
+// Webhook delivery log, test events and replays (INK-1118)
+export type {
+  WebhookDelivery,
+  WebhookDeliveryState,
+  WebhookDeliveryKind,
+  WebhookDeliverySubjectType,
+  WebhookDeliveryFilterParams,
+  WebhookDeliveryPagination,
+  WebhookDeliveryListResponse,
+  WebhookDeliveryErrorCode,
+  WebhookTestSource,
+  WebhookTestData,
+  WebhookTestEvent,
+  WebhookTestEventsResponse,
+  WebhookTestPreview,
+} from './resources/webhook-deliveries';
+
+// Partner activation (INK-760, INK-1512, INK-1532)
+export type {
+  PartnerActivationState,
+  PartnerActivationLink,
+  PartnerMerchantSummary,
+  PartnerKeys,
+  PartnerVouch,
+  PartnerVouchLimitKind,
+  PartnerMerchantProfile,
+  PartnerOwner,
+  PartnerActivateData,
+  PartnerActivationResult,
+  PartnerStatusResult,
+  PartnerLinkResult,
+  PartnerVerifyLinkResult,
+  PartnerDisconnectData,
+  PartnerDisconnectResult,
+  PartnerConnectData,
+  PartnerActivationErrorCode,
+} from './resources/partner-activation';
+
+// Order moves, custom lines, limit and closed-business codes (INK-1079, INK-1307, INK-1513, INK-1518, INK-1526)
+export {
+  BUSINESS_CLOSED_CODE,
+  type OrderTenderType,
+  type OrderFulfilmentStatus,
+  type RecordOrderPaymentData,
+  type FulfilOrderData,
+  type DeclineOrderPaymentData,
+  type CancelOrderData,
+  type OrderMoveResult,
+  type OrderMoveErrorCode,
+  type CustomOrderItem,
+  type TransactionLimitCode,
+} from './resources/order-status';
 
 export { InkressSDK as default };
 

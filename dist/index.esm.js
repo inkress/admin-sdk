@@ -106,6 +106,38 @@ class HttpClient {
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
+    /**
+     * A request relative to the API origin (not `/api/<version>`), returning the status, headers and
+     * parsed body without the `{state, result}` envelope or throwing on 4xx. Used for endpoints that
+     * speak another protocol (OFREP) or answer without the envelope (`/access`).
+     */
+    async raw(method, originPath, options = {}) {
+        const url = `${this.config.endpoint}${originPath}`;
+        const init = { method, headers: this.getHeaders(options.headers) };
+        if (options.body !== undefined && method !== 'GET')
+            init.body = JSON.stringify(options.body);
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Request timeout')), this.config.timeout);
+        });
+        let response;
+        try {
+            response = await Promise.race([fetch(url, init), timeoutPromise]);
+        }
+        catch (error) {
+            throw new InkressApiError(error instanceof Error ? error.message : 'Unknown error', 0, { error });
+        }
+        const text = await response.text();
+        let body = null;
+        if (text) {
+            try {
+                body = JSON.parse(text);
+            }
+            catch (_a) {
+                body = null;
+            }
+        }
+        return { status: response.status, headers: response.headers, body };
+    }
     async get(path, params) {
         let url = path;
         if (params) {
@@ -314,6 +346,8 @@ const mappings = {
         "billing_subscription_active": 2,
         "billing_subscription_cancelled": 3,
         "billing_subscription_adhoc_charged": 4,
+        "billing_subscription_payment_failed": 5,
+        "billing_subscription_paused": 6,
         "ledger_payout_pending": 1,
         "ledger_payout_processing": 2,
         "ledger_payout_processed": 3,
@@ -491,16 +525,17 @@ const StatusTranslator = {
      * Convert string to integer with context prefix
      */
     toIntegerWithContext(key, context) {
-        // If key already has the context prefix, use as-is
-        const fullKey = key.includes('_') ? key : `${context}_${key}`;
-        if (mappings.Status[fullKey] !== undefined) {
-            return mappings.Status[fullKey];
+        // Context-prefixed first: a short status may itself contain "_" ("adhoc_charged",
+        // "payment_failed"), so "contains an underscore" does not mean "already prefixed".
+        const prefixed = `${context}_${key}`;
+        if (mappings.Status[prefixed] !== undefined) {
+            return mappings.Status[prefixed];
         }
-        // Fallback: try the key as-is if it's a valid status
+        // Fallback: the key as given (a full key such as "billing_subscription_active").
         if (mappings.Status[key] !== undefined) {
             return mappings.Status[key];
         }
-        throw new Error(`Unknown status value: ${key} (tried with context: ${fullKey})`);
+        throw new Error(`Unknown status value: ${key} (tried with context: ${prefixed})`);
     },
     /**
      * Convert integer to string for user display
@@ -2447,6 +2482,13 @@ class MerchantsResource {
         return this.client.post('/merchants/account/contribution', params || {});
     }
     /**
+     * The businesses merged into the acting business (directly or through a chain), oldest merge
+     * first; `[]` when none (INK-1521). Needs a business selected (`Client-Id`).
+     */
+    async mergedBusinesses() {
+        return this.client.get('/merged-businesses');
+    }
+    /**
      * Request for bank account update
      */
     async updateBankInfo(data) {
@@ -2632,6 +2674,34 @@ class CategoriesResource {
      */
     createQueryBuilder(initialQuery) {
         return new CategoryQueryBuilder(this, initialQuery);
+    }
+}
+
+/**
+ * INK-692: merchant refunds of captured card-on-file and subscription orders
+ * (`POST/GET /orders/:order_ref/refunds`). Types + wire validation; the methods live on
+ * `OrdersResource` (`refund`, `refundStatus`, `waitForRefund`).
+ */
+/** Statuses a wait stops on. `unknown` is NOT one: Inkress is still reconciling it. */
+const RESOLVED_REFUND_STATUSES = ['succeeded', 'failed'];
+const STATUSES = ['pending', 'processing', 'provider_succeeded', 'succeeded', 'failed', 'unknown'];
+function isOrderRefund(value) {
+    if (typeof value !== 'object' || value === null)
+        return false;
+    const v = value;
+    return (typeof v.id === 'string' &&
+        typeof v.status === 'string' &&
+        STATUSES.includes(v.status) &&
+        typeof v.amount === 'number' &&
+        typeof v.idempotency_key === 'string');
+}
+/** The wait ran out before the refund resolved. Poll again with the SAME key — never re-request with a new one. */
+class OrderRefundPendingError extends InkressApiError {
+    constructor(idempotencyKey, refund, attempts) {
+        var _a;
+        super(`Refund ${idempotencyKey} unresolved after ${attempts} polls (last status: ${(_a = refund === null || refund === void 0 ? void 0 : refund.status) !== null && _a !== void 0 ? _a : 'none'})`, 0, refund);
+        this.name = 'OrderRefundPendingError';
+        this.refund = refund;
     }
 }
 
@@ -2848,6 +2918,81 @@ class OrdersResource {
      */
     createQueryBuilder(initialQuery) {
         return new OrderQueryBuilder(this, initialQuery);
+    }
+    /**
+     * INK-692: refund a captured card-on-file or subscription order, in full (no `amount`) or in
+     * part. `idempotencyKey` (8-200 printable ASCII) makes retries safe: the same key and payload
+     * return the same refund; a different payload is a 409. Resolves when the refund is ACCEPTED
+     * (`pending`); poll with `refundStatus` / `waitForRefund`. `orderRef` is the order id, its
+     * `reference_id` (e.g. the `cardchg-…` reference of a card charge) or uid.
+     */
+    async refund(orderRef, data, idempotencyKey) {
+        return this.client.post(`/orders/${encodeURIComponent(String(orderRef))}/refunds`, {
+            ...data,
+            idempotency_key: idempotencyKey,
+        });
+    }
+    /** Current state of a refund, by the idempotency key it was requested with. */
+    async refundStatus(orderRef, idempotencyKey) {
+        const response = await this.client.get(`/orders/${encodeURIComponent(String(orderRef))}/refunds/${encodeURIComponent(idempotencyKey)}`);
+        const body = response.result;
+        if (!isOrderRefund(body))
+            throw new InkressApiError('Unexpected response from the refund status endpoint', 0, response);
+        return { state: 'ok', result: body };
+    }
+    /**
+     * Poll `refundStatus` until `succeeded` or `failed`. Transient misses (network, 5xx, unreadable
+     * body) are retried; 4xx is thrown. Throws `OrderRefundPendingError` when the budget runs out —
+     * an `unknown` refund is still being reconciled by Inkress; never re-request with a new key.
+     */
+    async waitForRefund(orderRef, idempotencyKey, options = {}) {
+        var _a, _b, _c, _d;
+        const attempts = (_a = options.attempts) !== null && _a !== void 0 ? _a : 15;
+        const maxDelay = (_b = options.maxDelayMs) !== null && _b !== void 0 ? _b : 15000;
+        const sleep = (_c = options.sleep) !== null && _c !== void 0 ? _c : ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+        let delay = (_d = options.initialDelayMs) !== null && _d !== void 0 ? _d : 1000;
+        let last;
+        for (let attempt = 1; attempt <= attempts; attempt += 1) {
+            try {
+                const { result } = await this.refundStatus(orderRef, idempotencyKey);
+                last = result;
+                if (result && RESOLVED_REFUND_STATUSES.includes(result.status))
+                    return result;
+            }
+            catch (error) {
+                const transient = error instanceof InkressApiError && (error.status === 0 || error.status >= 500);
+                if (!transient)
+                    throw error;
+            }
+            if (attempt < attempts) {
+                await sleep(delay);
+                delay = Math.min(delay * 2, maxDelay);
+            }
+        }
+        throw new OrderRefundPendingError(idempotencyKey, last, attempts);
+    }
+    /**
+     * Record a payment made outside Inkress (cash, bank transfer, other) on one of your orders
+     * (INK-1079). Pending, failed, partly paid, verifying or stale orders only; subscription orders are
+     * refused and a paid order is a 409. No fee, ledger entry or wallet credit is booked.
+     */
+    async recordPayment(orderRef, data) {
+        return this.client.post(`/orders/${encodeURIComponent(String(orderRef))}/payment`, data);
+    }
+    /** Move a paid order forward through fulfilment (INK-1079, INK-1307). */
+    async fulfil(orderRef, data) {
+        return this.client.post(`/orders/${encodeURIComponent(String(orderRef))}/fulfilment`, data);
+    }
+    /** A bank transfer the order was waiting for didn't arrive: the order fails (INK-1307). */
+    async declinePayment(orderRef, data = {}) {
+        return this.client.post(`/orders/${encodeURIComponent(String(orderRef))}/payment/decline`, data);
+    }
+    /**
+     * Cancel an unpaid (pending, failed or stale) order; its open payment links close and
+     * `orders.cancelled` is sent (INK-1307). Refund a paid order instead.
+     */
+    async cancel(orderRef, data = {}) {
+        return this.client.post(`/orders/${encodeURIComponent(String(orderRef))}/cancel`, data);
     }
 }
 
@@ -3203,6 +3348,433 @@ class BillingPlansResource {
     }
 }
 
+/**
+ * Internal (not re-exported from index): wire validators and polling helpers shared by every
+ * card-on-file charge status endpoint — saved-card charges (`SavedCardsResource`) and linked
+ * subscription charges (`SubscriptionsResource`, INK-690). Both endpoints answer with the same
+ * commerce-api `ChargeOutcome` read model.
+ */
+// CHARGE_STATUSES is every status the wire can send (used to validate a charge/outcome body).
+// RESOLVED_STATUSES is the narrower set waitForCharge stops on: 'under_review' is a STOP status
+// (it resolves, never throws) alongside the three that always meant "done" - so it belongs here,
+// not in a separate "terminal-only" set that nothing then reads. Both stay STRICT allow-lists:
+// `status` is the money-safety field (shared decision with the storefront SDK) - an unrecognised
+// status must never be treated as final; see isFailureReason below for the DESCRIPTIVE field,
+// which takes the opposite (forward-compatible) stance on purpose.
+const CHARGE_STATUSES = ['queued', 'processing', 'succeeded', 'declined', 'under_review', 'failed'];
+const RESOLVED_STATUSES = ['succeeded', 'declined', 'failed', 'under_review'];
+function isRecord(value) {
+    return typeof value === 'object' && value !== null;
+}
+function isChargeStatus(value) {
+    return typeof value === 'string' && CHARGE_STATUSES.includes(value);
+}
+function isJobId(value) {
+    return value === null || typeof value === 'number';
+}
+// Forward-compatible (M-A2 / shared decision): failure_reason is DESCRIPTIVE, not the
+// money-safety field, so any non-empty string is accepted here - typed as
+// SavedCardChargeFailureReason's KnownUnion | (string & {}) above - so a server-side addition to
+// the enum never makes chargeStatus/waitForCharge throw on an otherwise-valid, resolved outcome.
+function isFailureReason(value) {
+    return typeof value === 'string' && value.length > 0;
+}
+function isChargeOrder(value) {
+    return (isRecord(value) &&
+        typeof value.id === 'number' &&
+        typeof value.total === 'number' &&
+        typeof value.customer_total === 'number' &&
+        typeof value.fee_total === 'number' &&
+        (value.currency === null || typeof value.currency === 'string') &&
+        typeof value.status === 'number');
+}
+function isChargeOutcome(value) {
+    return (isRecord(value) &&
+        isChargeStatus(value.status) &&
+        isJobId(value.job_id) &&
+        typeof value.reference === 'string' &&
+        (value.order === null || isChargeOrder(value.order)) &&
+        (value.failure_reason === null || isFailureReason(value.failure_reason)));
+}
+/**
+ * A response the client never actually SAW from the server: a network/timeout failure (the
+ * HttpClient wraps both as `InkressApiError` status `0`, including an unparseable/unexpected
+ * body - `chargeStatus` also throws status `0` for that) or a `5xx`. Used to decide when it's
+ * safe to assume "the earlier request may have landed anyway and just be slow to answer" - never
+ * for a 4xx, which the server definitely and deliberately answered.
+ */
+function isTransientError(error) {
+    return error instanceof InkressApiError && (error.status === 0 || error.status >= 500);
+}
+const IDEMPOTENCY_KEY_MIN_BYTES = 8;
+const IDEMPOTENCY_KEY_MAX_BYTES = 200;
+// 0x21-0x7E: printable ASCII, no space, no control characters - matches
+// Api.Services.Cards.ChargeRequest's own ascii_printable?/1 exactly.
+const IDEMPOTENCY_KEY_PATTERN = /^[\x21-\x7e]+$/;
+/**
+ * Validates an idempotency key CLIENT-SIDE, before any network call — mirrors the server's own
+ * rule (`Api.Services.Cards.ChargeRequest.idempotency_key/2`) exactly: 8-200 bytes after trimming,
+ * printable ASCII only (no spaces, no control characters). Throws a plain `Error` (never
+ * `InkressApiError` - nothing was sent) for a key the server would 422 on, and otherwise returns
+ * the TRIMMED key, since the server treats the trimmed value as canonical (it's what ends up in
+ * the stored reference and in every replay comparison) - `charge()` and `chargeStatus()` both use
+ * the trimmed result so a caller who passes an untrimmed key still gets consistent behaviour.
+ */
+function validateIdempotencyKey(key) {
+    const trimmed = key.trim();
+    const validLength = trimmed.length >= IDEMPOTENCY_KEY_MIN_BYTES && trimmed.length <= IDEMPOTENCY_KEY_MAX_BYTES;
+    if (!validLength || !IDEMPOTENCY_KEY_PATTERN.test(trimmed)) {
+        throw new Error(`idempotency_key must be a string of ${IDEMPOTENCY_KEY_MIN_BYTES} to ${IDEMPOTENCY_KEY_MAX_BYTES} printable-ASCII bytes after trimming (no spaces or control characters) — got ${trimmed.length} byte(s)`);
+    }
+    return trimmed;
+}
+/** M-A7: `attempts <= 0` would otherwise report "still unknown after 0 polls" without ever polling. */
+function validateWaitOptions(options) {
+    if (options.attempts !== undefined && options.attempts < 1) {
+        throw new Error(`waitForCharge: attempts must be >= 1 (got ${options.attempts})`);
+    }
+    if (options.initialDelayMs !== undefined && options.initialDelayMs <= 0) {
+        throw new Error(`waitForCharge: initialDelayMs must be > 0 (got ${options.initialDelayMs})`);
+    }
+    if (options.maxDelayMs !== undefined && options.maxDelayMs <= 0) {
+        throw new Error(`waitForCharge: maxDelayMs must be > 0 (got ${options.maxDelayMs})`);
+    }
+}
+const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Saved cards connected to your merchant (Ink Pay, INK-438). Requires a merchant access token and
+ * `username` (Client-Id); the caller must be a member of that merchant - D-18: for an `sk_` API
+ * key this means the key's OWNER must hold a card-management role at the merchant, the same rule
+ * P3 already applies to charging ("staff-minted keys can't charge").
+ *
+ * Roles (server `priv/rbac.yaml` `cards:`):
+ *  - `list` / `get` (view): merchant_admin, merchant_moderator, organisation_admin,
+ *    organisation_moderator, super_admin, super_moderator.
+ *  - `remove` (delete) and `charge` / `chargeStatus`: merchant_admin, organisation_admin,
+ *    super_admin only — **moderators are read-only here**: they can list/get, never remove or
+ *    charge.
+ *  - An OAuth app needs the `cards:charge` scope for `charge` / `chargeStatus`, and has NO
+ *    list/get/remove scope at all — it gets 403 on those regardless of the role table above.
+ *
+ * `remove()` DISCONNECTS the card from your merchant only (it stays usable by other merchants the
+ * customer connected it to) and, in the same transaction, REVOKES your merchant's on-demand fee
+ * consent for it (Ruling R-P5-14) — a later re-connection cannot resume on-demand charging until
+ * the shopper accepts the fee disclosure again.
+ */
+
+/**
+ * Thrown by `charge` on a `409 request_in_progress`: an earlier request with the SAME idempotency
+ * key is still being processed — a genuine in-flight race, distinct from the server's other 409
+ * (`idempotency_key_reuse_with_different_payload`, a real payload conflict, which stays a plain
+ * `InkressApiError`). A subclass of `InkressApiError` (so `instanceof InkressApiError` still
+ * matches it) that lets a caller tell the two apart without string-matching
+ * `error.result.result.reason` itself.
+ *
+ * Wait and poll `chargeStatus` / `waitForCharge` with the SAME key; never retry with a new one —
+ * the in-flight request may still go on to complete the charge.
+ */
+class SavedCardChargeInProgressError extends InkressApiError {
+    constructor(result) {
+        super('A charge with this idempotency key is still being processed — wait and poll with the SAME key (chargeStatus/waitForCharge); never retry with a new key.', 409, result);
+        this.name = 'SavedCardChargeInProgressError';
+    }
+}
+class SavedCardChargeRefusedError extends InkressApiError {
+    constructor(reason, detail, result) {
+        super(detail, 422, result);
+        this.name = 'SavedCardChargeRefusedError';
+        this.reason = reason;
+        this.detail = detail;
+    }
+}
+/**
+ * Thrown by `waitForCharge` when the attempt budget runs out while the charge is still
+ * unresolved. Carries the LAST outcome actually observed (`undefined` only if every single poll
+ * in the budget failed transiently — see the method doc) and the `idempotencyKey` being polled.
+ *
+ * The invariant for this money path: while a charge's outcome is unknown, NEVER call `charge()`
+ * again with a NEW idempotency key — the original request may still go on to complete. Poll again
+ * later with `chargeStatus`/`waitForCharge` using this SAME `idempotencyKey`, or contact support
+ * to reconcile manually. A subclass of `InkressApiError` (so `instanceof InkressApiError` still
+ * matches it, and `status` stays `0` — nothing final was decided) so callers who only check for
+ * that keep working unchanged.
+ */
+class SavedCardChargePendingError extends InkressApiError {
+    constructor(idempotencyKey, outcome, attempts) {
+        var _a;
+        super(`Charge still ${(_a = outcome === null || outcome === void 0 ? void 0 : outcome.status) !== null && _a !== void 0 ? _a : 'unknown'} after ${attempts} polls — poll again with the SAME idempotency key ("${idempotencyKey}"); never call charge() again with a new key while the outcome is unknown.`, 0, outcome);
+        this.name = 'SavedCardChargePendingError';
+        this.outcome = outcome;
+        this.idempotencyKey = idempotencyKey;
+    }
+}
+/**
+ * Thrown by `remove()` when the SDK's OWN retry of the DELETE — issued only after the first
+ * attempt's response was lost to a network/timeout error or a `5xx` — comes back `404`.
+ * DISCONNECT deletes this merchant's connector row (`CardManagement.disconnect/2`), which is
+ * exactly what every scoped list/get/delete query filters on, so a `404` on a RETRY of the SAME
+ * delete means the first attempt already succeeded — not that the card was never connected here.
+ *
+ * There is no `active_subscriptions` count on this error: the response that would have carried it
+ * is the one that got lost, and there is no way to re-query it once the connector is gone. Treat
+ * this as a successful disconnect. A first attempt that gets `404` immediately (no prior transient
+ * failure) is NOT wrapped — `remove()` still throws the plain `InkressApiError` `404` "Not Found"
+ * for that, since that case is a genuine not-found (wrong id, or never connected), not a lost
+ * response.
+ */
+class SavedCardAlreadyRemovedError extends InkressApiError {
+    constructor(id, result) {
+        super(`Card ${id} was already disconnected from your merchant — an earlier request likely succeeded and its response was lost. No active_subscriptions count is available from this response.`, 404, result);
+        this.name = 'SavedCardAlreadyRemovedError';
+        this.id = id;
+    }
+}
+// The 3 required keys are all a fresh enqueue ever sends. A same-key replay's superset body also
+// carries reference/order/failure_reason (the same fields chargeStatus returns) - validated here,
+// when present, so charge() can pass them through instead of silently dropping them.
+function isChargeAccepted(value) {
+    return (isRecord(value) &&
+        isChargeStatus(value.status) &&
+        isJobId(value.job_id) &&
+        typeof value.status_url === 'string' &&
+        (value.reference === undefined || typeof value.reference === 'string') &&
+        (value.order === undefined || value.order === null || isChargeOrder(value.order)) &&
+        (value.failure_reason === undefined || value.failure_reason === null || isFailureReason(value.failure_reason)));
+}
+/**
+ * The `reason` string from one of the server's 409-conflict bodies (`{state, result: {reason,
+ * description, status}}` - both `ApiWeb.Idempotency` and `CardController`'s own idempotency check
+ * send this exact shape), if `value` (an `InkressApiError.result`) looks like one. `undefined` for
+ * anything else, including a 409 whose body doesn't match (treated as an ordinary conflict).
+ */
+function conflictReason(value) {
+    if (!isRecord(value) || !isRecord(value.result))
+        return undefined;
+    return typeof value.result.reason === 'string' ? value.result.reason : undefined;
+}
+/**
+ * The plain-string `result` from a `charge()` 422 body (`{state, data: {result}, result}` -
+ * `ApiWeb.CardController`'s `unprocessable/3`), if `value` (an `InkressApiError.result`) looks
+ * like one. `undefined` for anything else, so a 422 with an unrecognised shape is left as a plain
+ * `InkressApiError` instead of wrapped with a fabricated reason.
+ */
+function refusalMessage(value) {
+    return isRecord(value) && typeof value.result === 'string' ? value.result : undefined;
+}
+/**
+ * Maps a `charge()` 422's message text to a `SavedCardChargeRefusalReason` - exact match for the
+ * two reasons the server sends verbatim, prefix match for the two merchant-gate messages (each
+ * continues with a human-readable detail after a colon - `Service.Order.Processor.validate_merchant_status/1`
+ * and `validate_processing_allowed/1`). Round 2 (final-review re-review): everything else -
+ * a `ChargeRequest` field-validation message included - is `'unknown'`, never silently mislabelled
+ * `invalid_request`; `detail` on `SavedCardChargeRefusedError` keeps the exact text regardless, so
+ * a caller who wants to recognise a validation message for themselves still can.
+ */
+function chargeRefusalReason(message) {
+    if (message === 'fee_consent_missing')
+        return 'fee_consent_missing';
+    if (message.startsWith('merchant_not_verified'))
+        return 'merchant_not_verified';
+    if (message.startsWith('merchant_incomplete_profile'))
+        return 'merchant_incomplete_profile';
+    if (message === 'Merchant not found')
+        return 'merchant_not_found';
+    if (message === 'Booking not found.')
+        return 'booking_not_found';
+    return 'unknown';
+}
+class SavedCardsResource {
+    constructor(client) {
+        this.client = client;
+    }
+    async list(params) {
+        const response = await this.client.get('/cards', params ? { ...params } : undefined);
+        if (!response.result)
+            return { state: response.state };
+        return { state: response.state, result: { entries: response.result.entries, page_info: response.result.pagination } };
+    }
+    async get(id) {
+        return this.client.get(`/cards/${id}`);
+    }
+    /**
+     * Disconnect the card from your merchant. It stays usable by other merchants the customer
+     * connected it to, and this also revokes your merchant's on-demand fee consent for it (see the
+     * class doc) — a re-linked card can't be charged again until the shopper re-accepts the
+     * disclosure.
+     *
+     * A retried DELETE (this SDK's OWN retry, attempted only after the first attempt's response was
+     * lost to a network/timeout error or a `5xx`) that then comes back `404` throws
+     * `SavedCardAlreadyRemovedError` instead of a plain not-found — DISCONNECT already dropped the
+     * card out of every scoped query, so a `404` on a retry of the SAME delete means the first
+     * attempt succeeded. A single, first-attempt `404` (no prior transient failure) is unaffected —
+     * it still throws the plain `InkressApiError` `404` "Not Found" it always did.
+     */
+    async remove(id) {
+        try {
+            return await this.client.delete(`/cards/${id}`);
+        }
+        catch (error) {
+            if (!isTransientError(error))
+                throw error;
+            try {
+                return await this.client.delete(`/cards/${id}`);
+            }
+            catch (retryError) {
+                if (retryError instanceof InkressApiError && retryError.status === 404) {
+                    throw new SavedCardAlreadyRemovedError(id, retryError.result);
+                }
+                throw retryError;
+            }
+        }
+    }
+    /**
+     * Queue an on-demand merchant-initiated charge (INK-436). The endpoint answers 202 with a FLAT
+     * body `{status, job_id, status_url}` (not the usual envelope), validated here before it is
+     * returned. Retrying with the same `idempotency_key` and the same charge details never charges
+     * twice: it reports the existing charge's current status instead of enqueuing a new one - and,
+     * when the server includes them (a same-key-same-payload replay), `reference`/`order`/
+     * `failure_reason` are passed through too (see `SavedCardChargeAccepted`), so a caller doesn't
+     * need a second `chargeStatus` round-trip just to see them. That replay can already report
+     * `under_review` on THIS response, not just from later polling — the same "never retry with a
+     * new key" rule applies to it here too.
+     *
+     * `idempotency_key` is validated client-side first (8-200 printable-ASCII bytes after trimming —
+     * see `SavedCardChargeData.idempotency_key`); an invalid key throws immediately, before any
+     * network call.
+     *
+     * Rejections propagate as `InkressApiError` (never swallowed) — notably:
+     *  - `422` `SavedCardChargeRefusedError`, one of `fee_consent_missing` (the card is live but
+     *    your merchant has no recorded fee consent for it — the shopper must re-connect and accept
+     *    the disclosure), `merchant_not_verified` (finish KYC), `merchant_incomplete_profile`
+     *    (complete the merchant profile), `merchant_not_found`, or `unknown` (a validation error —
+     *    bad `amount`/`description`/currency, a refused `customer`/`subscription_id` field, or a
+     *    refusal this SDK doesn't have a specific reason for yet; `error.detail` always has the
+     *    server's exact message either way). The reason is read from the server
+     *    body (`error.result.result`), never from `error.message`, which the HTTP layer always sets
+     *    to the generic `"HTTP 422"`;
+     *  - `409` `idempotency_key_reuse_with_different_payload` when the same key was already used for a
+     *    charge with a different account, amount, currency or description - a real conflict; only
+     *    retry with a NEW idempotency key after confirming the original charge's actual outcome;
+     *  - `409` `request_in_progress` - a genuine race: an earlier request with the SAME key is still
+     *    being processed. Thrown as `SavedCardChargeInProgressError` (a subclass of `InkressApiError`)
+     *    so callers can tell the two 409s apart without string-matching `error.result.result.reason`
+     *    themselves. Wait and poll with `chargeStatus` / `waitForCharge` using the SAME key; never
+     *    retry with a new one - the in-flight request may still complete the charge.
+     */
+    async charge(id, data) {
+        const idempotency_key = validateIdempotencyKey(data.idempotency_key);
+        let raw;
+        try {
+            raw = await this.client.post(`/cards/${id}/charge`, { ...data, idempotency_key });
+        }
+        catch (error) {
+            if (error instanceof InkressApiError && error.status === 409 && conflictReason(error.result) === 'request_in_progress') {
+                throw new SavedCardChargeInProgressError(error.result);
+            }
+            if (error instanceof InkressApiError && error.status === 422) {
+                const message = refusalMessage(error.result);
+                if (message !== undefined) {
+                    throw new SavedCardChargeRefusedError(chargeRefusalReason(message), message, error.result);
+                }
+            }
+            throw error;
+        }
+        if (!isChargeAccepted(raw)) {
+            throw new InkressApiError('Unexpected response from the saved-card charge endpoint', 0, raw);
+        }
+        const result = {
+            status: raw.status,
+            job_id: raw.job_id,
+            status_url: raw.status_url,
+            ...(raw.reference !== undefined ? { reference: raw.reference } : {}),
+            ...(raw.order !== undefined ? { order: raw.order } : {}),
+            ...(raw.failure_reason !== undefined ? { failure_reason: raw.failure_reason } : {}),
+        };
+        return { state: 'ok', result };
+    }
+    /**
+     * The current outcome of the charge made with `idempotencyKey` on this card. `404` ->
+     * `InkressApiError` (nothing recorded for this key/account, or it belongs to another merchant -
+     * the server never distinguishes those on the wire, so this SDK doesn't either). Validates
+     * `idempotencyKey` client-side first, exactly like `charge()` does.
+     */
+    async chargeStatus(id, idempotencyKey) {
+        const key = validateIdempotencyKey(idempotencyKey);
+        const response = await this.client.get(`/cards/${id}/charges/${encodeURIComponent(key)}`);
+        const body = response.result;
+        if (!isChargeOutcome(body)) {
+            throw new InkressApiError('Unexpected response from the saved-card charge status endpoint', 0, response);
+        }
+        return { state: 'ok', result: body };
+    }
+    /**
+     * Poll `chargeStatus` with doubling backoff until the charge reaches a resolved state:
+     * `succeeded`, `declined`, `failed` or `under_review`.
+     *
+     * `under_review` RESOLVES rather than throwing — the worker cancelled the job because, past the
+     * processor's idempotency window, it found no clean-decline evidence, so money MAY be held. Do
+     * NOT retry with a new idempotency key in that case (a second authorize risks a second capture);
+     * poll the SAME key again later or contact support to reconcile manually.
+     *
+     * A poll that fails TRANSIENTLY — a network/timeout error, a `5xx`, or a response body this SDK
+     * can't parse (all three surface from `chargeStatus` as `InkressApiError` with `status 0` for
+     * the network/timeout/unparseable cases, or the server's own `5xx`) — is never treated as the
+     * wait's outcome: it's counted as a missed poll and retried within the budget, exactly like a
+     * still-`queued`/`processing` result. A caller cannot otherwise tell "still pending" apart from
+     * "network blip" by `status`/`instanceof` alone, and the correct action is the SAME either way:
+     * keep polling with the SAME idempotency key. Any OTHER error (404 not found, 422 bad key, 403)
+     * is a real, non-transient refusal and is thrown immediately, not retried.
+     *
+     * Default budget is >= 60s (12 polls, 500ms initial delay doubling up to an 8s cap - 63.5s total:
+     * 500+1000+2000+4000+7×8000ms): a fresh decline is Oban-retryable server-side and can take ~40s+
+     * to become `declined`. Throws `SavedCardChargePendingError` (carrying the last outcome actually
+     * seen, if any, and the `idempotencyKey`) when the budget runs out while the charge is still
+     * unresolved — the message says to poll again with the SAME idempotency key, never a new one.
+     */
+    async waitForCharge(id, idempotencyKey, options = {}) {
+        var _a, _b, _c, _d;
+        validateWaitOptions(options);
+        const key = validateIdempotencyKey(idempotencyKey);
+        const attempts = (_a = options.attempts) !== null && _a !== void 0 ? _a : 12;
+        const maxDelay = (_b = options.maxDelayMs) !== null && _b !== void 0 ? _b : 8000;
+        const sleep = (_c = options.sleep) !== null && _c !== void 0 ? _c : defaultSleep;
+        let delay = (_d = options.initialDelayMs) !== null && _d !== void 0 ? _d : 500;
+        let last;
+        for (let attempt = 1; attempt <= attempts; attempt += 1) {
+            try {
+                const { result } = await this.chargeStatus(id, key);
+                last = result;
+                if (result && RESOLVED_STATUSES.includes(result.status))
+                    return result;
+            }
+            catch (error) {
+                if (!isTransientError(error))
+                    throw error;
+                // Missed poll (network/timeout, 5xx, or an unparseable body) - never abort the wait for
+                // it; keep the last known outcome and try again within the budget (see the method doc).
+            }
+            if (attempt < attempts) {
+                await sleep(delay);
+                delay = Math.min(delay * 2, maxDelay);
+            }
+        }
+        throw new SavedCardChargePendingError(key, last, attempts);
+    }
+}
+
+/** True for the linked (asynchronous, 202) charge answer. */
+function isSubscriptionChargeQueued(value) {
+    return isRecord(value) && 'job_id' in value && isJobId(value.job_id) && isChargeStatus(value.status);
+}
+function isSubscriptionChargeOutcome(value) {
+    return isChargeOutcome(value) && isRecord(value) && typeof value.subscription_uid === 'string';
+}
+function requireReference(reference) {
+    const trimmed = reference.trim();
+    if (trimmed === '')
+        throw new Error('reference is required');
+    return trimmed;
+}
 class SubscriptionsResource {
     constructor(client) {
         this.client = client;
@@ -3354,18 +3926,86 @@ class SubscriptionsResource {
         return this.client.post(`/billing_subscriptions/${uid}/card-update-link`, data !== null && data !== void 0 ? data : {});
     }
     /**
-     * Charge an existing subscription
-     * Requires Client-Id header to be set in the configuration
+     * Charge an existing subscription (one-off, on the subscription's card).
+     * Requires Client-Id header to be set in the configuration; a LINKED subscription additionally
+     * needs a credential bound to the plan-owning merchant with a charging role (merchant_admin /
+     * organisation_admin) — organisation-level keys and bot keys are refused (403).
+     *
+     * `reference_id` is your idempotency key: a retry with the same value never charges twice. It is
+     * also sent as `reference`, the name older API versions read.
+     *
+     * @example
+     * const { result } = await inkress.subscriptions.charge(uid, { total: 12, title: 'Domain', reference_id: 'dom-123-2026' });
+     * if (result && isSubscriptionChargeQueued(result)) {
+     *   const outcome = await inkress.subscriptions.waitForCharge(uid, 'dom-123-2026');
+     * }
      */
     async charge(uid, data) {
-        return this.client.post(`/billing_subscriptions/${uid}/charge`, data);
+        return this.client.post(`/billing_subscriptions/${uid}/charge`, {
+            ...data,
+            reference: data.reference_id,
+        });
     }
     /**
-     * Record usage for a subscription (for usage-based billing)
+     * Current outcome of a linked subscription's charge, by the `reference` from `charge` or by
+     * your own `reference_id`. 404 (`InkressApiError`) when no such charge exists on this
+     * subscription — including any charge on an unlinked subscription.
+     */
+    async chargeStatus(uid, reference) {
+        const ref = requireReference(reference);
+        const response = await this.client.get(`/billing_subscriptions/${uid}/charges/${encodeURIComponent(ref)}`);
+        const body = response.result;
+        if (!isSubscriptionChargeOutcome(body)) {
+            throw new InkressApiError('Unexpected response from the subscription charge status endpoint', 0, response);
+        }
+        return { state: 'ok', result: body };
+    }
+    /**
+     * Poll `chargeStatus` until the charge resolves (`succeeded`, `declined`, `failed` or
+     * `under_review`), same budget and semantics as `savedCards.waitForCharge`. Transient misses
+     * (network, 5xx, unparseable body) are retried; any 4xx is thrown. Throws
+     * `SavedCardChargePendingError` (carrying the last outcome seen) when the budget runs out —
+     * never retry the charge with a NEW reference then; poll again with the same one.
+     */
+    async waitForCharge(uid, reference, options = {}) {
+        var _a, _b, _c, _d;
+        validateWaitOptions(options);
+        const ref = requireReference(reference);
+        const attempts = (_a = options.attempts) !== null && _a !== void 0 ? _a : 12;
+        const maxDelay = (_b = options.maxDelayMs) !== null && _b !== void 0 ? _b : 8000;
+        const sleep = (_c = options.sleep) !== null && _c !== void 0 ? _c : defaultSleep;
+        let delay = (_d = options.initialDelayMs) !== null && _d !== void 0 ? _d : 500;
+        let last;
+        for (let attempt = 1; attempt <= attempts; attempt += 1) {
+            try {
+                const { result } = await this.chargeStatus(uid, ref);
+                last = result;
+                if (result && RESOLVED_STATUSES.includes(result.status))
+                    return result;
+            }
+            catch (error) {
+                if (!isTransientError(error))
+                    throw error;
+            }
+            if (attempt < attempts) {
+                await sleep(delay);
+                delay = Math.min(delay * 2, maxDelay);
+            }
+        }
+        throw new SavedCardChargePendingError(ref, last, attempts);
+    }
+    /**
+     * Record usage for a usage-based subscription (INK-781, INK-803). `mode` decides how `metric_count`
+     * (default 1) combines with the metric's total for the current billing period: `increment` (default)
+     * adds it, `set` replaces it, `max` keeps the higher value. Returns the new total.
+     * Usage settings are set on the plan's `data` and copied to each subscription.
+     * At renewal Inkress bills each metric in the subscription's `data.usage_metrics`
+     * (`{ metric, rate, allotment? }`): units above `allotment` times `rate`, added to the plan price
+     * when `data.apply_usage_charge_to_flat_rate` is true.
      * Requires Client-Id header to be set in the configuration
      */
     async usage(uid, data) {
-        return this.client.post(`/billing_subscriptions/${uid}/usage`, data);
+        return this.client.post(`/billing_subscriptions/usage/${uid}`, data);
     }
     /**
      * Get subscription billing periods
@@ -3374,12 +4014,54 @@ class SubscriptionsResource {
     async getPeriods(uid, params) {
         return this.client.get(`/billing_subscriptions/${uid}/periods`, params);
     }
+    async changePlan(uid, data) {
+        return this.client.post(`/billing_subscriptions/${uid}/plan-change`, data);
+    }
+    /**
+     * Upgrade to a more expensive plan now (INK-804): charges the pro-rated difference to the linked
+     * card and answers with the charge reference. The plan switches once that charge is paid; poll with
+     * `waitForCharge(uid, reference)`. Refusals carry a `PlanChangeErrorCode` or `ImmediateUpgradeErrorCode`.
+     */
+    async upgradeNow(uid, planUid) {
+        return this.changePlan(uid, { plan_uid: planUid, effective: 'now' });
+    }
+    /**
+     * Set how many days this subscription keeps access after its unpaid period end once renewal
+     * retries are exhausted (0–90), or `null` to use the plan's `grace_days` (INK-801).
+     */
+    async setGrace(uid, graceDays) {
+        return this.client.post(`/billing_subscriptions/${uid}/grace`, { grace_days: graceDays });
+    }
+    /**
+     * Pause collection (INK-802): the subscription is not charged until resumed, automatically at
+     * `resume_at` when given. Refusals carry a `SubscriptionPauseErrorCode`.
+     */
+    async pause(uid, data = {}) {
+        return this.client.post(`/billing_subscriptions/${uid}/pause`, data);
+    }
+    /** Resume a paused subscription (INK-802). */
+    async resume(uid) {
+        return this.client.post(`/billing_subscriptions/${uid}/resume`);
+    }
+    /** Cancel a pending plan change (404 `no_pending_plan_change` when none is pending). */
+    async cancelPlanChange(uid) {
+        return this.client.delete(`/billing_subscriptions/${uid}/plan-change`);
+    }
     /**
      * Cancel a subscription
      * Requires Client-Id header to be set in the configuration
      */
     async cancel(uid, code) {
         return this.client.post(`/billing_subscriptions/${uid}/cancel/${code}`);
+    }
+    /**
+     * Cancel a subscription as the plan owner (INK-1306), now or at the end of its period. `now`
+     * emails the subscriber and sends `subscription.cancelled`. Needs a credential bound to the
+     * plan-owning merchant (merchant_admin / organisation_admin); bot keys are refused. Refusals carry
+     * an `OwnerCancelErrorCode`. For the subscriber's own cancel link, use `cancel(uid, code)`.
+     */
+    async cancelAsOwner(uid, data = {}) {
+        return this.client.post(`/billing_subscriptions/${uid}/cancel`, data);
     }
     /**
      * Query subscriptions with enhanced query support
@@ -4211,6 +4893,22 @@ class WebhookUrlsResource {
     async delete(id) {
         return this.client.delete(`/webhook_urls/${id}`);
     }
+    /** The events a test can send, with the sources each takes and the statuses a sample can have (INK-1118). */
+    async testEvents() {
+        return this.client.get('/webhook_urls/test-events');
+    }
+    /** The exact request a test would make to this endpoint, without sending it (INK-1118). */
+    async previewTest(id, data) {
+        return this.client.post(`/webhook_urls/${id}/test/preview`, data);
+    }
+    /**
+     * Send a test event to this endpoint now (INK-1118). It is built and signed like a live event,
+     * carries `X-Inkress-Webhook-Test: true` and an event id no live event can have. Waits up to 10 s
+     * and returns the delivery (`is_test: true`). Tests and replays share 10 per endpoint per minute.
+     */
+    async sendTest(id, data) {
+        return this.client.post(`/webhook_urls/${id}/test`, data);
+    }
     /**
      * Advanced query interface with full type safety
      *
@@ -4345,6 +5043,28 @@ class WebhookUrlsResource {
         return payload;
     }
     /**
+     * Verify and parse an `app.disconnected` delivery (INK-1522), sent to your app's URLs for a
+     * business just before its access ends. `secret` is your app's `whsec_` signing secret.
+     * `verifyRequest` doesn't fit this event: its body has no `timestamp` or `event`.
+     */
+    async verifyAppDisconnected(request, secret) {
+        const signature = request.headers['x-inkress-webhook-signature'] || request.headers['X-Inkress-Webhook-Signature'];
+        if (!signature || typeof signature !== 'string') {
+            throw new Error('Missing X-Inkress-Webhook-Signature header');
+        }
+        if (typeof request.body !== 'string') {
+            throw new Error('Pass the raw request body as a string: the signature covers the exact bytes received');
+        }
+        if (!this.verifySignature(request.body, signature, secret)) {
+            throw new Error('Webhook signature verification failed: signature does not match');
+        }
+        const parsed = JSON.parse(request.body);
+        if (!isAppDisconnectedWebhook(parsed)) {
+            throw new Error('Not an app.disconnected webhook');
+        }
+        return parsed;
+    }
+    /**
      * Verify webhook signature only (without parsing)
      * Useful for custom verification flows
      *
@@ -4390,6 +5110,18 @@ class WebhookUrlsResource {
     extractEventData(payload) {
         return payload.event.data;
     }
+}
+function isAppDisconnectedWebhook(value) {
+    if (!value || typeof value !== 'object')
+        return false;
+    const v = value;
+    const data = v.data;
+    return (v.type === 'app.disconnected' &&
+        typeof v.id === 'string' &&
+        !!data &&
+        typeof data.reason === 'string' &&
+        typeof data.merchant === 'object' &&
+        typeof data.app === 'object');
 }
 
 /**
@@ -4564,6 +5296,95 @@ class AddressesResource {
      */
     createQueryBuilder() {
         return new AddressQueryBuilder(this);
+    }
+}
+
+class BookingsResource {
+    constructor(client) {
+        this.client = client;
+    }
+    async list(params) {
+        return this.client.get('/bookings', params);
+    }
+    async get(id) {
+        return this.client.get(`/bookings/${id}`);
+    }
+    async create(data) {
+        return this.client.post('/bookings', data);
+    }
+    async update(id, data) {
+        return this.client.put(`/bookings/${id}`, data);
+    }
+    /** The booking carrying your `reference_id`, or null — use it to recover after a retried create. */
+    async findByReference(referenceId) {
+        var _a, _b, _c;
+        const response = await this.list({ reference_id: referenceId, limit: 1 });
+        return (_c = (_b = (_a = response.result) === null || _a === void 0 ? void 0 : _a.entries) === null || _b === void 0 ? void 0 : _b[0]) !== null && _c !== void 0 ? _c : null;
+    }
+}
+
+/**
+ * "May this customer use my product right now, and with which features?" (INK-805).
+ * Needs the merchant's secret key (`sk_live_` / `sk_test_`) as `accessToken`.
+ */
+class AccessResource {
+    constructor(client) {
+        this.client = client;
+    }
+    /** Access for a customer by uid. An unknown customer reads as `access: 'none'`. */
+    async get(customerUid, options = {}) {
+        return this.fetch(`/api/v1/access/${encodeURIComponent(customerUid)}`, options);
+    }
+    /** Access for a customer by email. */
+    async getByEmail(email, options = {}) {
+        return this.fetch(`/api/v1/access`, options, { email });
+    }
+    async fetch(path, options, query = {}) {
+        var _a;
+        const params = new URLSearchParams(query);
+        if (options.targetingKey)
+            params.set('targeting_key', options.targetingKey);
+        const qs = params.toString();
+        const { status, body } = await this.client.raw('GET', qs ? `${path}?${qs}` : path);
+        if (status === 200 && body && 'allowed' in body)
+            return body;
+        const reason = (_a = body === null || body === void 0 ? void 0 : body.result) === null || _a === void 0 ? void 0 : _a.reason;
+        throw new InkressApiError(reason || `HTTP ${status}`, status, body);
+    }
+}
+
+/**
+ * Feature flag evaluation over OFREP v1 (INK-805). Needs the merchant's secret key as `accessToken`.
+ * Any OpenFeature OFREP provider can be used instead, pointed at the same origin.
+ */
+class FlagsResource {
+    constructor(client) {
+        this.client = client;
+    }
+    /**
+     * Evaluate one flag. Evaluation failures (unknown flag, bad context) come back as `errorCode`, not
+     * as exceptions; auth (401) and rate limits (429) throw `InkressApiError`.
+     */
+    async evaluate(key, context = {}) {
+        const { status, body } = await this.client.raw('POST', `/api/ofrep/v1/evaluate/flags/${encodeURIComponent(key)}`, { body: { context } });
+        if ((status === 200 || status === 400 || status === 404) && body)
+            return body;
+        throw new InkressApiError(`Flag evaluation failed: HTTP ${status}`, status, body);
+    }
+    /** Evaluate every flag for a context. */
+    async evaluateAll(context = {}, options = {}) {
+        const { status, headers, body } = await this.client.raw('POST', '/api/ofrep/v1/evaluate/flags', { body: { context }, headers: options.etag ? { 'If-None-Match': options.etag } : {} });
+        const etag = headers.get('etag');
+        if (status === 304)
+            return { notModified: true, flags: [], etag: etag || options.etag || null };
+        if (status === 200 && (body === null || body === void 0 ? void 0 : body.flags))
+            return { notModified: false, flags: body.flags, etag };
+        throw new InkressApiError(`Flag evaluation failed: HTTP ${status}`, status, body);
+    }
+    /** Convenience: a flag's boolean value, or `defaultValue` when it cannot be evaluated. */
+    async isEnabled(key, context = {}, defaultValue = false) {
+        const result = await this.evaluate(key, context);
+        return typeof result.value === 'boolean' ? result.value : defaultValue;
     }
 }
 
@@ -5035,6 +5856,82 @@ class CheckoutSessionsResource {
     }
 }
 
+class WebhookDeliveriesResource {
+    constructor(client) {
+        this.client = client;
+    }
+    /** Deliveries to the endpoints you can see, newest first. */
+    async list(params) {
+        return this.client.get('/webhook_deliveries', params);
+    }
+    async get(id) {
+        return this.client.get(`/webhook_deliveries/${id}`);
+    }
+    /**
+     * Send a delivery again: the stored body, to the endpoint's current URL, signed with its current
+     * secret, with `X-Inkress-Webhook-Replay` naming the original. The event id is unchanged, so your
+     * deduplication treats it as the same event. Waits up to 10 s and returns the new delivery
+     * (`replay_of_id` = the original). Tests and replays share 10 per endpoint per minute.
+     */
+    async replay(id) {
+        return this.client.post(`/webhook_deliveries/${id}/replay`);
+    }
+}
+
+const BASE = '/merchants/partner-activation';
+class PartnerActivationResource {
+    constructor(client) {
+        this.client = client;
+    }
+    /** Set up or link a business. Idempotent: repeat until `state` is `active`. */
+    async activate(data) {
+        return this.client.post(BASE, data);
+    }
+    /** The business linked under `reference`, and whether its contact details are confirmed. */
+    async status(reference) {
+        return this.client.get(`${BASE}/${encodeURIComponent(reference)}`);
+    }
+    /** A single-use, 60-second link that signs the business into Inkress's verification page. */
+    async verifyLink(reference) {
+        return this.client.post(`${BASE}/verify-link`, { reference });
+    }
+    /** A 60-second link that signs the owner into the dashboard's Payouts page. */
+    async dashboardLink(reference, to = 'payouts') {
+        return this.client.post(`${BASE}/dashboard-link`, { reference, to });
+    }
+    /**
+     * Unlink the business under `reference` (INK-1512): your apps' access to it ends (each is sent
+     * `app.disconnected`), your API key for it is turned off, and the `orders.paid` URL is removed.
+     * The business keeps its own keys and verification. Nothing linked is still `disconnected`.
+     */
+    async disconnect(data) {
+        return this.client.post(`${BASE}/disconnect`, data);
+    }
+    /**
+     * Link the business a person chose through Connect with Inkress (INK-1512). Finishes like
+     * `activate`. `409 reference_in_use` while another business is linked: disconnect it first.
+     */
+    async connect(data) {
+        return this.client.post(`${BASE}/connect`, data);
+    }
+    /**
+     * The keys of the business linked under `reference`, issuing `api_secret_key` for a business
+     * activated before INK-1532. `409 revoked_by_business` once the owner removed you; they must
+     * connect again.
+     */
+    async keys(reference) {
+        return this.client.post(`${BASE}/keys`, { reference });
+    }
+}
+
+/**
+ * Types for the merchant's own order moves (INK-1079, INK-1307) and custom order lines (INK-1513).
+ * Each move answers 200 with an `OrderMoveResult`; a refusal is an `InkressApiError` whose
+ * `result.result.code` is an `OrderMoveErrorCode`.
+ */
+/** `code` on any write for a closed (archived, resigned or rejected) business: 403 (INK-1518). */
+const BUSINESS_CLOSED_CODE = 'business_closed';
+
 /**
  * Main Inkress Commerce API SDK class
  *
@@ -5088,6 +5985,7 @@ class InkressSDK {
         this.products = new ProductsResource(this.client);
         this.billingPlans = new BillingPlansResource(this.client);
         this.subscriptions = new SubscriptionsResource(this.client);
+        this.savedCards = new SavedCardsResource(this.client);
         this.users = new UsersResource(this.client);
         this.public = new PublicResource(this.client);
         this.kyc = new KycResource(this.client);
@@ -5097,6 +5995,9 @@ class InkressSDK {
         this.webhookUrls = new WebhookUrlsResource(this.client);
         this.tokens = new TokensResource(this.client);
         this.addresses = new AddressesResource(this.client);
+        this.bookings = new BookingsResource(this.client);
+        this.access = new AccessResource(this.client);
+        this.flags = new FlagsResource(this.client);
         this.currencies = new CurrenciesResource(this.client);
         this.exchangeRates = new ExchangeRatesResource(this.client);
         this.fees = new FeesResource(this.client);
@@ -5104,6 +6005,8 @@ class InkressSDK {
         this.transactionEntries = new TransactionEntriesResource(this.client);
         this.generics = new GenericsResource(this.client);
         this.checkoutSessions = new CheckoutSessionsResource(this.client);
+        this.webhookDeliveries = new WebhookDeliveriesResource(this.client);
+        this.partnerActivation = new PartnerActivationResource(this.client);
     }
     /**
      * Update the SDK configuration
@@ -5119,5 +6022,5 @@ class InkressSDK {
     }
 }
 
-export { ADDRESS_FIELD_TYPES, AddressQueryBuilder, BILLING_PLAN_FIELD_TYPES, BillingPlanQueryBuilder, CATEGORY_FIELD_TYPES, CURRENCY_FIELD_TYPES, CategoryQueryBuilder, CurrencyQueryBuilder, EXCHANGE_RATE_FIELD_TYPES, ExchangeRateQueryBuilder, FEE_FIELD_TYPES, FINANCIAL_ACCOUNT_FIELD_TYPES, FINANCIAL_REQUEST_FIELD_TYPES, FeeQueryBuilder, FinancialAccountQueryBuilder, FinancialRequestQueryBuilder, HttpClient, InkressApiError, InkressSDK, KYC_DOCUMENT_REQUIREMENTS, MERCHANT_FIELD_TYPES, MerchantQueryBuilder, ORDER_FIELD_TYPES, OrderQueryBuilder, PAYMENT_LINK_FIELD_TYPES, PAYMENT_METHOD_FIELD_TYPES, PRODUCT_FIELD_TYPES, PaymentLinkQueryBuilder, PaymentMethodQueryBuilder, ProductQueryBuilder, QueryBuilder, SUBSCRIPTION_FIELD_TYPES, SubscriptionQueryBuilder, TOKEN_FIELD_TYPES, TRANSACTION_ENTRY_FIELD_TYPES, TokenQueryBuilder, TransactionEntryQueryBuilder, USER_FIELD_TYPES, UserQueryBuilder, WEBHOOK_URL_FIELD_TYPES, WebhookUrlQueryBuilder, InkressSDK as default, processQuery };
+export { ADDRESS_FIELD_TYPES, AddressQueryBuilder, BILLING_PLAN_FIELD_TYPES, BUSINESS_CLOSED_CODE, BillingPlanQueryBuilder, CATEGORY_FIELD_TYPES, CURRENCY_FIELD_TYPES, CategoryQueryBuilder, CurrencyQueryBuilder, EXCHANGE_RATE_FIELD_TYPES, ExchangeRateQueryBuilder, FEE_FIELD_TYPES, FINANCIAL_ACCOUNT_FIELD_TYPES, FINANCIAL_REQUEST_FIELD_TYPES, FeeQueryBuilder, FinancialAccountQueryBuilder, FinancialRequestQueryBuilder, HttpClient, InkressApiError, InkressSDK, KYC_DOCUMENT_REQUIREMENTS, MERCHANT_FIELD_TYPES, MerchantQueryBuilder, ORDER_FIELD_TYPES, OrderQueryBuilder, OrderRefundPendingError, PAYMENT_LINK_FIELD_TYPES, PAYMENT_METHOD_FIELD_TYPES, PRODUCT_FIELD_TYPES, PaymentLinkQueryBuilder, PaymentMethodQueryBuilder, ProductQueryBuilder, QueryBuilder, SUBSCRIPTION_FIELD_TYPES, SavedCardAlreadyRemovedError, SavedCardChargeInProgressError, SavedCardChargePendingError, SavedCardChargeRefusedError, SubscriptionQueryBuilder, TOKEN_FIELD_TYPES, TRANSACTION_ENTRY_FIELD_TYPES, TokenQueryBuilder, TransactionEntryQueryBuilder, USER_FIELD_TYPES, UserQueryBuilder, WEBHOOK_URL_FIELD_TYPES, WebhookUrlQueryBuilder, InkressSDK as default, isSubscriptionChargeQueued, processQuery };
 //# sourceMappingURL=index.esm.js.map

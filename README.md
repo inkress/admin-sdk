@@ -214,8 +214,8 @@ The SDK provides access to 23+ fully-typed resources:
 - **Merchants** - Merchant management and account operations
 - **Products** - Product catalog with full CRUD
 - **Categories** - Product categorization  
-- **Orders** - Order processing and tracking, plus refunds of card-on-file and subscription orders
-- **Bookings** - Bookings whose orders (deposit, balance, …) are payments towards them
+- **Orders** - Order processing and tracking, refunds of card-on-file and subscription orders, custom lines, and the merchant's own moves (record a payment, fulfil, decline a transfer, cancel)
+- **Bookings** - Bookings whose orders (deposit, balance, …) are payments towards them, priced from catalogue products
 - **Users** - User and account management
 
 ### Billing & Subscriptions
@@ -236,7 +236,9 @@ The SDK provides access to 23+ fully-typed resources:
 ### Identity & Access
 - **Addresses** - Address management
 - **Tokens** - API token management
-- **Webhook URLs** - Webhook configuration
+- **Webhook URLs** - Webhook configuration, test events and `app.disconnected` verification
+- **Webhook Deliveries** - The last 30 days of deliveries, and replays
+- **Partner Activation** - Partner platforms set up, link, disconnect and connect their businesses
 - **KYC** - Know Your Customer verification and compliance
 - **Access** - "May this customer use my product?" from their subscription standing
 - **Flags** - Feature flag evaluation (OpenFeature OFREP)
@@ -335,6 +337,10 @@ const merchants = await inkress.merchants
   .search('electronics')
   .execute();
 ```
+
+Businesses merged into this one (INK-1521): `await inkress.merchants.mergedBusinesses()` returns
+`[{ id, name }]`. Pass `merged_history: 'include'` (or `'only'`) on list reads to add their records,
+each tagged with `merged_from`.
 
 ### Products Resource
 
@@ -563,6 +569,78 @@ const existing = await inkress.bookings.findByReference('bookerva:bk_123'); // B
 
 // Take the balance on a saved card, tagged to the booking
 await inkress.savedCards.charge(cardId, { amount: 9000, currency: 'JMD', idempotency_key: 'bk_123-balance', booking_id: booking.id });
+
+// Book catalogue products (INK-1483): Inkress prices each line, and the lines set total and currency_code
+await inkress.bookings.create({
+  start_time: '2026-11-02T14:00:00Z',
+  end_time: '2026-11-02T15:00:00Z',
+  items: [{ product_id: 2944, quantity: 1, options: { Length: 'Long' } }]
+});
+await inkress.bookings.update(booking.id, { items: [] }); // removes the products, keeps the price
+```
+
+### Order moves and custom lines
+
+```typescript
+// Lines that aren't catalogue products (INK-1513). Secret key (sk_) from your server only.
+await inkress.orders.create({
+  reference_id: 'pkg-1001', kind: 'online', total: 1650.5, currency_code: 'JMD',
+  customer: { email: 'shopper@example.com', first_name: 'Ana', last_name: 'Brown' },
+  items: [{ title: 'Freight', unit_price: 1200 }, { title: 'Customs', unit_price: 450.5 }]
+});
+
+// The merchant's own moves (INK-1079, INK-1307). orderRef is the id, reference_id or uid.
+await inkress.orders.recordPayment('pkg-1001', { tender_type: 'bank_transfer', reference: 'TT-77' });
+await inkress.orders.fulfil('pkg-1001', { status: 'shipped' });
+await inkress.orders.declinePayment('pkg-1002', { note: 'Transfer never arrived' });
+await inkress.orders.cancel('pkg-1003', { reason: 'Customer changed their mind' }); // unpaid orders only
+```
+
+A payment refused by a transaction limit carries a `TransactionLimitCode` in `code`
+(`transaction_limit_single`, `transaction_limit_daily`, `transaction_limit_monthly`). Any write for
+a closed business is a 403 with `code: 'business_closed'` (`BUSINESS_CLOSED_CODE`).
+
+### Webhook deliveries, tests and replays (INK-1118)
+
+```typescript
+const { result: events } = await inkress.webhookUrls.testEvents();
+const { result: preview } = await inkress.webhookUrls.previewTest(webhookUrlId, { event: 'orders.paid' });
+await inkress.webhookUrls.sendTest(webhookUrlId, { event: 'orders.paid', source: 'order', subject_id: 4512 });
+
+const { result: page } = await inkress.webhookDeliveries.list({ webhook_url_id: webhookUrlId, state: 'failed' });
+await inkress.webhookDeliveries.replay(page.entries[0].id); // same event id, current URL and secret
+```
+
+### When an app's access ends: `app.disconnected` (INK-1522)
+
+```typescript
+// Express: keep the raw body, the signature covers the exact bytes
+app.post('/inkress/app-events', express.text({ type: '*/*' }), async (req, res) => {
+  const event = await inkress.webhookUrls.verifyAppDisconnected(
+    { headers: req.headers, body: req.body },
+    process.env.INKRESS_APP_WHSEC
+  );
+  // event.data.reason: revoked_by_business | partner_disconnected | business_merged | business_archived | other
+  await forgetBusiness(event.data.merchant.id);
+  res.sendStatus(200);
+});
+```
+
+### Partner activation (INK-760, INK-1512, INK-1532)
+
+For partner platforms, with the partner organisation's credential and no business selected.
+
+```typescript
+const { result } = await inkress.partnerActivation.activate({
+  reference: 'courier-13',
+  merchant: { name: 'Island Couriers', email: 'owner@islandcouriers.example' },
+  owner: { email: 'owner@islandcouriers.example', first_name: 'Ana' },
+  webhook_url: 'https://partner.example/inkress/paid'
+}); // repeat until result.state === 'active'; result.keys.api_secret_key is the business's sk_ key for you
+
+await inkress.partnerActivation.disconnect({ reference: 'courier-13' });
+await inkress.partnerActivation.connect({ reference: 'courier-13', access_token: 'inka_…' }); // after Connect with Inkress
+await inkress.partnerActivation.keys('courier-13'); // issues api_secret_key for businesses activated earlier
 ```
 
 ### Users Resource
@@ -666,6 +744,9 @@ const plans = await inkress.billingPlans
 ```
 
 ### Subscriptions Resource
+
+The plan owner cancels with `cancelAsOwner(uid, { at: 'now' | 'period_end' })` (INK-1306); the
+subscriber's own link uses `cancel(uid, code)`.
 
 Subscription management with proper typing for all methods:
 
@@ -1137,6 +1218,9 @@ await inkress.tokens.create({
 // Delete token
 await inkress.tokens.delete(tokenId);
 ```
+
+A key's value (`public_key`) comes back only from `create`. Reads show `key_hint` (for example
+`sk_live_…AbCd`) and `last_used_at` (INK-1534).
 
 ### Addresses
 

@@ -67,6 +67,19 @@ export interface LegacyMerchantFilterParams {
   // Legacy interface - kept for backward compatibility
 }
 
+/** A business merged into this one (INK-1521). */
+export interface MergedBusiness {
+  id: number;
+  name: string | null;
+}
+
+/**
+ * How list reads treat records of businesses merged into this one: pass it as `merged_history`.
+ * `exclude` (the default) leaves them out, `include` adds them, `only` returns just them. Each
+ * merged row carries `merged_from: {id, name}`.
+ */
+export type MergedHistoryMode = 'exclude' | 'include' | 'only';
+
 export class MerchantsResource {
   constructor(private client: HttpClient) {}
 
@@ -279,6 +292,14 @@ export class MerchantsResource {
    */
   async contribution(params?: { currency_code?: string }): Promise<ApiResponse<AppContributionResponse>> {
     return this.client.post<AppContributionResponse>('/merchants/account/contribution', params || {});
+  }
+
+  /**
+   * The businesses merged into the acting business (directly or through a chain), oldest merge
+   * first; `[]` when none (INK-1521). Needs a business selected (`Client-Id`).
+   */
+  async mergedBusinesses(): Promise<ApiResponse<MergedBusiness[]>> {
+    return this.client.get<MergedBusiness[]>('/merged-businesses');
   }
 
   /**

@@ -7,6 +7,13 @@ import {
   type OrderRefund,
   type WaitForRefundOptions,
 } from './order-refunds';
+import type {
+  CancelOrderData,
+  DeclineOrderPaymentData,
+  FulfilOrderData,
+  OrderMoveResult,
+  RecordOrderPaymentData,
+} from './order-status';
 import {
   Order,
   ApiResponse,
@@ -328,5 +335,32 @@ export class OrdersResource {
       }
     }
     throw new OrderRefundPendingError(idempotencyKey, last, attempts);
+  }
+
+  /**
+   * Record a payment made outside Inkress (cash, bank transfer, other) on one of your orders
+   * (INK-1079). Pending, failed, partly paid, verifying or stale orders only; subscription orders are
+   * refused and a paid order is a 409. No fee, ledger entry or wallet credit is booked.
+   */
+  async recordPayment(orderRef: string | number, data: RecordOrderPaymentData): Promise<ApiResponse<OrderMoveResult>> {
+    return this.client.post<OrderMoveResult>(`/orders/${encodeURIComponent(String(orderRef))}/payment`, data);
+  }
+
+  /** Move a paid order forward through fulfilment (INK-1079, INK-1307). */
+  async fulfil(orderRef: string | number, data: FulfilOrderData): Promise<ApiResponse<OrderMoveResult>> {
+    return this.client.post<OrderMoveResult>(`/orders/${encodeURIComponent(String(orderRef))}/fulfilment`, data);
+  }
+
+  /** A bank transfer the order was waiting for didn't arrive: the order fails (INK-1307). */
+  async declinePayment(orderRef: string | number, data: DeclineOrderPaymentData = {}): Promise<ApiResponse<OrderMoveResult>> {
+    return this.client.post<OrderMoveResult>(`/orders/${encodeURIComponent(String(orderRef))}/payment/decline`, data);
+  }
+
+  /**
+   * Cancel an unpaid (pending, failed or stale) order; its open payment links close and
+   * `orders.cancelled` is sent (INK-1307). Refund a paid order instead.
+   */
+  async cancel(orderRef: string | number, data: CancelOrderData = {}): Promise<ApiResponse<OrderMoveResult>> {
+    return this.client.post<OrderMoveResult>(`/orders/${encodeURIComponent(String(orderRef))}/cancel`, data);
   }
 }

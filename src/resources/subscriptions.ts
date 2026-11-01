@@ -294,6 +294,24 @@ export interface SubscriptionPeriodsResponse {
   };
 }
 
+/** When a plan owner's cancel takes effect (INK-1306). */
+export type OwnerCancelTiming = 'now' | 'period_end';
+
+export interface OwnerCancelSubscriptionData {
+  /** Defaults to `now`. */
+  at?: OwnerCancelTiming;
+}
+
+export interface OwnerCancelSubscriptionResponse {
+  subscription_uid: string;
+  /** `cancelled` now, or `canceling` until the period ends. */
+  status: 'cancelled' | 'canceling';
+  canceled_at: string | null;
+  ends_at: string | null;
+}
+
+export type OwnerCancelErrorCode = 'not_found' | 'already_cancelled' | 'invalid_timing' | 'cancel_failed';
+
 export class SubscriptionsResource {
   constructor(private client: HttpClient) {}
 
@@ -622,6 +640,16 @@ export class SubscriptionsResource {
    */
   async cancel(uid: number, code: string): Promise<ApiResponse<SubscriptionCancelResponse>> {
     return this.client.post<SubscriptionCancelResponse>(`/billing_subscriptions/${uid}/cancel/${code}`);
+  }
+
+  /**
+   * Cancel a subscription as the plan owner (INK-1306), now or at the end of its period. `now`
+   * emails the subscriber and sends `subscription.cancelled`. Needs a credential bound to the
+   * plan-owning merchant (merchant_admin / organisation_admin); bot keys are refused. Refusals carry
+   * an `OwnerCancelErrorCode`. For the subscriber's own cancel link, use `cancel(uid, code)`.
+   */
+  async cancelAsOwner(uid: string, data: OwnerCancelSubscriptionData = {}): Promise<ApiResponse<OwnerCancelSubscriptionResponse>> {
+    return this.client.post<OwnerCancelSubscriptionResponse>(`/billing_subscriptions/${uid}/cancel`, data);
   }
 
   /**

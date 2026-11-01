@@ -5,7 +5,45 @@ All notable changes to the Inkress Admin SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.3.0] - 2026-11-01
+
+Brings the SDK up to the commerce-api production surface of October 2026 (INK-1548).
+
+### ✨ Added
+
+- **Webhook delivery log, test events and replays (INK-1118).** `webhookDeliveries.list / get /
+  replay` and `webhookUrls.testEvents / previewTest / sendTest`. Deliveries are kept 30 days; tests
+  and replays share 10 per endpoint per minute. Types `WebhookDelivery`, `WebhookTestData`, and the
+  refusal codes as `WebhookDeliveryErrorCode`.
+- **`webhookUrls.verifyAppDisconnected(request, whsec)` (INK-1522).** Verifies and parses the
+  `app.disconnected` webhook an OAuth app receives when its access to a business ends (revoked,
+  partner disconnect, merge, archive). Types `AppDisconnectedWebhook`, `AppDisconnectedData`,
+  `AppDisconnectedReason`. `verifyRequest` can't parse this event: it has no `timestamp`/`event`.
+- **`partnerActivation` (INK-760, INK-1512, INK-1532).** `activate`, `status`, `verifyLink`,
+  `dashboardLink`, `disconnect`, `connect` (Connect with Inkress) and `keys`, for partner platforms
+  with an organisation credential. `PartnerKeys.api_secret_key` is the business's `sk_` key issued
+  to the partner.
+- **Order moves (INK-1079, INK-1307).** `orders.recordPayment`, `orders.fulfil`,
+  `orders.declinePayment`, `orders.cancel`, with `OrderMoveResult` and `OrderMoveErrorCode`.
+- **Custom order lines (INK-1513).** `CreateOrderData.items: CustomOrderItem[]` for charges that
+  aren't catalogue products. Secret key (`sk_`) only.
+- **Bookings with products (INK-1483).** `CreateBookingData.items: BookingItemInput[]`; reads carry
+  the priced `Booking.items`.
+- **`subscriptions.cancelAsOwner(uid, { at: 'now' | 'period_end' })` (INK-1306).** The plan owner's
+  cancel. The subscriber's own `cancel(uid, code)` is unchanged.
+- **`merchants.mergedBusinesses()` (INK-1521)** and `MergedHistoryMode` for the `merged_history`
+  list parameter.
+- `TransactionLimitCode` (INK-1526) and `BUSINESS_CLOSED_CODE` (INK-1518) for refusal codes.
+
+### 🔄 Changed
+
+- **`Token.public_key` is optional (INK-1534).** The API returns a key's value only when it is
+  created; reads carry `key_hint` and `last_used_at` instead. Code that read `public_key` from a
+  listed key was getting `undefined`.
+
+## [1.2.0, continued] - published 2026-10-10
+
+These were listed as unreleased but shipped in the 1.2.0 published to npm on 2026-10-10.
 
 ### ✨ Added
 

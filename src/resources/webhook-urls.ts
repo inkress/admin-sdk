@@ -5,6 +5,7 @@ import {
   UpdateWebhookUrlData,
   ApiResponse,
   WebhookEvent,
+  AppDisconnectedWebhook,
 } from '../types';
 import { processQuery } from '../utils/query-transformer';
 import { WebhookUrlQueryBuilder } from '../utils/query-builders';
@@ -14,6 +15,7 @@ import {
   WebhookUrlListResponse,
   WEBHOOK_URL_FIELD_TYPES,
 } from '../types/resources';
+import { WebhookDelivery, WebhookTestData, WebhookTestEventsResponse, WebhookTestPreview } from './webhook-deliveries';
 
 // Node.js crypto and Buffer with proper typing
 declare const require: any;
@@ -79,6 +81,25 @@ export class WebhookUrlsResource {
    */
   async delete(id: number): Promise<ApiResponse<void>> {
     return this.client.delete<void>(`/webhook_urls/${id}`);
+  }
+
+  /** The events a test can send, with the sources each takes and the statuses a sample can have (INK-1118). */
+  async testEvents(): Promise<ApiResponse<WebhookTestEventsResponse>> {
+    return this.client.get<WebhookTestEventsResponse>('/webhook_urls/test-events');
+  }
+
+  /** The exact request a test would make to this endpoint, without sending it (INK-1118). */
+  async previewTest(id: number, data: WebhookTestData): Promise<ApiResponse<WebhookTestPreview>> {
+    return this.client.post<WebhookTestPreview>(`/webhook_urls/${id}/test/preview`, data);
+  }
+
+  /**
+   * Send a test event to this endpoint now (INK-1118). It is built and signed like a live event,
+   * carries `X-Inkress-Webhook-Test: true` and an event id no live event can have. Waits up to 10 s
+   * and returns the delivery (`is_test: true`). Tests and replays share 10 per endpoint per minute.
+   */
+  async sendTest(id: number, data: WebhookTestData): Promise<ApiResponse<WebhookDelivery>> {
+    return this.client.post<WebhookDelivery>(`/webhook_urls/${id}/test`, data);
   }
 
   /**
@@ -237,6 +258,29 @@ export class WebhookUrlsResource {
   }
 
   /**
+   * Verify and parse an `app.disconnected` delivery (INK-1522), sent to your app's URLs for a
+   * business just before its access ends. `secret` is your app's `whsec_` signing secret.
+   * `verifyRequest` doesn't fit this event: its body has no `timestamp` or `event`.
+   */
+  async verifyAppDisconnected(request: IncomingWebhookRequest, secret: string): Promise<AppDisconnectedWebhook> {
+    const signature = request.headers['x-inkress-webhook-signature'] || request.headers['X-Inkress-Webhook-Signature'];
+    if (!signature || typeof signature !== 'string') {
+      throw new Error('Missing X-Inkress-Webhook-Signature header');
+    }
+    if (typeof request.body !== 'string') {
+      throw new Error('Pass the raw request body as a string: the signature covers the exact bytes received');
+    }
+    if (!this.verifySignature(request.body, signature, secret)) {
+      throw new Error('Webhook signature verification failed: signature does not match');
+    }
+    const parsed: unknown = JSON.parse(request.body);
+    if (!isAppDisconnectedWebhook(parsed)) {
+      throw new Error('Not an app.disconnected webhook');
+    }
+    return parsed;
+  }
+
+  /**
    * Verify webhook signature only (without parsing)
    * Useful for custom verification flows
    * 
@@ -285,4 +329,18 @@ export class WebhookUrlsResource {
   extractEventData<T = any>(payload: WebhookPayload): T {
     return payload.event.data as T;
   }
+}
+
+function isAppDisconnectedWebhook(value: unknown): value is AppDisconnectedWebhook {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  const data = v.data as Record<string, unknown> | undefined;
+  return (
+    v.type === 'app.disconnected' &&
+    typeof v.id === 'string' &&
+    !!data &&
+    typeof data.reason === 'string' &&
+    typeof data.merchant === 'object' &&
+    typeof data.app === 'object'
+  );
 }

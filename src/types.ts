@@ -1,3 +1,4 @@
+import type { CustomOrderItem } from './resources/order-status';
 // filepath: /Users/romario/projects/inkress/admin-sdk/src/types.ts
 // Configuration and base types
 
@@ -711,6 +712,12 @@ export interface CreateOrderData {
 
   /** Tags the order as a payment towards one of your bookings (INK-792). Set only at creation. */
   booking_id?: number;
+
+  /**
+   * Lines that aren't catalogue products, e.g. freight or customs (INK-1513). Only with the
+   * business's secret key (`sk_`) from your server; anything else is a 422.
+   */
+  items?: CustomOrderItem[];
   
   /** Subscription fields (if kind = 'subscription' or OrderKind.SUBSCRIPTION) */
   plan_id?: string;
@@ -1067,7 +1074,12 @@ export interface UpdateWebhookUrlData {
 // Token types
 export interface Token {
   id: number;
-  public_key: string;
+  /** The key's value: only on the response to creating it (INK-1534). Reads never return it. */
+  public_key?: string;
+  /** A masked form for telling keys apart, e.g. `sk_live_…AbCd`. */
+  key_hint?: string;
+  /** When the key last authenticated a request (updated at most every 5 minutes). */
+  last_used_at?: string | null;
   title?: string;
   provider: string;
   kind: number;
@@ -1946,6 +1958,39 @@ export type MerchantEventType =
   | 'card_charge.paid'
   | 'card_charge.failed'
   | 'refund.completed';
+
+/** Why an app's access to a business ended (`app.disconnected`, INK-1522). */
+export type AppDisconnectedReason =
+  | 'revoked_by_business'
+  | 'partner_disconnected'
+  | 'business_merged'
+  | 'business_archived'
+  | 'other';
+
+/**
+ * `data` of `app.disconnected`, sent to every URL an OAuth app registered for a business just
+ * before its access ends and those URLs are removed. Register them again after a reconnect.
+ */
+export interface AppDisconnectedData {
+  merchant: { id: number; username: string | null };
+  app: { client_id: string };
+  reason: AppDisconnectedReason;
+  /** Set when `reason` is `business_merged`. */
+  merged_into?: { id: number; username: string | null };
+}
+
+/**
+ * Body of `app.disconnected`. Verify `X-Inkress-Webhook-Signature` (base64 HMAC-SHA256 of the raw
+ * body with your app's `whsec_`) with `webhookUrls.verifyAppDisconnected`. `jwt` is HS256 with the
+ * business's client secret (`kid` = its `client_id`). `id` equals `X-Inkress-Webhook-ID`.
+ */
+export interface AppDisconnectedWebhook {
+  id: string;
+  type: 'app.disconnected';
+  created_at: string;
+  data: AppDisconnectedData;
+  jwt: string;
+}
 
 /** Body of a signed merchant event. `id` equals the X-Inkress-Webhook-ID header. */
 export interface MerchantEventWebhook<D = Record<string, any>> {

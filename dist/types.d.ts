@@ -1,3 +1,4 @@
+import type { CustomOrderItem } from './resources/order-status';
 import type { FeeStructureKey, KindKey, StatusKey } from './utils/translators';
 /**
  * IMPORTANT: Types have been updated to match the database schema:
@@ -15,7 +16,7 @@ export type ProductStatus = 'draft' | 'published' | 'archived';
 export type ProductKind = 'draft' | 'published' | 'archived';
 export type AccountStatus = 'pending' | 'approved' | 'suspended' | 'rejected' | 'disabled';
 export type UserKind = 'address' | 'preset' | 'organisation' | 'store';
-export type SubscriptionStatus = 'pending' | 'active' | 'cancelled' | 'adhoc_charged';
+export type SubscriptionStatus = 'pending' | 'active' | 'cancelled' | 'adhoc_charged' | 'payment_failed' | 'paused';
 export type TransactionStatus = 'pending' | 'authorized' | 'hold' | 'captured' | 'voided' | 'refunded' | 'processed';
 export type BillingPlanKind = 'subscription' | 'payout';
 export type BillingStatus = 'active' | 'inactive';
@@ -423,6 +424,8 @@ export interface Order {
     payment_link_id?: number;
     billing_plan_id?: number;
     billing_subscription_id?: number;
+    /** Set when this order is a payment towards a booking (INK-792). */
+    booking_id?: number | null;
     meta_data?: Record<string, any>;
     session_id?: string;
     data?: Record<string, any>;
@@ -563,6 +566,13 @@ export interface CreateOrderData {
     method_id?: number;
     /** Source payment link ID (if creating from existing payment link) */
     payment_link_id?: string;
+    /** Tags the order as a payment towards one of your bookings (INK-792). Set only at creation. */
+    booking_id?: number;
+    /**
+     * Lines that aren't catalogue products, e.g. freight or customs (INK-1513). Only with the
+     * business's secret key (`sk_`) from your server; anything else is a 422.
+     */
+    items?: CustomOrderItem[];
     /** Subscription fields (if kind = 'subscription' or OrderKind.SUBSCRIPTION) */
     plan_id?: string;
     subscription_token?: string;
@@ -871,7 +881,12 @@ export interface UpdateWebhookUrlData {
 }
 export interface Token {
     id: number;
-    public_key: string;
+    /** The key's value: only on the response to creating it (INK-1534). Reads never return it. */
+    public_key?: string;
+    /** A masked form for telling keys apart, e.g. `sk_live_…AbCd`. */
+    key_hint?: string;
+    /** When the key last authenticated a request (updated at most every 5 minutes). */
+    last_used_at?: string | null;
     title?: string;
     provider: string;
     kind: number;
@@ -1010,6 +1025,12 @@ export interface BillingPlan {
     billing_cycle?: number;
     trial_period: number;
     charge_strategy: number;
+    /** Renewal attempts before a subscription becomes payment_failed (1–10, default 3). */
+    dunning_max_attempts: number;
+    /** Hours between failed renewal attempts (1–168, default 24). */
+    dunning_interval_hours: number;
+    /** Days a payment_failed subscription keeps access after its unpaid period end (0–90, default 0). */
+    grace_days: number;
     kind: BillingPlanKind;
     auto_charge: boolean;
     public: boolean;
@@ -1039,6 +1060,12 @@ export interface CreateBillingPlanData {
     billing_cycle?: number;
     trial_period?: number;
     charge_strategy?: number;
+    /** Renewal attempts before a subscription becomes payment_failed (1–10, default 3). */
+    dunning_max_attempts?: number;
+    /** Hours between failed renewal attempts (1–168, default 24). */
+    dunning_interval_hours?: number;
+    /** Days a payment_failed subscription keeps access after its unpaid period end (0–90, default 0). */
+    grace_days?: number;
     kind?: BillingPlanKind | KindKey | number;
     auto_charge?: boolean;
     public?: boolean;
@@ -1065,6 +1092,12 @@ export interface UpdateBillingPlanData {
     billing_cycle?: number;
     trial_period?: number;
     charge_strategy?: number;
+    /** Renewal attempts before a subscription becomes payment_failed (1–10, default 3). */
+    dunning_max_attempts?: number;
+    /** Hours between failed renewal attempts (1–168, default 24). */
+    dunning_interval_hours?: number;
+    /** Days a payment_failed subscription keeps access after its unpaid period end (0–90, default 0). */
+    grace_days?: number;
     kind?: BillingPlanKind | KindKey | number;
     auto_charge?: boolean;
     public?: boolean;
@@ -1089,6 +1122,11 @@ export interface Subscription {
     current_period_end?: string;
     trial_end?: string;
     canceled_at?: string;
+    /** Overrides the plan's grace_days when set (setGrace). */
+    grace_days?: number | null;
+    /** Set while paused (pause / resume). */
+    paused_at?: string | null;
+    resume_at?: string | null;
     uid: string;
     token?: string;
     billing_plan_id: number;
@@ -1129,12 +1167,49 @@ export interface SubscriptionPeriod {
     inserted_at: string;
     updated_at: string;
 }
+/** Usage to record against a subscription's current period (INK-781). */
+export interface SubscriptionUsageData {
+    /** Metric name, matching a `metric` in the subscription's `data.usage_metrics`. */
+    metric: string;
+    /** Units to record. Defaults to 1. With `increment`, a negative count takes units back. */
+    metric_count?: number;
+    /**
+     * How `metric_count` combines with the period's total (INK-803): `increment` adds it (default),
+     * `set` replaces it, `max` keeps the higher value (for seats billed at their peak).
+     */
+    mode?: SubscriptionUsageMode;
+}
+/** INK-803 usage modes. */
+export type SubscriptionUsageMode = 'increment' | 'set' | 'max';
 export interface SubscriptionUsageResponse {
-    id: number;
-    subscription_id: string;
-    usage_amount: number;
-    recorded_at: string;
-    description?: string;
+    subscription_uid: string;
+    metric: string;
+    /** End date (YYYY-MM-DD) of the billing period the usage was recorded against. */
+    period_ending: string;
+    /** The metric's total for that period after this call. */
+    total: number;
+}
+/**
+ * One entry of a usage-based plan's `data.usage_metrics` (INK-781), alongside
+ * `is_usage_based: true` and, to add usage to the plan price, `apply_usage_charge_to_flat_rate: true`.
+ * Subscriptions copy these from their plan when they're created and when they change plan.
+ */
+export interface SubscriptionUsageMetric {
+    id?: string;
+    metric: string;
+    /** Charge per unit above the allotment, in the plan's currency. */
+    rate: number;
+    /** Units included in the plan price; only units above it are charged. */
+    allotment?: number;
+    /**
+     * Volume tiers: the period's total picks the highest tier reached (`from`), and every billable
+     * unit is charged at that tier's rate, with its allotment when set.
+     */
+    tiers?: Array<{
+        from: number;
+        rate: number;
+        allotment?: number;
+    }>;
 }
 export interface SubscriptionCancelResponse {
     id: number;
@@ -1503,6 +1578,12 @@ export interface InternalBillingPlan {
     billing_cycle?: number;
     trial_period: number;
     charge_strategy: number;
+    /** Renewal attempts before a subscription becomes payment_failed (1–10, default 3). */
+    dunning_max_attempts: number;
+    /** Hours between failed renewal attempts (1–168, default 24). */
+    dunning_interval_hours: number;
+    /** Days a payment_failed subscription keeps access after its unpaid period end (0–90, default 0). */
+    grace_days: number;
     auto_charge: boolean;
     public: boolean;
     payout_period: number;
@@ -1526,6 +1607,11 @@ export interface InternalSubscription {
     current_period_end: string;
     trial_end?: string;
     canceled_at?: string;
+    /** Overrides the plan's grace_days when set (setGrace). */
+    grace_days?: number | null;
+    /** Set while paused (pause / resume). */
+    paused_at?: string | null;
+    resume_at?: string | null;
     start_date: string;
     end_date?: string;
     record: string;
@@ -1566,5 +1652,59 @@ export interface InternalPayoutRequest {
     uid: string;
     inserted_at: string;
     updated_at: string;
+}
+/** Wire names of the signed merchant events. Subscribe with the exact name or the family. */
+export type MerchantEventType = 'subscription.created' | 'subscription.trial_started' | 'subscription.activated' | 'subscription.trial_ending' | 'subscription.trial_ended' | 'subscription.renewed' | 'subscription.payment_succeeded' | 'subscription.payment_attempt_failed' | 'subscription.payment_failed' | 'subscription.grace_started' | 'subscription.grace_ended' | 'subscription.adhoc_charge' | 'subscription.plan_changed' | 'subscription.paused' | 'subscription.resumed' | 'subscription.cancelled' | 'card_charge.paid' | 'card_charge.failed' | 'refund.completed';
+/** Why an app's access to a business ended (`app.disconnected`, INK-1522). */
+export type AppDisconnectedReason = 'revoked_by_business' | 'partner_disconnected' | 'business_merged' | 'business_archived' | 'other';
+/**
+ * `data` of `app.disconnected`, sent to every URL an OAuth app registered for a business just
+ * before its access ends and those URLs are removed. Register them again after a reconnect.
+ */
+export interface AppDisconnectedData {
+    merchant: {
+        id: number;
+        username: string | null;
+    };
+    app: {
+        client_id: string;
+    };
+    reason: AppDisconnectedReason;
+    /** Set when `reason` is `business_merged`. */
+    merged_into?: {
+        id: number;
+        username: string | null;
+    };
+}
+/**
+ * Body of `app.disconnected`. Verify `X-Inkress-Webhook-Signature` (base64 HMAC-SHA256 of the raw
+ * body with your app's `whsec_`) with `webhookUrls.verifyAppDisconnected`. `jwt` is HS256 with the
+ * business's client secret (`kid` = its `client_id`). `id` equals `X-Inkress-Webhook-ID`.
+ */
+export interface AppDisconnectedWebhook {
+    id: string;
+    type: 'app.disconnected';
+    created_at: string;
+    data: AppDisconnectedData;
+    jwt: string;
+}
+/** Body of a signed merchant event. `id` equals the X-Inkress-Webhook-ID header. */
+export interface MerchantEventWebhook<D = Record<string, any>> {
+    id: string;
+    type: MerchantEventType;
+    event: MerchantEventType;
+    version: 1;
+    created_at: string;
+    timestamp: number;
+    facilitator: string;
+    merchant: {
+        id: number;
+        username: string | null;
+    };
+    /** Your reference: the subscription's reference_id, or the charge / refund idempotency key. */
+    reference_id: string | null;
+    data: D;
+    /** HS256 JWT over the body without `jwt`, signed with the merchant client secret. */
+    jwt: string;
 }
 //# sourceMappingURL=types.d.ts.map

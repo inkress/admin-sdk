@@ -33,6 +33,17 @@ export interface BankAccountUpdateConfirmResponse {
  */
 export interface LegacyMerchantFilterParams {
 }
+/** A business merged into this one (INK-1521). */
+export interface MergedBusiness {
+    id: number;
+    name: string | null;
+}
+/**
+ * How list reads treat records of businesses merged into this one: pass it as `merged_history`.
+ * `exclude` (the default) leaves them out, `include` adds them, `only` returns just them. Each
+ * merged row carries `merged_from: {id, name}`.
+ */
+export type MergedHistoryMode = 'exclude' | 'include' | 'only';
 export declare class MerchantsResource {
     private client;
     constructor(client: HttpClient);
@@ -111,6 +122,11 @@ export declare class MerchantsResource {
     contribution(params?: {
         currency_code?: string;
     }): Promise<ApiResponse<AppContributionResponse>>;
+    /**
+     * The businesses merged into the acting business (directly or through a chain), oldest merge
+     * first; `[]` when none (INK-1521). Needs a business selected (`Client-Id`).
+     */
+    mergedBusinesses(): Promise<ApiResponse<MergedBusiness[]>>;
     /**
      * Request for bank account update
      */

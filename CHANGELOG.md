@@ -35,6 +35,12 @@ Brings the SDK up to the commerce-api production surface of October 2026 (INK-15
   list parameter.
 - `TransactionLimitCode` (INK-1526) and `BUSINESS_CLOSED_CODE` (INK-1518) for refusal codes.
 
+### 🐛 Fixed
+
+- **`require('@inkress/admin-sdk')` works in Node.** The package is `"type": "module"`, so the
+  CommonJS build at `dist/index.js` was loaded as ESM and threw `exports is not defined`. It is now
+  `dist/index.cjs`, and `exports` lists `types` first.
+
 ### 🔄 Changed
 
 - **`Token.public_key` is optional (INK-1534).** The API returns a key's value only when it is

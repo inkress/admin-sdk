@@ -61,6 +61,8 @@ export interface WebhookDeliveryPagination {
   page_size: number;
   total_entries: number;
   total_pages: number;
+  /** True when another page follows. */
+  more: boolean;
 }
 
 export interface WebhookDeliveryListResponse {
@@ -101,7 +103,13 @@ export interface WebhookTestPreview {
   headers: Record<string, string>;
   body: string;
   payload: Record<string, unknown>;
-  [key: string]: unknown;
+  event: string;
+  event_id: string;
+  kind: WebhookDeliveryKind;
+  merchant_id: number;
+  subject_type: WebhookDeliverySubjectType | null;
+  subject_id: number | null;
+  webhook_url_id: number;
 }
 
 /** `code` values of a refused test send, replay or list. */

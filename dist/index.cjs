@@ -6076,4 +6076,4 @@ exports.WebhookUrlQueryBuilder = WebhookUrlQueryBuilder;
 exports.default = InkressSDK;
 exports.isSubscriptionChargeQueued = isSubscriptionChargeQueued;
 exports.processQuery = processQuery;
-//# sourceMappingURL=index.js.map
+//# sourceMappingURL=index.cjs.map

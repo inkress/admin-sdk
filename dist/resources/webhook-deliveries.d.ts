@@ -54,6 +54,8 @@ export interface WebhookDeliveryPagination {
     page_size: number;
     total_entries: number;
     total_pages: number;
+    /** True when another page follows. */
+    more: boolean;
 }
 export interface WebhookDeliveryListResponse {
     entries: WebhookDelivery[];
@@ -88,7 +90,13 @@ export interface WebhookTestPreview {
     headers: Record<string, string>;
     body: string;
     payload: Record<string, unknown>;
-    [key: string]: unknown;
+    event: string;
+    event_id: string;
+    kind: WebhookDeliveryKind;
+    merchant_id: number;
+    subject_type: WebhookDeliverySubjectType | null;
+    subject_id: number | null;
+    webhook_url_id: number;
 }
 /** `code` values of a refused test send, replay or list. */
 export type WebhookDeliveryErrorCode = 'webhook_not_found' | 'delivery_not_found' | 'subject_not_found' | 'unsupported_event' | 'invalid_source' | 'source_not_allowed' | 'subject_required' | 'subject_has_no_booking' | 'invalid_status' | 'endpoint_has_no_merchant' | 'merchant_has_no_credentials' | 'no_signing_secret' | 'unsupported_endpoint' | 'not_replayable' | 'rate_limited' | 'worker_unavailable' | 'rate_limiter_unavailable';

@@ -34,7 +34,7 @@ describe('webhook delivery log, test events and replays (INK-1118)', () => {
 
   test('deliveries list, get and replay', async () => {
     const sdk = new InkressSDK(config);
-    const get = ok({ entries: [delivery], pagination: { page: 1, page_size: 25, total_entries: 1, total_pages: 1 } });
+    const get = ok({ entries: [delivery], pagination: { page: 1, page_size: 25, total_entries: 1, total_pages: 1, more: false } });
     const post = ok({ ...delivery, id: 10, replay_of_id: 9 });
     mockClient(sdk.webhookDeliveries, { get, post });
 

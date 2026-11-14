@@ -1,4 +1,4 @@
-import { InkressSDK } from '../index';
+import { InkressSDK, TEST_TRANSACTION_HEADER, isTestTransactionWebhook } from '../index';
 import type {
   CheckoutSession,
   CreateCheckoutSessionResponseData,
@@ -73,5 +73,17 @@ describe('test transactions (INK-1591)', () => {
     };
     await sdk.orders.create(data);
     expect(post).toHaveBeenLastCalledWith('/orders', expect.objectContaining({ test: true }));
+  });
+});
+
+describe('test-transaction webhook header (INK-1591)', () => {
+  test('the test-transaction header is read exactly', () => {
+    expect(TEST_TRANSACTION_HEADER).toBe('X-Inkress-Test-Transaction');
+    expect(isTestTransactionWebhook({ headers: { 'x-inkress-test-transaction': 'true' } })).toBe(true);
+    expect(isTestTransactionWebhook({ headers: { 'X-Inkress-Test-Transaction': 'true' } })).toBe(true);
+    for (const value of ['TRUE', '1', 'false', '', undefined, ['true']]) {
+      expect(isTestTransactionWebhook({ headers: { 'x-inkress-test-transaction': value } })).toBe(false);
+    }
+    expect(isTestTransactionWebhook({ headers: {} })).toBe(false);
   });
 });

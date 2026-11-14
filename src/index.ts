@@ -166,6 +166,7 @@ export type {
   WebhookVerificationOptions,
   IncomingWebhookRequest,
 } from './resources/webhook-urls';
+export { TEST_TRANSACTION_HEADER, isTestTransactionWebhook } from './resources/webhook-urls';
 
 // Export KYC document requirements types and constants
 export {

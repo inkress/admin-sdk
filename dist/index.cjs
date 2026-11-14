@@ -4863,6 +4863,20 @@ try {
 catch (_a) {
     // Fallback for environments without Node.js crypto
 }
+/** Header Inkress sends, with the value `true`, on every webhook about a test transaction. */
+const TEST_TRANSACTION_HEADER = 'X-Inkress-Test-Transaction';
+/**
+ * `true` when the request carries `X-Inkress-Test-Transaction: true` (header name matched without
+ * regard to case). A test was never charged: check this (or the body's `test`) before fulfilling.
+ * Any other value, a repeated header or no header means a live event.
+ */
+function isTestTransactionWebhook(request) {
+    const name = TEST_TRANSACTION_HEADER.toLowerCase();
+    const key = Object.keys(request.headers).find((header) => header.toLowerCase() === name);
+    if (key === undefined)
+        return false;
+    return request.headers[key] === 'true';
+}
 class WebhookUrlsResource {
     constructor(client) {
         this.client = client;
@@ -6065,6 +6079,7 @@ exports.SavedCardChargeInProgressError = SavedCardChargeInProgressError;
 exports.SavedCardChargePendingError = SavedCardChargePendingError;
 exports.SavedCardChargeRefusedError = SavedCardChargeRefusedError;
 exports.SubscriptionQueryBuilder = SubscriptionQueryBuilder;
+exports.TEST_TRANSACTION_HEADER = TEST_TRANSACTION_HEADER;
 exports.TOKEN_FIELD_TYPES = TOKEN_FIELD_TYPES;
 exports.TRANSACTION_ENTRY_FIELD_TYPES = TRANSACTION_ENTRY_FIELD_TYPES;
 exports.TokenQueryBuilder = TokenQueryBuilder;
@@ -6075,5 +6090,6 @@ exports.WEBHOOK_URL_FIELD_TYPES = WEBHOOK_URL_FIELD_TYPES;
 exports.WebhookUrlQueryBuilder = WebhookUrlQueryBuilder;
 exports.default = InkressSDK;
 exports.isSubscriptionChargeQueued = isSubscriptionChargeQueued;
+exports.isTestTransactionWebhook = isTestTransactionWebhook;
 exports.processQuery = processQuery;
 //# sourceMappingURL=index.cjs.map

@@ -4859,6 +4859,20 @@ try {
 catch (_a) {
     // Fallback for environments without Node.js crypto
 }
+/** Header Inkress sends, with the value `true`, on every webhook about a test transaction. */
+const TEST_TRANSACTION_HEADER = 'X-Inkress-Test-Transaction';
+/**
+ * `true` when the request carries `X-Inkress-Test-Transaction: true` (header name matched without
+ * regard to case). A test was never charged: check this (or the body's `test`) before fulfilling.
+ * Any other value, a repeated header or no header means a live event.
+ */
+function isTestTransactionWebhook(request) {
+    const name = TEST_TRANSACTION_HEADER.toLowerCase();
+    const key = Object.keys(request.headers).find((header) => header.toLowerCase() === name);
+    if (key === undefined)
+        return false;
+    return request.headers[key] === 'true';
+}
 class WebhookUrlsResource {
     constructor(client) {
         this.client = client;
@@ -6022,5 +6036,5 @@ class InkressSDK {
     }
 }
 
-export { ADDRESS_FIELD_TYPES, AddressQueryBuilder, BILLING_PLAN_FIELD_TYPES, BUSINESS_CLOSED_CODE, BillingPlanQueryBuilder, CATEGORY_FIELD_TYPES, CURRENCY_FIELD_TYPES, CategoryQueryBuilder, CurrencyQueryBuilder, EXCHANGE_RATE_FIELD_TYPES, ExchangeRateQueryBuilder, FEE_FIELD_TYPES, FINANCIAL_ACCOUNT_FIELD_TYPES, FINANCIAL_REQUEST_FIELD_TYPES, FeeQueryBuilder, FinancialAccountQueryBuilder, FinancialRequestQueryBuilder, HttpClient, InkressApiError, InkressSDK, KYC_DOCUMENT_REQUIREMENTS, MERCHANT_FIELD_TYPES, MerchantQueryBuilder, ORDER_FIELD_TYPES, OrderQueryBuilder, OrderRefundPendingError, PAYMENT_LINK_FIELD_TYPES, PAYMENT_METHOD_FIELD_TYPES, PRODUCT_FIELD_TYPES, PaymentLinkQueryBuilder, PaymentMethodQueryBuilder, ProductQueryBuilder, QueryBuilder, SUBSCRIPTION_FIELD_TYPES, SavedCardAlreadyRemovedError, SavedCardChargeInProgressError, SavedCardChargePendingError, SavedCardChargeRefusedError, SubscriptionQueryBuilder, TOKEN_FIELD_TYPES, TRANSACTION_ENTRY_FIELD_TYPES, TokenQueryBuilder, TransactionEntryQueryBuilder, USER_FIELD_TYPES, UserQueryBuilder, WEBHOOK_URL_FIELD_TYPES, WebhookUrlQueryBuilder, InkressSDK as default, isSubscriptionChargeQueued, processQuery };
+export { ADDRESS_FIELD_TYPES, AddressQueryBuilder, BILLING_PLAN_FIELD_TYPES, BUSINESS_CLOSED_CODE, BillingPlanQueryBuilder, CATEGORY_FIELD_TYPES, CURRENCY_FIELD_TYPES, CategoryQueryBuilder, CurrencyQueryBuilder, EXCHANGE_RATE_FIELD_TYPES, ExchangeRateQueryBuilder, FEE_FIELD_TYPES, FINANCIAL_ACCOUNT_FIELD_TYPES, FINANCIAL_REQUEST_FIELD_TYPES, FeeQueryBuilder, FinancialAccountQueryBuilder, FinancialRequestQueryBuilder, HttpClient, InkressApiError, InkressSDK, KYC_DOCUMENT_REQUIREMENTS, MERCHANT_FIELD_TYPES, MerchantQueryBuilder, ORDER_FIELD_TYPES, OrderQueryBuilder, OrderRefundPendingError, PAYMENT_LINK_FIELD_TYPES, PAYMENT_METHOD_FIELD_TYPES, PRODUCT_FIELD_TYPES, PaymentLinkQueryBuilder, PaymentMethodQueryBuilder, ProductQueryBuilder, QueryBuilder, SUBSCRIPTION_FIELD_TYPES, SavedCardAlreadyRemovedError, SavedCardChargeInProgressError, SavedCardChargePendingError, SavedCardChargeRefusedError, SubscriptionQueryBuilder, TEST_TRANSACTION_HEADER, TOKEN_FIELD_TYPES, TRANSACTION_ENTRY_FIELD_TYPES, TokenQueryBuilder, TransactionEntryQueryBuilder, USER_FIELD_TYPES, UserQueryBuilder, WEBHOOK_URL_FIELD_TYPES, WebhookUrlQueryBuilder, InkressSDK as default, isSubscriptionChargeQueued, isTestTransactionWebhook, processQuery };
 //# sourceMappingURL=index.esm.js.map

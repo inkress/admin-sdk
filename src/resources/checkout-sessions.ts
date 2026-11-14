@@ -64,6 +64,8 @@ export interface CheckoutSessionTotals {
  * Response data from creating a checkout session
  */
 export interface CreateCheckoutSessionResponseData {
+  /** `true` for a test: the card was checked and not charged; never in balances, payouts or totals. */
+  test?: boolean;
   session_id: string;
   reference_id: string;
   status: string;
@@ -122,6 +124,8 @@ export type CheckoutSessionStatus = 'pending' | 'awaiting_payment' | 'completed'
  * Response data from getting a checkout session
  */
 export interface CheckoutSession {
+  /** `true` for a test: the card was checked and not charged; never in balances, payouts or totals. */
+  test?: boolean;
   status: CheckoutSessionStatus;
   title: string;
   currency: CheckoutSessionCurrency;

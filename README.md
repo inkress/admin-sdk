@@ -626,6 +626,27 @@ app.post('/inkress/app-events', express.text({ type: '*/*' }), async (req, res) 
 });
 ```
 
+### Test transactions (INK-1591)
+
+A test order, link or checkout session runs the full payment flow and checks the real card, but is
+never charged and never counts toward balances, payouts or totals. Create one with `test: true` on
+`orders.create`, `paymentLinks.create` or `checkoutSessions.create` (secret key or signed-in
+merchant only). Lists leave tests out unless you pass `include_test: true` (or `test: true` for
+tests only). Every object carries `test`, and every webhook about a test has a top-level
+`test: true` and the header `X-Inkress-Test-Transaction: true`:
+
+```typescript
+import { isTestTransactionWebhook } from '@inkress/admin-sdk';
+
+app.post('/webhooks/inkress', (req, res) => {
+  if (isTestTransactionWebhook(req) || req.body.test === true) {
+    // Not charged: do not ship, fulfil or grant access.
+    return res.sendStatus(200);
+  }
+  // ...
+});
+```
+
 ### Partner activation (INK-760, INK-1512, INK-1532)
 
 For partner platforms, with the partner organisation's credential and no business selected.

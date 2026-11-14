@@ -113,6 +113,7 @@ export declare class InkressSDK {
 export * from './types';
 export * from './client';
 export type { WebhookPayload, WebhookVerificationOptions, IncomingWebhookRequest, } from './resources/webhook-urls';
+export { TEST_TRANSACTION_HEADER, isTestTransactionWebhook } from './resources/webhook-urls';
 export { KYC_DOCUMENT_REQUIREMENTS, type EntityType, type KycDocumentType, type KycDocumentStatus, type KycRequirements, type KycVerifyLink, } from './resources/kyc';
 export { isSubscriptionChargeQueued, type CreateCardUpdateLinkData, type CardUpdateLinkResponse, type ChargeSubscriptionData, type ChargeSubscriptionResponse, type SubscriptionChargeQueued, type SubscriptionChargeSettled, type SubscriptionChargeOutcome, type PlanChangeOutcome, type PlanChangeResolution, type PlanChangeErrorCode, type PlanChangePlanSummary, type PendingPlanChange, type ResolvedPlanChange, type ChangeSubscriptionPlanData, type ChangeSubscriptionPlanResponse, type CancelSubscriptionPlanChangeResponse, type ImmediateUpgradeErrorCode, type ImmediateUpgradeResponse, type OwnerCancelTiming, type OwnerCancelSubscriptionData, type OwnerCancelSubscriptionResponse, type OwnerCancelErrorCode, type SubscriptionGraceResponse, type SubscriptionGraceErrorCode, type PauseSubscriptionData, type SubscriptionPauseResponse, type SubscriptionPauseErrorCode, } from './resources/subscriptions';
 export type { AccessState, AccessSubscription, AccessResult, AccessOptions, } from './resources/access';

@@ -3,6 +3,8 @@ export interface WebhookPayload {
     id: string;
     timestamp: number;
     event: WebhookEvent;
+    /** `true` for a test: the card was checked and not charged; never in balances, payouts or totals. */
+    test?: boolean;
 }
 export interface WebhookVerificationOptions {
     tolerance?: number;

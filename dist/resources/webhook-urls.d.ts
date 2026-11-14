@@ -7,6 +7,8 @@ export interface WebhookPayload {
     id: string;
     timestamp: number;
     event: WebhookEvent;
+    /** `true` for a test: the card was checked and not charged; never in balances, payouts or totals. */
+    test?: boolean;
 }
 export interface WebhookVerificationOptions {
     tolerance?: number;
@@ -15,6 +17,14 @@ export interface IncomingWebhookRequest {
     headers: Record<string, string | string[] | undefined>;
     body?: string | any;
 }
+/** Header Inkress sends, with the value `true`, on every webhook about a test transaction. */
+export declare const TEST_TRANSACTION_HEADER: "X-Inkress-Test-Transaction";
+/**
+ * `true` when the request carries `X-Inkress-Test-Transaction: true` (header name matched without
+ * regard to case). A test was never charged: check this (or the body's `test`) before fulfilling.
+ * Any other value, a repeated header or no header means a live event.
+ */
+export declare function isTestTransactionWebhook(request: Pick<IncomingWebhookRequest, 'headers'>): boolean;
 export declare class WebhookUrlsResource {
     private client;
     constructor(client: HttpClient);

@@ -5,6 +5,27 @@ All notable changes to the Inkress Admin SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-11-14
+
+Test transactions on a live account (INK-1579, INK-1591). A test runs the full payment flow and
+checks the real card, but is never charged and never reaches balances, payouts or totals.
+
+### ✨ Added
+
+- **`test` on read types.** `Order`, `InternalOrder`, `CreateOrderResponseData`, `PaymentLink`,
+  `InternalPaymentLink`, `CheckoutSession`, `CreateCheckoutSessionResponseData` and the webhook
+  bodies (`WebhookEvent`, `WebhookPayload`, `MerchantEventWebhook`) carry `test?: boolean`.
+- **`test` at creation.** `CreateOrderData.test` (and so `checkoutSessions.create`) and
+  `CreatePaymentLinkData.test`. Honoured only with a secret key or a signed-in merchant; set at
+  creation and never changed. Update types do not carry it.
+- **`include_test` / `test` list filters** on `OrderFilterParams` and `PaymentLinkFilterParams`.
+  Lists exclude tests unless asked: `include_test: true` adds them, `test: true` returns only them.
+- **`TEST_TRANSACTION_HEADER` and `isTestTransactionWebhook(request)`.** Every webhook about a test
+  carries `X-Inkress-Test-Transaction: true` and a top-level `test: true`.
+
+A test is never charged: check `test` (or the header) before fulfilling an order, shipping goods
+or granting access.
+
 ## [1.3.0] - 2026-11-01
 
 Brings the SDK up to the commerce-api production surface of October 2026 (INK-1548).

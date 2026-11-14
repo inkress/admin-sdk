@@ -1157,6 +1157,10 @@ export interface TransactionEntryQueryParams {
  * @deprecated Use OrderQueryParams with the query() method instead
  */
 export interface OrderFilterParams extends BaseFilterParams {
+  /** Include test records (excluded by default). */
+  include_test?: boolean;
+  /** Only test records. */
+  test?: boolean;
   search?: string;
   status?: OrderStatus | StatusKey | number;
   kind?: OrderKind | KindKey | number;
@@ -1345,6 +1349,10 @@ export interface SubscriptionFilterParams extends BaseFilterParams {
  * @deprecated Use PaymentLinkQueryParams with the query() method instead
  */
 export interface PaymentLinkFilterParams extends BaseFilterParams {
+  /** Include test records (excluded by default). */
+  include_test?: boolean;
+  /** Only test records. */
+  test?: boolean;
   status?: number;
   kind?: number;
   total?: number;

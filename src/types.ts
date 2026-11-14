@@ -516,6 +516,8 @@ export interface UpdateProductData {
 
 // Order types
 export interface Order {
+  /** `true` for a test: the card was checked and not charged; never in balances, payouts or totals. */
+  test?: boolean;
   id: number;
   reference_id?: string;
   total: number;
@@ -678,6 +680,8 @@ export interface RecordOrderMetaData {
  * Creates a complete order with customer, products, transactions, and payment URLs
  */
 export interface CreateOrderData {
+  /** Create as a test. Honoured only with a secret key or a signed-in merchant; set at creation, never changed. */
+  test?: boolean;
   reference_id: string;
   total: number;
 
@@ -733,6 +737,8 @@ export interface CreateOrderData {
  * Returns formatted order with all associations
  */
 export interface CreateOrderResponseData {
+  /** `true` for a test: the card was checked and not charged; never in balances, payouts or totals. */
+  test?: boolean;
   /** Order identification */
   id: number;
   reference_id: string;
@@ -882,6 +888,8 @@ export interface Customer {
 
 // Payment Link types
 export interface PaymentLink {
+  /** `true` for a test: the card was checked and not charged; never in balances, payouts or totals. */
+  test?: boolean;
   id: number;
   uid: string;
   title: string;
@@ -904,6 +912,8 @@ export interface PaymentLink {
 }
 
 export interface CreatePaymentLinkData {
+  /** Create as a test. Honoured only with a secret key or a signed-in merchant; set at creation, never changed. */
+  test?: boolean;
   title: string;
   description?: string;
   total?: number;
@@ -1511,6 +1521,8 @@ export interface UpdateUserData {
 
 // Webhook types
 export interface WebhookEvent {
+  /** `true` for a test: the card was checked and not charged; never in balances, payouts or totals. */
+  test?: boolean;
   action: string;
   jwt: string;
   webhook_id?: string;
@@ -1767,6 +1779,8 @@ export interface InternalProduct {
 }
 
 export interface InternalOrder {
+  /** `true` for a test: the card was checked and not charged; never in balances, payouts or totals. */
+  test?: boolean;
   id: number;
   reference_id?: string;
   total: number;
@@ -1816,6 +1830,8 @@ export interface InternalUser {
 }
 
 export interface InternalPaymentLink {
+  /** `true` for a test: the card was checked and not charged; never in balances, payouts or totals. */
+  test?: boolean;
   id: number;
   uid: string;
   title: string;
@@ -1994,6 +2010,8 @@ export interface AppDisconnectedWebhook {
 
 /** Body of a signed merchant event. `id` equals the X-Inkress-Webhook-ID header. */
 export interface MerchantEventWebhook<D = Record<string, any>> {
+  /** `true` for a test: the card was checked and not charged; never in balances, payouts or totals. */
+  test?: boolean;
   id: string;
   type: MerchantEventType;
   event: MerchantEventType;
